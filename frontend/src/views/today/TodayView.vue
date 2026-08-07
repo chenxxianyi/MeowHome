@@ -40,6 +40,13 @@ const showEvidence = ref(false)
 
 const currentCat = computed(() => app.currentCat)
 
+/** 杂志期号：一年中的第几天 */
+const dayOfYear = computed(() => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  return Math.floor((now.getTime() - start.getTime()) / 86400000)
+})
+
 const quickRecords = [
   { id: 'feeding', label: '喂食', icon: 'food' },
   { id: 'elimination', label: '排便', icon: 'elimination' },
@@ -166,15 +173,26 @@ onMounted(load)
 
 <template>
   <AppShell>
-    <!-- 顶部：问候语 / 家庭名 / 日期 / 提醒入口 / 猫咪切换器 -->
+    <!-- 报头（Masthead）：刊名 + 日期 + 期号 -->
     <div class="page-header">
+      <div class="masthead">
+        <span
+          class="masthead-mark"
+          aria-hidden="true"
+        ><AppIcon
+          name="catEar"
+          :size="18"
+        /></span>
+        <span class="masthead-name">MEOWHOME · 猫宅家刊</span>
+        <span class="masthead-date">{{ todayDateLabel() }} · 第 {{ dayOfYear }} 期</span>
+      </div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;width:100%;">
         <div>
-          <div style="font-size:var(--font-size-title);font-weight:600;">
+          <div class="greet-title">
             {{ greeting() }}
           </div>
-          <div style="font-size:var(--font-size-assist);color:var(--color-text-tertiary);margin-top:4px;">
-            小家的猫宅 · {{ todayDateLabel() }}
+          <div class="greet-sub">
+            小家的猫宅 · 今日家刊
           </div>
         </div>
         <button
@@ -218,7 +236,10 @@ onMounted(load)
           aria-label="今日状态"
         >
           <div class="status-panel-title">
-            今日状态
+            <AppIcon
+              name="pawPrint"
+              :size="16"
+            /> 今日状态
           </div>
           <template
             v-for="group in statusGroups"
@@ -284,6 +305,10 @@ onMounted(load)
             :class="item.severity"
           >
             <div class="focus-title">
+              <span
+                class="focus-quote-mark"
+                aria-hidden="true"
+              >“</span>
               <AppIcon
                 name="alertTriangle"
                 :size="18"
@@ -405,11 +430,14 @@ onMounted(load)
           </div>
         </section>
 
-        <!-- 快捷记录 -->
+        <!-- 本期速记（杂志目录索引） -->
         <section
           class="quick-record-section"
           aria-label="快捷记录"
         >
+          <div class="section-title">
+            本期速记
+          </div>
           <div class="quick-record-grid">
             <button
               v-for="btn in quickRecords"
