@@ -104,7 +104,7 @@ onMounted(load)
             {{ greeting() }}
           </div>
           <div style="font-size:var(--font-size-assist);color:var(--color-text-tertiary);margin-top:4px;">
-            小家的猫宅 · {{ todayDateLabel }}
+            小家的猫宅 · {{ todayDateLabel() }}
           </div>
         </div>
         <button

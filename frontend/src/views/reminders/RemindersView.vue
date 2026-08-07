@@ -131,7 +131,7 @@ const todayDone = () => reminders.value.filter((r) => r.state === 'done')
                 {{ item.title }}
               </div>
               <div class="reminder-subtitle">
-                {{ item.subtitle }}
+                {{ item.subtitle }} · {{ item.time }}
               </div>
             </div>
           </div>
