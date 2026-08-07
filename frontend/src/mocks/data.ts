@@ -52,7 +52,7 @@ export const mockExpenses: Expense[] = [
 
 export const mockFocusItems: FocusItemData[] = [
   {
-    id: 'f1', catId: 'cat-whit', type: 'vomit', severity: 'warn', title: '小白下午呕吐1次',
+    id: 'f1', catId: 'cat-whit', type: 'vomit', severity: 'danger', title: '小白下午呕吐1次',
     body: '黄色液体，无食物残渣。发生在午餐后约2小时。精神正常，建议继续观察。',
     evidence: ['喂食记录 12:30', '呕吐记录 14:45'],
     actions: [

@@ -21,7 +21,7 @@ export const todayStatusByCat: Record<string, TodayStatusData> = {
     food: { amount: 55, expected: 80, unit: 'g', state: 'warning', label: '早餐食量偏低' },
     water: { amount: 120, expected: 150, unit: 'ml', state: 'normal', label: '饮水正常' },
     elimination: { state: 'normal', label: '排便正常' },
-    vomit: { count: 1, state: 'danger', label: '下午呕吐1次（黄色液体）' },
+    vomit: { count: 1, state: 'danger', label: '下午 14:45 呕吐 1 次（黄色液体）' },
     medication: { state: 'none', label: '无需用药', time: undefined },
     mental: { state: 'normal', label: '精神状态正常' }
   },

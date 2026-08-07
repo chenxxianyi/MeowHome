@@ -110,26 +110,78 @@
   color: var(--color-text-primary);
 }
 
+/* 图标圆底：提升扫读节奏（与 demo 一致） */
 .status-label svg {
   flex-shrink: 0;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  box-sizing: content-box;
+  color: var(--color-text-secondary);
 }
 
 .status-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  max-width: 72%;
   font-size: var(--font-size-body);
   color: var(--color-text-secondary);
   text-align: right;
 }
 
+/* 正常数据降低视觉权重：弱化为三级文字色，不抢注意力 */
 .status-value.normal {
-  color: var(--color-success);
+  color: var(--color-text-tertiary);
 }
 
 .status-value.warning {
   color: var(--color-warning);
+  font-weight: 500;
 }
 
 .status-value.danger {
   color: var(--color-danger);
+  font-weight: 500;
+}
+
+/* 状态徽标：文字 + 颜色，不只靠颜色表达状态 */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  line-height: 18px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+}
+.status-badge.normal {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.status-badge.warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.status-badge.danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* “全部”模式：每只猫的状态块带身份标识，双猫数据不可混淆 */
+.status-cat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-assist);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: var(--space-8) 0 0;
+}
+.status-cat-head + .status-row {
+  padding-top: var(--space-8);
 }
 
 /* === Focus Item === */
@@ -176,8 +228,27 @@
   background: var(--color-bg-subtle);
   font-size: var(--font-size-assist);
   color: var(--color-text-secondary);
-  min-height: 36px;
+  min-height: 44px; /* 触控目标不小于 44×44 */
   cursor: pointer;
+}
+
+/* 提示依据：与具体记录一一对应，可追溯 */
+.focus-evidence {
+  margin: -4px 0 var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-assist);
+  color: var(--color-text-tertiary);
+}
+.focus-evidence-title {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+}
+.focus-evidence-item {
+  padding: 2px 0;
+  line-height: 1.6;
 }
 
 .focus-action-btn.primary {

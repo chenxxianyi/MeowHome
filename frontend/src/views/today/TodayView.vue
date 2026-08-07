@@ -7,6 +7,7 @@ import CatSwitcher from '../../components/cat/CatSwitcher.vue'
 import AIResultBadge from '../../components/ai/AIResultBadge.vue'
 import AIEvidencePanel from '../../components/ai/AIEvidencePanel.vue'
 import { useAppStore } from '../../stores/app'
+import { useCatStore } from '../../stores/cat'
 import { services } from '../../services'
 import { greeting, todayDateLabel } from '../../utils/date'
 import type { TodayStatusData } from '../../types'
@@ -14,8 +15,23 @@ import type { FocusItemData, Reminder } from '../../types'
 
 const router = useRouter()
 const app = useAppStore()
+const catStore = useCatStore()
 
-const status = ref<TodayStatusData | null>(null)
+interface StatusRow {
+  icon: string
+  label: string
+  value: string
+  state: string
+  badge: string
+}
+interface StatusGroup {
+  catId: string
+  catName: string
+  avatar?: string
+  rows: StatusRow[]
+}
+
+const statusGroups = ref<StatusGroup[]>([])
 const focusItems = ref<FocusItemData[]>([])
 const aiSummary = ref<any>(null)
 const reminderList = ref<Reminder[]>([])
@@ -23,18 +39,6 @@ const loading = ref(true)
 const showEvidence = ref(false)
 
 const currentCat = computed(() => app.currentCat)
-
-const statusRows = computed(() => {
-  if (!status.value) return []
-  return [
-    { icon: 'food', label: '饮食', value: status.value.food.label, state: status.value.food.state },
-    { icon: 'water', label: '饮水', value: status.value.water.label, state: status.value.water.state },
-    { icon: 'elimination', label: '排便', value: status.value.elimination.label, state: status.value.elimination.state },
-    { icon: 'vomit', label: '呕吐', value: status.value.vomit.state === 'none' ? '无呕吐' : status.value.vomit.label, state: status.value.vomit.state },
-    { icon: 'medication', label: '用药', value: status.value.medication.state === 'none' ? '无需用药' : status.value.medication.label, state: status.value.medication.state },
-    { icon: 'mental', label: '精神', value: status.value.mental.label, state: status.value.mental.state }
-  ]
-})
 
 const quickRecords = [
   { id: 'feeding', label: '喂食', icon: 'food' },
@@ -44,17 +48,60 @@ const quickRecords = [
   { id: 'more', label: '更多', icon: 'more' }
 ]
 
+/** 状态徽标文案：normal→正常，danger→需关注，warning 按行类型给语义 */
+function badgeOf(state: string, warnText: string): string {
+  if (state === 'normal') return '正常'
+  if (state === 'danger') return '需关注'
+  if (state === 'warning') return warnText
+  return ''
+}
+
+function buildRows(status: TodayStatusData): StatusRow[] {
+  return [
+    { icon: 'food', label: '饮食', value: status.food.label, state: status.food.state, badge: badgeOf(status.food.state, '偏低') },
+    { icon: 'water', label: '饮水', value: status.water.label, state: status.water.state, badge: badgeOf(status.water.state, '偏低') },
+    { icon: 'elimination', label: '排便', value: status.elimination.label, state: status.elimination.state, badge: badgeOf(status.elimination.state, '注意') },
+    { icon: 'vomit', label: '呕吐', value: status.vomit.state === 'none' ? '无呕吐' : status.vomit.label, state: status.vomit.state, badge: badgeOf(status.vomit.state, '注意') },
+    {
+      icon: 'medication',
+      label: '用药',
+      value:
+        status.medication.state === 'none'
+          ? '无需用药'
+          : status.medication.label + (status.medication.time ? ' · ' + status.medication.time : ''),
+      state: status.medication.state,
+      badge: status.medication.state === 'none' ? '' : status.medication.state === 'warning' ? '待办' : '需关注'
+    },
+    { icon: 'mental', label: '精神', value: status.mental.label, state: status.mental.state, badge: badgeOf(status.mental.state, '注意') }
+  ]
+}
+
 async function load() {
   loading.value = true
   try {
-    const catId = currentCat.value === 'all' ? 'cat-whit' : currentCat.value
-    const [statusRes, focusRes, aiRes, reminderRes] = await Promise.all([
-      services.getTodayStatus(catId),
+    // 今日状态：单猫 → 该猫；全部 → 两只猫并列，明确显示所属猫咪
+    if (currentCat.value === 'all') {
+      const cats = catStore.cats
+      const results = await Promise.all(cats.map((c) => services.getTodayStatus(c.id)))
+      statusGroups.value = cats.map((c, i) => ({
+        catId: c.id,
+        catName: c.name,
+        avatar: c.avatar,
+        rows: buildRows(results[i].data)
+      }))
+    } else {
+      const res = await services.getTodayStatus(currentCat.value)
+      const cat = catStore.cats.find((c) => c.id === currentCat.value)
+      statusGroups.value = [
+        { catId: currentCat.value, catName: cat?.name || '', avatar: cat?.avatar, rows: buildRows(res.data) }
+      ]
+    }
+
+    const [focusRes, aiRes, reminderRes] = await Promise.all([
       services.getFocusItems(),
       services.getAISummary(),
       services.getReminders('todo')
     ])
-    status.value = statusRes.data
     focusItems.value = focusRes.data
     aiSummary.value = aiRes.data
     reminderList.value = reminderRes.data.filter((r: Reminder) => !app.completedReminders.includes(r.id))
@@ -70,11 +117,19 @@ function onCatSelect(catId: string) {
   load()
 }
 
-function handleFocusAction(action: string) {
+function handleFocusAction(item: FocusItemData, action: string) {
   if (action === 'ai') router.push('/records/ai')
   else if (action === 'view') router.push('/records')
   else if (action === 'observe') router.push('/records')
   else if (action === 'add') router.push('/records/quick/vomit')
+  else if (action === 'done') {
+    focusItems.value = focusItems.value.filter((i) => i.id !== item.id)
+    showToast('已标记完成')
+  } else if (action === 'later') {
+    showToast('已设置稍后提醒（1 小时后）')
+  } else if (action === 'plan') {
+    router.push('/reminders')
+  }
 }
 
 function handleQuickRecord(id: string) {
@@ -89,6 +144,21 @@ function completeReminder(id: string) {
 
 function laterReminder(id: string) {
   reminderList.value = reminderList.value.filter((r) => r.id !== id)
+  showToast('已设置稍后提醒')
+}
+
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+function showToast(msg: string) {
+  let el = document.querySelector('.today-toast') as HTMLElement | null
+  if (!el) {
+    el = document.createElement('div')
+    el.className = 'today-toast'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.classList.add('show')
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el?.classList.remove('show'), 2000)
 }
 
 onMounted(load)
@@ -142,7 +212,7 @@ onMounted(load)
       </div>
 
       <template v-else>
-        <!-- 今日状态：连续状态列表 -->
+        <!-- 今日状态：连续状态列表；"全部"模式下两只猫并列 -->
         <section
           class="status-panel"
           aria-label="今日状态"
@@ -150,22 +220,53 @@ onMounted(load)
           <div class="status-panel-title">
             今日状态
           </div>
-          <div
-            v-for="row in statusRows"
-            :key="row.icon"
-            class="status-row"
+          <template
+            v-for="group in statusGroups"
+            :key="group.catId"
           >
-            <span class="status-label">
-              <AppIcon
-                :name="row.icon as any"
-                :size="18"
-              /> {{ row.label }}
-            </span>
-            <span
-              class="status-value"
-              :class="row.state"
-            >{{ row.value }}</span>
-          </div>
+            <div
+              v-if="statusGroups.length > 1"
+              class="status-cat-head"
+            >
+              <img
+                v-if="group.avatar"
+                class="cat-avatar-sm"
+                :src="group.avatar"
+                :alt="group.catName + '头像'"
+              />
+              <span
+                v-else
+                class="cat-avatar-sm"
+              ><AppIcon
+                name="cat"
+                :size="14"
+              /></span>
+              {{ group.catName }}
+            </div>
+            <div
+              v-for="row in group.rows"
+              :key="group.catId + '-' + row.icon"
+              class="status-row"
+            >
+              <span class="status-label">
+                <AppIcon
+                  :name="row.icon as any"
+                  :size="18"
+                /> {{ row.label }}
+              </span>
+              <span
+                class="status-value"
+                :class="row.state"
+              >
+                {{ row.value }}
+                <span
+                  v-if="row.badge"
+                  class="status-badge"
+                  :class="row.state"
+                >{{ row.badge }}</span>
+              </span>
+            </div>
+          </template>
         </section>
 
         <!-- 需要关注 -->
@@ -191,13 +292,29 @@ onMounted(load)
             <div class="focus-body">
               {{ item.body }}
             </div>
+            <!-- 提示依据：与记录一一对应，可追溯 -->
+            <div
+              v-if="item.evidence.length"
+              class="focus-evidence"
+            >
+              <div class="focus-evidence-title">
+                提示依据
+              </div>
+              <div
+                v-for="ev in item.evidence"
+                :key="ev"
+                class="focus-evidence-item"
+              >
+                {{ ev }}
+              </div>
+            </div>
             <div class="focus-actions">
               <button
                 v-for="action in item.actions"
                 :key="action.action"
                 class="focus-action-btn"
                 :class="{ primary: action.action === 'ai' }"
-                @click="handleFocusAction(action.action)"
+                @click="handleFocusAction(item, action.action)"
               >
                 {{ action.label }}
               </button>
@@ -312,3 +429,24 @@ onMounted(load)
     </div>
   </AppShell>
 </template>
+
+<style scoped>
+.today-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + var(--safe-bottom));
+  transform: translateX(-50%);
+  background: rgba(45, 41, 37, 0.92);
+  color: #fff;
+  font-size: var(--font-size-assist);
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 90;
+}
+.today-toast.show {
+  opacity: 1;
+}
+</style>
