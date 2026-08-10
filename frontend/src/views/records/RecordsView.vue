@@ -16,6 +16,16 @@ const aiInput = ref(app.aiInput || '')
 const aiLoading = ref(false)
 const aiError = ref('')
 
+const aiExamples = [
+  '小白早上吐了一次黄色的水',
+  '小橘晚饭吃了半罐，喝水正常'
+]
+
+function useAIExample(example: string) {
+  aiInput.value = example
+  aiError.value = ''
+}
+
 // —— 语音输入（Web Speech API，不支持时降级为提示）——
 interface SpeechRecognitionEventLike {
   results: {
@@ -177,79 +187,125 @@ async function parseAI() {
         </div>
       </section>
 
-      <!-- AI 管家：紧凑卡片，说句话即可记录 -->
+      <!-- AI 管家：自然语言优先的记录工作台 -->
       <section
-        class="ai-card"
+        class="ai-assistant"
         aria-label="AI 管家"
       >
-        <div class="ai-card-head">
-          <AppIcon
-            name="ai"
-            :size="20"
+        <div class="ai-assistant-head">
+          <div class="ai-assistant-mark">
+            <AppIcon
+              name="ai"
+              :size="22"
+            />
+          </div>
+          <div class="ai-assistant-heading">
+            <span class="ai-assistant-kicker">AI 智能记录</span>
+            <h2>说一说，管家帮你记</h2>
+          </div>
+        </div>
+
+        <p class="ai-assistant-subtitle">
+          不用先选分类，直接描述发生了什么，AI 会提取时间、事件和数值。
+        </p>
+
+        <div
+          class="ai-example-list"
+          aria-label="输入示例"
+        >
+          <span class="ai-example-label">试试这样说</span>
+          <button
+            v-for="example in aiExamples"
+            :key="example"
+            type="button"
+            class="ai-example-chip"
+            @click="useAIExample(example)"
+          >
+            {{ example }}
+          </button>
+        </div>
+
+        <div
+          class="ai-composer"
+          :class="{ 'is-recording': recording }"
+        >
+          <textarea
+            v-model="aiInput"
+            class="ai-composer-input"
+            rows="3"
+            maxlength="300"
+            :placeholder="recording ? '正在聆听，请说话…' : '例如：小白今天早上没怎么吃，下午吐了一次黄色的水…'"
+            aria-label="AI 自然语言输入"
+            @keydown.ctrl.enter.prevent="parseAI"
+            @keydown.meta.enter.prevent="parseAI"
           />
-          <div>
-            <div class="ai-card-title">
-              AI 管家
-            </div>
-            <div class="ai-card-sub">
-              说句话，自动整理成结构化记录
+          <div class="ai-composer-footer">
+            <span class="ai-composer-hint">Ctrl / ⌘ + Enter 发送</span>
+            <div class="ai-composer-actions">
+              <button
+                type="button"
+                class="ai-voice-btn"
+                :class="{ recording }"
+                :aria-label="recording ? '停止语音输入' : '语音输入'"
+                :aria-pressed="recording"
+                @click="toggleVoiceInput"
+              >
+                <AppIcon
+                  name="mic"
+                  :size="18"
+                />
+                <span>{{ recording ? '停止' : '语音' }}</span>
+              </button>
+              <button
+                type="button"
+                class="ai-submit-btn"
+                :class="{ 'is-loading': aiLoading }"
+                :disabled="!aiInput.trim() || aiLoading"
+                @click="parseAI"
+              >
+                <AppIcon
+                  :name="aiLoading ? 'loading' : 'ai'"
+                  :size="17"
+                />
+                {{ aiLoading ? '正在整理…' : '智能整理' }}
+              </button>
             </div>
           </div>
         </div>
-        <div class="ai-card-input-row">
-          <textarea
-            v-model="aiInput"
-            class="ai-card-input"
-            rows="2"
-            :placeholder="recording ? '正在聆听，请说话…' : '例如：小白早上吐了一次黄色的水…'"
-            aria-label="AI 自然语言输入"
-            @keydown.enter.exact.prevent="parseAI"
-          />
-          <button
-            class="ai-card-mic"
-            :class="{ recording }"
-            :aria-label="recording ? '停止语音输入' : '语音输入'"
-            :aria-pressed="recording"
-            @click="toggleVoiceInput"
-          >
-            <AppIcon
-              name="mic"
-              :size="20"
-            />
-          </button>
-          <button
-            class="btn-primary ai-card-submit"
-            :disabled="!aiInput.trim() || aiLoading"
-            @click="parseAI"
-          >
-            <AppIcon
-              name="ai"
-              :size="16"
-            /> {{ aiLoading ? '解析中…' : '交给管家整理' }}
-          </button>
-        </div>
         <p
           v-if="micError"
-          class="ai-card-error"
+          class="ai-assistant-error"
           aria-live="polite"
         >
           {{ micError }}
         </p>
         <p
           v-if="aiError"
-          class="ai-card-error"
+          class="ai-assistant-error"
           aria-live="polite"
         >
           {{ aiError }}
         </p>
         <button
-          class="ai-card-scan"
+          type="button"
+          class="ai-medical-entry"
           @click="router.push('/medical/upload')"
         >
+          <span class="ai-medical-icon">
+            <AppIcon
+              name="medical"
+              :size="19"
+            />
+          </span>
+          <span class="ai-medical-copy">
+            <strong>导入病历或检查单</strong>
+            <small>拍照扫描，自动提取检查信息</small>
+          </span>
           <AppIcon
-            name="medical"
-            :size="16"
-          /> 病历扫描 · 自动提取检查信息
+            class="ai-medical-arrow"
+            name="chevronRight"
+            :size="18"
+          />
         </button>
       </section>
 
