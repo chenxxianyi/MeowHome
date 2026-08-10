@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: meowhome-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: meowhome
+      MYSQL_USER: meowhome
+      MYSQL_PASSWORD: changeme
+    ports:
+      - "3306:3306"
+    volumes:
+      - meowhome_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uchangeme", "-pchangeme"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  meowhome_mysql_data:

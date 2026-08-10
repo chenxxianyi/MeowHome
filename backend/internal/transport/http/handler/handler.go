@@ -1,0 +1,322 @@
+// Package handler 实现 HTTP 处理层（认证、家庭、猫咪）。
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/meowhome/backend/internal/app"
+	"github.com/meowhome/backend/internal/domain/model"
+	"github.com/meowhome/backend/internal/transport/http/response"
+)
+
+// Handler 聚合所有业务 handler。
+type Handler struct {
+	auth   *app.AuthService
+	family *app.FamilyService
+	cat    *app.CatService
+	member *app.MemberService
+}
+
+// New 创建 handler 集合。
+func New(auth *app.AuthService, family *app.FamilyService, cat *app.CatService, member *app.MemberService) *Handler {
+	return &Handler{
+		auth:   auth,
+		family: family,
+		cat:    cat,
+		member: member,
+	}
+}
+
+// --- Auth Handlers ---
+
+// RegisterRequest 注册请求体。
+type RegisterRequest struct {
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=8"`
+	UserName   string `json:"user_name" binding:"required,min=1,max=64"`
+	FamilyName string `json:"family_name,omitempty"`
+}
+
+// Register 用户注册。
+func (h *Handler) Register(c *gin.Context) {
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	result, err := h.auth.Register(c.Request.Context(), req.Email, req.Password, req.UserName)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.Created(c, result)
+}
+
+// LoginRequest 登录请求体。
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+// Login 用户登录。
+func (h *Handler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	result, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, result)
+}
+
+// RefreshRequest 刷新请求体。
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// Refresh 刷新令牌。
+func (h *Handler) Refresh(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	result, err := h.auth.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, result)
+}
+
+// Logout 登出。
+func (h *Handler) Logout(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	if err := h.auth.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.NoContent(c)
+}
+
+// Me 当前用户（B3 简化版：从 JWT context 返回 userId）。
+func (h *Handler) Me(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	// 此处需要 UserRepo 查询完整用户对象，B3 简化版返回 minimal
+	c.JSON(200, gin.H{
+		"code": "SUCCESS",
+		"data": gin.H{
+			"id": userID,
+		},
+	})
+}
+
+// --- Family Handlers ---
+
+// FamilyCreateRequest 创建家庭请求体。
+type FamilyCreateRequest struct {
+	Name     string `json:"name" binding:"required,min=1"`
+	Timezone string `json:"timezone,omitempty"`
+	Currency string `json:"currency,omitempty"`
+}
+
+// CreateFamily 创建家庭。
+func (h *Handler) CreateFamily(c *gin.Context) {
+	var req FamilyCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	userID, _ := c.Get("user_id")
+	f, err := h.family.CreateFamily(c.Request.Context(), req.Name, req.Timezone, req.Currency, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.Created(c, gin.H{
+		"id":       f.ID,
+		"name":     f.Name,
+		"timezone": f.Timezone,
+		"currency": f.Currency,
+	})
+}
+
+// GetFamily 获取家庭详情。
+func (h *Handler) GetFamily(c *gin.Context) {
+	familyID := c.Param("familyId")
+	userID, _ := c.Get("user_id")
+	f, err := h.family.GetFamily(c.Request.Context(), familyID, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, gin.H{
+		"id":       f.ID,
+		"name":     f.Name,
+		"timezone": f.Timezone,
+		"currency": f.Currency,
+	})
+}
+
+// FamilyUpdateRequest 更新家庭请求体。
+type FamilyUpdateRequest struct {
+	Name     string `json:"name,omitempty"`
+	Timezone string `json:"timezone,omitempty"`
+	Currency string `json:"currency,omitempty"`
+}
+
+// UpdateFamily 更新家庭。
+func (h *Handler) UpdateFamily(c *gin.Context) {
+	var req FamilyUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	familyID := c.Param("familyId")
+	userID, _ := c.Get("user_id")
+	f, err := h.family.UpdateFamily(c.Request.Context(), familyID, userID.(string), req.Name, req.Timezone, req.Currency)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, gin.H{
+		"id":       f.ID,
+		"name":     f.Name,
+		"timezone": f.Timezone,
+		"currency": f.Currency,
+	})
+}
+
+// ListMembers 成员列表。
+func (h *Handler) ListMembers(c *gin.Context) {
+	familyID := c.Param("familyId")
+	userID, _ := c.Get("user_id")
+	members, err := h.family.ListMembers(c.Request.Context(), familyID, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	result := make([]gin.H, len(members))
+	for i, m := range members {
+		result[i] = gin.H{
+			"id":        m.ID,
+			"family_id": m.FamilyID,
+			"user_id":   m.UserID,
+			"role":      m.Role,
+		}
+	}
+	response.OK(c, result)
+}
+
+// --- Cat Handlers ---
+
+// CatCreateRequest 创建猫咪请求体。
+type CatCreateRequest struct {
+	Name   string `json:"name" binding:"required,min=1,max=64"`
+	Breed  string `json:"breed,omitempty"`
+	Gender string `json:"gender,omitempty"`
+}
+
+// CreateCat 创建猫咪。
+func (h *Handler) CreateCat(c *gin.Context) {
+	var req CatCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	familyID := c.Param("familyId")
+	userID, _ := c.Get("user_id")
+	cat, err := h.cat.CreateCat(c.Request.Context(), familyID, req.Name, req.Breed, req.Gender, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.Created(c, catToEnvelope(cat))
+}
+
+// GetCat 获取猫咪详情。
+func (h *Handler) GetCat(c *gin.Context) {
+	catID := c.Param("catId")
+	userID, _ := c.Get("user_id")
+	cat, err := h.cat.GetCat(c.Request.Context(), catID, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, catToEnvelope(cat))
+}
+
+// UpdateCat 更新猫咪。
+func (h *Handler) UpdateCat(c *gin.Context) {
+	var req CatUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Err(c, err)
+		return
+	}
+	catID := c.Param("catId")
+	userID, _ := c.Get("user_id")
+	cat, err := h.cat.UpdateCat(c.Request.Context(), catID, userID.(string), req.Name, req.Breed, req.Gender)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, catToEnvelope(cat))
+}
+
+// CatUpdateRequest 更新猫咪请求体。
+type CatUpdateRequest struct {
+	Name   string `json:"name,omitempty"`
+	Breed  string `json:"breed,omitempty"`
+	Gender string `json:"gender,omitempty"`
+}
+
+// DeleteCat 删除猫咪。
+func (h *Handler) DeleteCat(c *gin.Context) {
+	catID := c.Param("catId")
+	userID, _ := c.Get("user_id")
+	if err := h.cat.DeleteCat(c.Request.Context(), catID, userID.(string)); err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.NoContent(c)
+}
+
+// ListCats 猫咪列表。
+func (h *Handler) ListCats(c *gin.Context) {
+	familyID := c.Param("familyId")
+	userID, _ := c.Get("user_id")
+	cats, err := h.cat.ListCats(c.Request.Context(), familyID, userID.(string))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	result := make([]map[string]any, len(cats))
+	for i, cat := range cats {
+		result[i] = catToEnvelope(cat)
+	}
+	response.OK(c, result)
+}
+
+// catToEnvelope 转换为 JSON 响应格式。
+func catToEnvelope(c *model.Cat) map[string]any {
+	envelope := map[string]any{
+		"id":        c.ID,
+		"family_id": c.FamilyID,
+		"name":      c.Name,
+		"breed":     c.Breed,
+		"gender":    c.Gender,
+		"neutered":  c.Neutered,
+	}
+	if c.AvatarKey != "" {
+		envelope["avatar_key"] = c.AvatarKey
+	}
+	return envelope
+}

@@ -1,0 +1,609 @@
+openapi: 3.0.0
+info:
+  title: MeowHome API
+  version: 0.2.0
+  description: |
+    猫宅 MeowHome 后端 API。移动优先的家庭多猫照护、记录、健康聚合与 AI 辅助。
+    所有业务资源均通过 FamilyScope 授权，时间字段统一返回 RFC 3339（UTC 存储）。
+servers:
+  - url: /api/v1
+    description: 默认前缀
+tags:
+  - name: system
+    description: 系统与健康检查
+  - name: auth
+    description: 认证与会话
+  - name: families
+    description: 家庭与成员
+  - name: cats
+    description: 猫咪档案
+paths:
+  /health/live:
+    get:
+      tags: [system]
+      summary: 存活检查
+      operationId: healthLiveness
+      security: []
+      responses:
+        '200':
+          description: 服务存活
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+  /health/ready:
+    get:
+      tags: [system]
+      summary: 就绪检查
+      operationId: healthReadiness
+      security: []
+      responses:
+        '200':
+          description: 服务就绪
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+  /ping:
+    get:
+      tags: [system]
+      summary: 联通性检查
+      operationId: ping
+      security: []
+      responses:
+        '200':
+          description: pong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  # --- B3 阶段补充：auth / families / cats ---
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: 注册
+      operationId: authRegister
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 登录
+      operationId: authLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: 刷新令牌
+      operationId: authRefresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出
+      operationId: authLogout
+      responses:
+        '204':
+          description: 登出成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /me:
+    get:
+      tags: [auth]
+      summary: 当前用户
+      operationId: authMe
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /families:
+    post:
+      tags: [families]
+      summary: 创建家庭
+      operationId: createFamily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /families/{familyId}:
+    get:
+      tags: [families]
+      summary: 获取家庭
+      operationId: getFamily
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      responses:
+        '200':
+          description: 家庭详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyEnvelope'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [families]
+      summary: 更新家庭
+      operationId: updateFamily
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FamilyEnvelope'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/members:
+    get:
+      tags: [families]
+      summary: 成员列表
+      operationId: listMembers
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      responses:
+        '200':
+          description: 成员列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberListEnvelope'
+  /families/{familyId}/cats:
+    get:
+      tags: [cats]
+      summary: 猫咪列表
+      operationId: listCats
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      responses:
+        '200':
+          description: 猫咪列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatListEnvelope'
+    post:
+      tags: [cats]
+      summary: 创建猫咪
+      operationId: createCat
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatEnvelope'
+  /families/{familyId}/cats/{catId}:
+    get:
+      tags: [cats]
+      summary: 获取猫咪
+      operationId: getCat
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/CatId'
+      responses:
+        '200':
+          description: 猫咪详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [cats]
+      summary: 更新猫咪
+      operationId: updateCat
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/CatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatEnvelope'
+    delete:
+      tags: [cats]
+      summary: 删除猫咪（软删除）
+      operationId: deleteCat
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/CatId'
+      responses:
+        '204':
+          description: 删除成功
+components:
+  parameters:
+    FamilyId:
+      name: familyId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: '01J'
+    CatId:
+      name: catId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: 未认证或令牌失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: 无权访问该家庭资源
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: 资源冲突（如邮箱已注册）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Liveness:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [up]
+        version:
+          type: string
+    Envelope:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          example: OK
+        message:
+          type: string
+        data:
+          description: 业务数据
+        request_id:
+          type: string
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_FAILED
+        message:
+          type: string
+        request_id:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [email, password, user_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        user_name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        family_name:
+          type: string
+          description: 首次注册时创建的家庭名称
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+    AuthResult:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: 访问令牌有效期（秒）
+        user:
+          $ref: '#/components/schemas/User'
+    AuthEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AuthResult'
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        user_name:
+          type: string
+        family_id:
+          type: string
+        member_id:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        timezone:
+          type: string
+    UserEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/User'
+    Family:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        timezone:
+          type: string
+        currency:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+    FamilyCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        timezone:
+          type: string
+          default: Asia/Shanghai
+        currency:
+          type: string
+          default: CNY
+    FamilyUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        timezone:
+          type: string
+        currency:
+          type: string
+        avatar_url:
+          type: string
+    FamilyEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Family'
+    Member:
+      type: object
+      properties:
+        id:
+          type: string
+        family_id:
+          type: string
+        user_id:
+          type: string
+        user_name:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+    MemberListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Member'
+    Cat:
+      type: object
+      properties:
+        id:
+          type: string
+        family_id:
+          type: string
+        name:
+          type: string
+        breed:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, unknown]
+          nullable: true
+        birth_date:
+          type: string
+          format: date
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+    CatCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        breed:
+          type: string
+        gender:
+          type: string
+          enum: [male, female, unknown]
+        birth_date:
+          type: string
+          format: date
+        color:
+          type: string
+    CatUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        breed:
+          type: string
+        gender:
+          type: string
+          enum: [male, female, unknown]
+        birth_date:
+          type: string
+          format: date
+        color:
+          type: string
+        avatar_key:
+          type: string
+    CatEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Cat'
+    CatListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Cat'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []

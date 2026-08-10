@@ -257,6 +257,9 @@ onMounted(async () => {
                   :class="[`type-${event.type}`, { featured: index === 0 }]"
                 >
                   <div class="moments-memory-visual">
+                    <span class="moments-memory-index">
+                      NO. {{ String(index + 1).padStart(2, '0') }}
+                    </span>
                     <span class="moments-memory-icon">
                       <AppIcon
                         :name="eventIcon(event.type)"
