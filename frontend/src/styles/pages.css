@@ -786,47 +786,207 @@
 }
 
 /* === Records Page === */
-.ai-input-section {
-  background: transparent;
-  border-radius: 0;
-  padding: 0;
-  margin-bottom: var(--space-20);
+.records-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
 }
 
-.ai-input-label {
+.records-header .cat-switcher {
+  margin-top: 0;
+}
+
+.records-section-title {
   font-size: var(--font-size-assist);
   color: var(--color-text-tertiary);
-  margin-bottom: var(--space-8);
-  display: block;
+  font-weight: 500;
+  margin-bottom: var(--space-12);
+  padding-left: var(--space-4);
 }
 
-.ai-input-row {
+/* 常用记录：首屏大卡片（主路径） */
+.records-hero {
+  margin-bottom: var(--space-24);
+}
+
+.record-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-12);
+}
+
+.record-hero-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-10);
+  padding: var(--space-16) var(--space-8);
+  min-height: 96px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.record-hero-btn:active {
+  transform: scale(0.97);
+}
+
+.record-hero-btn svg {
+  width: 26px;
+  height: 26px;
+  color: var(--color-brand);
+}
+
+.record-hero-btn span {
+  font-size: var(--font-size-assist);
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+/* AI 管家：紧凑卡片 */
+.ai-card {
+  margin: var(--space-4) 0 var(--space-24);
+  padding: var(--space-16);
+  background: var(--color-ai-bg);
+  border: 1px solid var(--color-ai-border);
+  border-radius: var(--radius-lg);
+}
+
+.ai-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.ai-card-head > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--color-ai-accent);
+}
+
+.ai-card-title {
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-ai-text);
+}
+
+.ai-card-sub {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.ai-card-input-row {
   display: flex;
   gap: var(--space-8);
   align-items: flex-end;
 }
 
-.ai-input-field {
+.ai-card-input {
   flex: 1;
-  min-height: 88px;
+  min-width: 0;
+  min-height: 64px;
   padding: var(--space-12);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-ai-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-page);
-  font-size: var(--font-size-body);
-  resize: none;
-  line-height: 1.5;
-}
-
-.ai-input-field:focus {
-  outline: none;
-  border-color: var(--color-brand);
   background: var(--color-bg-surface);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  resize: none;
 }
 
-.ai-input-actions {
-  display: flex;
-  gap: var(--space-8);
+.ai-card-input:focus {
+  outline: none;
+  border-color: var(--color-ai-accent);
+}
+
+/* 语音输入 */
+.ai-card-mic {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-ai-border);
+  background: var(--color-bg-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ai-accent);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ai-card-mic svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ai-card-mic.recording {
+  background: var(--color-ai-accent);
+  border-color: var(--color-ai-accent);
+  color: #fff;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+.ai-card-input-row:has(.ai-card-mic.recording) .ai-card-input {
+  border-color: var(--color-ai-accent);
+}
+
+@keyframes mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(123, 104, 174, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(123, 104, 174, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-card-mic.recording {
+    animation: none;
+  }
+}
+
+.ai-card-submit {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  font-size: var(--font-size-assist);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-card-error {
+  margin-top: var(--space-8);
+  font-size: var(--font-size-caption);
+  color: var(--color-danger);
+}
+
+.ai-card-scan {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-12);
+  padding: var(--space-4) 0;
+  border: none;
+  background: none;
+  font-size: var(--font-size-caption);
+  color: var(--color-ai-text);
+  cursor: pointer;
+}
+
+.ai-card-scan svg {
+  width: 16px;
+  height: 16px;
 }
 
 .ai-action-btn {
@@ -847,6 +1007,7 @@
   height: 20px;
 }
 
+/* 更多记录：弱化分组 */
 .record-type-section {
   margin-bottom: var(--space-24);
 }
@@ -855,8 +1016,6 @@
   font-size: var(--font-size-assist);
   color: var(--color-text-tertiary);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   margin-bottom: var(--space-12);
   padding-left: var(--space-4);
 }
@@ -864,19 +1023,19 @@
 .record-type-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-12);
+  gap: var(--space-8);
 }
 
 .record-type-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-16) var(--space-8);
-  border-radius: 0;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-4);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s ease;
-  min-height: 88px;
+  min-height: 76px;
   justify-content: center;
 }
 
@@ -885,13 +1044,13 @@
 }
 
 .record-type-btn svg {
-  width: 24px;
-  height: 24px;
-  color: var(--color-brand);
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
 }
 
 .record-type-btn span {
-  font-size: var(--font-size-assist);
+  font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
   text-align: center;
 }

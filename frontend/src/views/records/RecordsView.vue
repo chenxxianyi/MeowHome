@@ -1,35 +1,143 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import AppShell from '../../components/app/AppShell.vue'
 import AppIcon from '../../components/app/AppIcon.vue'
-import AIResultBadge from '../../components/ai/AIResultBadge.vue'
+import CatSwitcher from '../../components/cat/CatSwitcher.vue'
 import { useAppStore } from '../../stores/app'
 import { services } from '../../services'
 import { mockRecordTypes } from '../../mocks/data'
-import type { RecordTypeGroup } from '../../types'
 
 const router = useRouter()
 const app = useAppStore()
-const recordType = ref('feeding')
-const recordTypes = ref<RecordTypeGroup>(mockRecordTypes)
-const aiInput = ref('')
-const aiResult = ref<any>(null)
+
+// 从 AI 确认页“返回修改”回来时，保留上次输入以便继续编辑
+const aiInput = ref(app.aiInput || '')
 const aiLoading = ref(false)
-const showAI = ref(false)
+const aiError = ref('')
+
+// —— 语音输入（Web Speech API，不支持时降级为提示）——
+interface SpeechRecognitionEventLike {
+  results: {
+    length: number
+    [index: number]: {
+      isFinal: boolean
+      length: number
+      [index: number]: { transcript: string }
+    }
+  }
+}
+interface SpeechRecognitionErrorEventLike {
+  error: string
+}
+interface SpeechRecognitionLike {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onend: (() => void) | null
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
+  start(): void
+  stop(): void
+  abort(): void
+}
+type SpeechRecognitionCtorLike = new () => SpeechRecognitionLike
+
+const win = window as {
+  SpeechRecognition?: SpeechRecognitionCtorLike
+  webkitSpeechRecognition?: SpeechRecognitionCtorLike
+}
+const recognitionCtor = win.SpeechRecognition || win.webkitSpeechRecognition
+
+const recording = ref(false)
+const recognition = ref<SpeechRecognitionLike | null>(null)
+const micError = ref('')
+
+function toggleVoiceInput() {
+  micError.value = ''
+  if (recording.value) {
+    recognition.value?.stop()
+    return
+  }
+  if (!recognitionCtor) {
+    micError.value = '当前浏览器不支持语音输入，请使用 Chrome / Edge，或直接手动输入'
+    return
+  }
+  const rec = new recognitionCtor()
+  rec.lang = 'zh-CN'
+  rec.interimResults = true
+  rec.continuous = false
+  // 录音开始时保留输入框已有内容作为前缀
+  const baseText = aiInput.value.trim()
+  rec.onresult = (event) => {
+    let finalText = ''
+    let interimText = ''
+    for (let i = 0; i < event.results.length; i++) {
+      const result = event.results[i]
+      const transcript = result[0]?.transcript ?? ''
+      if (result.isFinal) finalText += transcript
+      else interimText += transcript
+    }
+    aiInput.value = [baseText, finalText, interimText].filter(Boolean).join(' ')
+  }
+  rec.onend = () => {
+    if (recognition.value !== rec) return
+    recording.value = false
+  }
+  rec.onerror = (event) => {
+    if (recognition.value !== rec) return
+    recording.value = false
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      micError.value = '麦克风权限被拒绝，请在浏览器设置中允许后重试'
+    } else if (event.error === 'no-speech') {
+      micError.value = '没有听到声音，请靠近麦克风再试'
+    } else if (event.error === 'network') {
+      micError.value = '语音识别服务连接失败，请检查网络后重试'
+    } else {
+      micError.value = '语音识别出错，请重试'
+    }
+  }
+  recognition.value = rec
+  rec.start()
+  recording.value = true
+}
+
+onBeforeUnmount(() => {
+  recognition.value?.abort()
+})
+
+// 常用（高频）记录：主路径，首屏大卡片
+const commonTypes = computed(() => mockRecordTypes.high)
+
+// 其余分类弱化为两个分组
+const moreGroups = computed(() => [
+  { key: 'health', title: '健康', items: mockRecordTypes.health },
+  { key: 'life', title: '生活', items: mockRecordTypes.life }
+])
 
 function selectType(type: string) {
   router.push(`/records/quick/${type}`)
 }
 
 async function parseAI() {
-  if (!aiInput.value.trim()) return
+  if (!aiInput.value.trim() || aiLoading.value) return
   aiLoading.value = true
+  aiError.value = ''
+  app.setAIState(aiInput.value, null, true)
   try {
     const res = await services.parseAI(aiInput.value)
-    aiResult.value = res.data
-    showAI.value = true
-  } finally {
+    if (res.success) {
+      app.setAIState(aiInput.value, res.data, false)
+      aiLoading.value = false
+      router.push('/records/ai/confirm')
+    } else {
+      aiError.value = '没有识别到有效内容，请补充描述后重试'
+      app.setAIState(aiInput.value, null, false)
+      aiLoading.value = false
+    }
+  } catch {
+    aiError.value = 'AI 服务暂时不可用，可先使用下方分类手动记录'
+    app.setAIState(aiInput.value, null, false)
     aiLoading.value = false
   }
 }
@@ -37,60 +145,80 @@ async function parseAI() {
 
 <template>
   <AppShell>
-    <div class="page-header">
+    <div class="page-header records-header">
       <div class="page-title">
         记录
       </div>
+      <CatSwitcher />
     </div>
 
     <div class="page-content">
-      <!-- AI 自然语言输入，复用 demo 结构 -->
-      <section class="ai-input-section">
-        <label
-          class="ai-input-label"
-          for="ai-natural-input"
-        >告诉猫宅管家，猫咪今天发生了什么…</label>
-        <div class="ai-input-row">
+      <!-- 常用记录：主路径，首屏直达 -->
+      <section
+        class="records-hero"
+        aria-label="常用记录"
+      >
+        <div class="records-section-title">
+          常用
+        </div>
+        <div class="record-hero-grid">
+          <button
+            v-for="item in commonTypes"
+            :key="item.id"
+            class="record-hero-btn"
+            @click="selectType(item.id)"
+          >
+            <AppIcon
+              :name="item.icon"
+              :size="26"
+            />
+            <span>{{ item.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- AI 管家：紧凑卡片，说句话即可记录 -->
+      <section
+        class="ai-card"
+        aria-label="AI 管家"
+      >
+        <div class="ai-card-head">
+          <AppIcon
+            name="ai"
+            :size="20"
+          />
+          <div>
+            <div class="ai-card-title">
+              AI 管家
+            </div>
+            <div class="ai-card-sub">
+              说句话，自动整理成结构化记录
+            </div>
+          </div>
+        </div>
+        <div class="ai-card-input-row">
           <textarea
-            id="ai-natural-input"
             v-model="aiInput"
-            class="ai-input-field"
-            rows="3"
-            placeholder="例如：小白今天早上没怎么吃，下午吐了一次黄色的水…"
+            class="ai-card-input"
+            rows="2"
+            :placeholder="recording ? '正在聆听，请说话…' : '例如：小白早上吐了一次黄色的水…'"
             aria-label="AI 自然语言输入"
+            @keydown.enter.exact.prevent="parseAI"
           />
           <button
-            class="ai-action-btn"
-            aria-label="拍照"
-            @click="router.push('/medical/upload')"
+            class="ai-card-mic"
+            :class="{ recording }"
+            :aria-label="recording ? '停止语音输入' : '语音输入'"
+            :aria-pressed="recording"
+            @click="toggleVoiceInput"
           >
             <AppIcon
-              name="camera"
+              name="mic"
               :size="20"
             />
           </button>
           <button
-            class="ai-action-btn"
-            aria-label="上传图片"
-            @click="router.push('/medical/upload')"
-          >
-            <AppIcon
-              name="upload"
-              :size="20"
-            />
-          </button>
-          <button
-            class="ai-action-btn"
-            aria-label="病历扫描"
-            @click="router.push('/medical/upload')"
-          >
-            <AppIcon
-              name="medical"
-              :size="20"
-            />
-          </button>
-          <button
-            class="btn-primary ai-submit"
+            class="btn-primary ai-card-submit"
             :disabled="!aiInput.trim() || aiLoading"
             @click="parseAI"
           >
@@ -100,88 +228,50 @@ async function parseAI() {
             /> {{ aiLoading ? '解析中…' : '交给管家整理' }}
           </button>
         </div>
+        <p
+          v-if="micError"
+          class="ai-card-error"
+          aria-live="polite"
+        >
+          {{ micError }}
+        </p>
+        <p
+          v-if="aiError"
+          class="ai-card-error"
+          aria-live="polite"
+        >
+          {{ aiError }}
+        </p>
+        <button
+          class="ai-card-scan"
+          @click="router.push('/medical/upload')"
+        >
+          <AppIcon
+            name="medical"
+            :size="16"
+          /> 病历扫描 · 自动提取检查信息
+        </button>
       </section>
 
-      <!-- AI 解析结果 -->
-      <div
-        v-if="showAI && aiResult"
-        class="ai-confirm-section"
-      >
-        <AIResultBadge />
-        <div class="ai-confirm-list">
-          <div
-            v-for="rec in aiResult.records"
-            :key="rec.id"
-            class="ai-record-card"
-          >
-            <div class="ai-record-header">
-              <div class="ai-record-type">
-                {{ rec.type === 'feeding' ? '喂食' : rec.type === 'vomit' ? '呕吐' : '用药' }}
-                <span class="cat-tag">{{ rec.catId === 'cat-whit' ? '小白' : '小橘' }}</span>
-              </div>
-              <button class="ai-record-delete">
-                删除
-              </button>
-            </div>
-            <div class="ai-fields">
-              <div
-                v-for="f in rec.fields"
-                :key="f.key"
-                class="ai-field"
-              >
-                <span class="ai-field-label">{{ f.key }}</span>
-                <span
-                  class="ai-field-value"
-                  :class="f.confidence === 'high' ? 'confirmed' : 'unconfirmed'"
-                >
-                  {{ f.value || '—' }}
-                  <span
-                    v-if="f.note"
-                    class="ai-field-note"
-                  >{{ f.note }}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="ai-disclaimer">
-          AI 整理 · 不构成医疗诊断 · 请确认后保存
-        </div>
-        <div class="ai-actions">
-          <button
-            class="btn-secondary"
-            @click="showAI = false"
-          >
-            返回修改
-          </button>
-          <button
-            class="btn-primary"
-            @click="router.push('/records/ai/confirm')"
-          >
-            确认并保存
-          </button>
-        </div>
-      </div>
-
-      <!-- 记录类型 -->
+      <!-- 健康 / 生活：其余分类 -->
       <section
-        v-for="(group, key) in recordTypes"
-        :key="key"
+        v-for="group in moreGroups"
+        :key="group.key"
         class="record-type-section"
       >
         <div class="record-type-group-title">
-          {{ key === 'high' ? '常用' : key === 'health' ? '健康' : '生活' }}
+          {{ group.title }}
         </div>
         <div class="record-type-grid">
           <button
-            v-for="item in group"
+            v-for="item in group.items"
             :key="item.id"
             class="record-type-btn"
             @click="selectType(item.id)"
           >
             <AppIcon
               :name="item.icon"
-              :size="24"
+              :size="20"
             />
             <span>{{ item.label }}</span>
           </button>
@@ -190,26 +280,3 @@ async function parseAI() {
     </div>
   </AppShell>
 </template>
-
-<style scoped>
-.ai-submit { margin-left: auto; width: auto; min-height: 44px; padding: 0 var(--space-20); font-size: var(--font-size-body); display: flex; align-items: center; gap: 6px; }
-.ai-confirm-section { margin-top: var(--space-16); }
-.ai-confirm-list { display: flex; flex-direction: column; gap: var(--space-12); }
-.ai-record-card { background: var(--color-bg-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-lg); padding: var(--space-16); margin-bottom: var(--space-12); position: relative; }
-.ai-record-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-12); }
-.ai-record-type { display: flex; align-items: center; gap: var(--space-8); font-size: var(--font-size-body); font-weight: 500; color: var(--color-text-primary); }
-.ai-record-type svg { width: 18px; height: 18px; color: var(--color-brand); }
-.ai-record-delete { padding: var(--space-4) var(--space-8); font-size: var(--font-size-caption); color: var(--color-danger); border: 1px solid var(--color-danger-soft); border-radius: var(--radius-sm); cursor: pointer; }
-.ai-fields { display: flex; flex-direction: column; gap: 4px; }
-.ai-field { display: flex; justify-content: space-between; padding: var(--space-8) 0; border-bottom: 1px solid var(--color-divider); font-size: var(--font-size-assist); }
-.ai-field:last-child { border-bottom: none; }
-.ai-field-label { color: var(--color-text-tertiary); }
-.ai-field-value { color: var(--color-text-primary); font-weight: 500; text-align: right; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ai-field-value.confirmed { color: var(--color-success); }
-.ai-field-value.unconfirmed { color: var(--color-warning); background: var(--color-warning-soft); padding: 2px 8px; border-radius: var(--radius-sm); }
-.ai-field-note { font-size: 10px; color: var(--color-warning); }
-.ai-disclaimer { font-size: var(--font-size-caption); color: var(--color-text-tertiary); margin-top: var(--space-16); }
-.ai-actions { display: flex; gap: var(--space-12); margin-top: var(--space-16); }
-.ai-actions .btn-primary { flex: 2; margin: 0; }
-.ai-actions .btn-secondary { flex: 1; margin: 0; }
-</style>

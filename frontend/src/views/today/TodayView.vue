@@ -184,7 +184,6 @@ onMounted(load)
           :size="18"
         /></span>
         <span class="masthead-name">MEOWHOME · 猫宅家刊</span>
-        <span class="masthead-date">{{ todayDateLabel() }} · 第 {{ dayOfYear }} 期</span>
       </div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;width:100%;">
         <div>

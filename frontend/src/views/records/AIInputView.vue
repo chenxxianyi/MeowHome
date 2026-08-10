@@ -22,6 +22,7 @@ async function handleParse() {
     const res = await services.parseAI(input.value)
     result.value = res.data
     app.setAIState(input.value, res.data, false)
+    loading.value = false
   } catch {
     loading.value = false
     app.setAIState(input.value, null, false)
