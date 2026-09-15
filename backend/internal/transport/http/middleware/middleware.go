@@ -4,8 +4,8 @@ package middleware
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -30,7 +30,7 @@ func (r *RequestContext) Handle(next gin.HandlerFunc) gin.HandlerFunc {
 		c.Header("X-Request-Id", id)
 
 		start := time.Now()
-		next(c)
+		c.Next() // 执行后续中间件与 handler；此前误传空函数导致日志早于 handler 输出
 
 		fields := []zap.Field{
 			zap.String("request_id", id),
@@ -62,7 +62,7 @@ func Recover(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				stack := fmt.Sprintf("%v", err)
+				stack := string(debug.Stack())
 				logger.Error("panic recovered",
 					zap.Any("error", err),
 					zap.String("stack", stack),

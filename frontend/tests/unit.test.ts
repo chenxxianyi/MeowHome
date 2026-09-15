@@ -30,7 +30,7 @@ describe('date utils', () => {
   })
 })
 
-// —— Mock 数据 ——
+// —— Mock 数据（保留为静态夹具，供图表占位与记录类型常量使用）——
 describe('mock data', () => {
   it('mockCats has at least 2 cats', async () => {
     const { mockCats } = await import('@/mocks/family')
@@ -70,54 +70,119 @@ describe('mock data', () => {
   })
 })
 
-// —— 服务 ——
-describe('services', () => {
-  it('getCats returns data', async () => {
+// —— 响应适配层 ——
+describe('api adapter', () => {
+  it('unwrap 把后端 Envelope 转成 APIResponse', async () => {
+    const { unwrap } = await import('@/api/adapter')
+    const r = unwrap({ code: 'SUCCESS', data: { id: 'x' }, request_id: 'rid-1' })
+    expect(r.success).toBe(true)
+    expect(r.data).toEqual({ id: 'x' })
+    expect(r.requestId).toBe('rid-1')
+  })
+
+  it('unwrap 对非 SUCCESS 返回 success=false', async () => {
+    const { unwrap } = await import('@/api/adapter')
+    expect(unwrap({ code: 'CONFLICT', message: 'dup' }).success).toBe(false)
+  })
+
+  it('toApiError 解析业务错误体', async () => {
+    const { toApiError } = await import('@/api/adapter')
+    const err = toApiError({
+      response: { status: 403, data: { code: 'FAMILY_FORBIDDEN', message: 'access denied' } }
+    })
+    expect(err.status).toBe(403)
+    expect(err.code).toBe('FAMILY_FORBIDDEN')
+    expect(err.isAuthError).toBe(false)
+  })
+
+  it('toApiError 把 401 标记为认证错误', async () => {
+    const { toApiError } = await import('@/api/adapter')
+    const err = toApiError({ response: { status: 401, data: { code: 'TOKEN_EXPIRED' } } })
+    expect(err.isAuthError).toBe(true)
+  })
+
+  it('toApiError 对网络错误给出兜底码', async () => {
+    const { toApiError } = await import('@/api/adapter')
+    expect(toApiError(new Error('boom')).code).toBe('NETWORK_ERROR')
+  })
+})
+
+// —— 后端 DTO → 前端类型 ——
+describe('DTO 映射', () => {
+  it('toCat 由生日推算年龄', async () => {
+    const { toCat } = await import('@/api/endpoints')
+    const cat = toCat({
+      id: 'c1', family_id: 'f1', name: '小白', gender: 'female',
+      breed: '中华田园猫', birthday: '2020-01-01', neutered: true
+    })
+    expect(cat.name).toBe('小白')
+    expect(cat.gender).toBe('female')
+    expect(cat.age).toBeGreaterThanOrEqual(5)
+    expect(cat.neutered).toBe(true)
+  })
+
+  it('toCat 把无法识别的性别归一化为 unknown', async () => {
+    const { toCat } = await import('@/api/endpoints')
+    expect(toCat({ id: 'c1', family_id: 'f1', name: 'x', gender: 'weird' }).gender).toBe('unknown')
+  })
+
+  it('toInventory 保留后端推导的 status，空 expiry 归一为 null', async () => {
+    const { toInventory } = await import('@/api/endpoints')
+    const item = toInventory({
+      id: 'i1', name: '豆腐猫砂', category: '猫砂', quantity: 2, unit: '袋', status: 'low', expiry: ''
+    })
+    expect(item.status).toBe('low')
+    expect(item.expiry).toBeNull()
+  })
+
+  it('toExpense 保留小数金额', async () => {
+    const { toExpense } = await import('@/api/endpoints')
+    const e = toExpense({ id: 'e1', date: '2026-08-01', amount: 168.5, category: '粮食', label: '猫粮' })
+    expect(e.amount).toBe(168.5)
+  })
+
+  it('toReminder 归一化 state 与 catId', async () => {
+    const { toReminder } = await import('@/api/endpoints')
+    const r = toReminder({
+      id: 'r1', catId: '', type: 'medication', title: '服药', subtitle: '', time: '20:00', state: 'done', icon: ''
+    })
+    expect(r.state).toBe('done')
+    expect(r.catId).toBe('both')
+  })
+
+  it('toParseSession 保留字段置信度', async () => {
+    const { toParseSession } = await import('@/api/endpoints')
+    const s = toParseSession({
+      id: 's1', originalInput: 'text', parsedAt: 't', model: 'rule-based-v1',
+      records: [{ id: 'rec-1', type: 'feeding', catId: 'c1', fields: [{ key: 'time', value: '08:00', confidence: 'high' }] }]
+    })
+    expect(s.records[0].fields[0].confidence).toBe('high')
+    expect(s.model).toBe('rule-based-v1')
+  })
+})
+
+// —— 服务层降级（无后端 / 未加入家庭时不抛异常）——
+describe('services 降级行为', () => {
+  it('未加入家庭时 getCats 返回 success=false 与数组兜底', async () => {
     const { services } = await import('@/services')
     const res = await services.getCats()
-    expect(res.success).toBe(true)
+    expect(res.success).toBe(false)
     expect(Array.isArray(res.data)).toBe(true)
   })
 
-  it('getFamily returns data', async () => {
+  it('未加入家庭时 getTodayStatus 返回中性状态', async () => {
     const { services } = await import('@/services')
-    const res = await services.getFamily()
-    expect(res.success).toBe(true)
-    expect(res.data.id).toBeDefined()
+    const res = await services.getTodayStatus('cat-1')
+    expect(res.success).toBe(false)
+    expect(res.data.food.state).toBe('none')
+    expect(res.data.vomit.count).toBe(0)
   })
 
-  it('getReminders with todo filter', async () => {
+  it('未加入家庭时 getReminders 返回空数组', async () => {
     const { services } = await import('@/services')
     const res = await services.getReminders('todo')
-    expect(res.success).toBe(true)
-    expect(res.data.every(r => r.state === 'todo')).toBe(true)
-  })
-
-  it('getAISummary returns evidence', async () => {
-    const { services } = await import('@/services')
-    const res = await services.getAISummary()
-    expect(res.success).toBe(true)
-    expect(res.data.evidence.length).toBeGreaterThan(0)
-  })
-
-  it('parseAI with empty string returns false success', async () => {
-    const { services } = await import('@/services')
-    const res = await services.parseAI('')
     expect(res.success).toBe(false)
-  })
-
-  it('saveRecord returns new id', async () => {
-    const { services } = await import('@/services')
-    const res = await services.saveRecord({ type: 'feeding', food: 'test' })
-    expect(res.success).toBe(true)
-    expect(res.data.id).toContain('rec-')
-  })
-
-  it('completeReminder returns done state', async () => {
-    const { services } = await import('@/services')
-    const res = await services.completeReminder('r1')
-    expect(res.success).toBe(true)
-    expect(res.data.state).toBe('done')
+    expect(res.data).toEqual([])
   })
 })
 
@@ -135,12 +200,35 @@ describe('Pinia stores', () => {
     expect(store.aiInput).toBe('')
   })
 
-  it('cat store', async () => {
+  it('cat store 由接口数据驱动，并自动回落到首只', async () => {
     const { useCatStore } = await import('@/stores/cat')
     const store = useCatStore()
-    expect(store.cats.length).toBeGreaterThanOrEqual(2)
-    store.setCat('cat-oran')
-    expect(store.currentCatId).toBe('cat-oran')
+    expect(store.cats).toEqual([])
+    expect(store.currentCatId).toBe('')
+
+    store.setCats([
+      {
+        id: 'cat-a', name: 'A', gender: 'female', breed: '', birthday: '', age: 1,
+        neutered: false, diseases: [], allergies: [], currentMedication: null,
+        nextVaccine: null, nextDeworm: null
+      }
+    ])
+    expect(store.currentCatId).toBe('cat-a')
+    expect(store.hasCats).toBe(true)
+
+    store.setCat('cat-a')
+    expect(store.activeCatId).toBe('cat-a')
+
+    store.reset()
+    expect(store.cats).toEqual([])
+  })
+
+  it('auth store 初始为未登录，logout 清空状态', async () => {
+    const { useAuthStore } = await import('@/stores/auth')
+    const store = useAuthStore()
+    store.$reset()
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.user).toBeNull()
   })
 
   it('reminder store filter', async () => {
@@ -164,7 +252,7 @@ describe('types', () => {
     const { mockCats } = await import('@/mocks/family')
     const cat = mockCats[0]
     expect(cat.id).toBeDefined()
-    expect(['male', 'female']).toContain(cat.gender)
+    expect(['male', 'female', 'unknown']).toContain(cat.gender)
     expect(cat.age).toBeGreaterThanOrEqual(0)
     expect(typeof cat.neutered).toBe('boolean')
   })

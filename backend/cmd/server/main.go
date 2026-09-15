@@ -53,6 +53,13 @@ func main() {
 	mediaRepo := mysql.NewMediaRepo(db)
 	refreshRepo := mysql.NewRefreshTokenRepo(db)
 	auditRepo := mysql.NewAuditRepo(db)
+	recordRepo := mysql.NewDailyRecordRepo(db)
+	reminderRepo := mysql.NewReminderRepo(db)
+	inventoryRepo := mysql.NewInventoryRepo(db)
+	expenseRepo := mysql.NewExpenseRepo(db)
+	timelineRepo := mysql.NewTimelineRepo(db)
+	aiRepo := mysql.NewAIRepo(db)
+	reportRepo := mysql.NewAnalysisReportRepo(db)
 	_ = mediaRepo
 
 	// 组装应用层
@@ -60,9 +67,14 @@ func main() {
 	familySvc := app.NewFamilyService(familyRepo, memberRepo, userRepo, auditRepo)
 	catSvc := app.NewCatService(catRepo, healthRepo, memberRepo, auditRepo, familyRepo)
 	memberSvc := app.NewMemberService(memberRepo, userRepo, familyRepo)
+	recordSvc := app.NewRecordService(recordRepo, memberRepo, auditRepo)
+	careSvc := app.NewCareService(recordRepo, reminderRepo, catRepo, familyRepo, memberRepo)
+	reminderSvc := app.NewReminderService(reminderRepo, memberRepo)
+	assetSvc := app.NewAssetService(timelineRepo, inventoryRepo, expenseRepo, memberRepo)
+	aiSvc := app.NewAIService(recordRepo, reportRepo, aiRepo, catRepo, memberRepo)
 
 	// 组装 HTTP 层
-	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc)
+	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc)
 	health := &appHealth{db: db}
 	srv.Handler = router.New(cfg, logger, nil, health, hdl)
 

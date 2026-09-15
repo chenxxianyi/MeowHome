@@ -11,6 +11,7 @@ import (
 	"github.com/meowhome/backend/internal/domain/model"
 	"github.com/meowhome/backend/internal/domain/repository"
 	apperr "github.com/meowhome/backend/internal/platform/errors"
+	"github.com/meowhome/backend/internal/platform/token"
 )
 
 // AuthService 认证服务。
@@ -185,19 +186,9 @@ func (s *AuthService) newRefreshToken(ctx context.Context, userID string) (strin
 	return raw, nil
 }
 
-// newAccessToken 生成 JWT（B3 简化版：HMAC 签名带前缀）。
+// newAccessToken 生成签名访问令牌（HMAC-SHA256，载荷为 base64url(JSON)）。
 func (s *AuthService) newAccessToken(user *model.User) (string, error) {
-	now := s.clock().UTC().Unix()
-	exp := now + int64(s.accessTTL.Seconds())
-	payload := map[string]any{
-		"uid": user.ID,
-		"exp": exp,
-		"iat": now,
-	}
-
-	body := hex.EncodeToString(sha256.New().Sum([]byte(structToString(payload))))
-	unsigned := user.ID + "." + body
-	return unsigned + "." + hex.EncodeToString(hmacSign(s.secret, []byte(unsigned))), nil
+	return token.Sign(s.secret, user.ID, s.accessTTL, s.clock().UTC())
 }
 
 func isDuplicate(err error) bool {

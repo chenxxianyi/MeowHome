@@ -2,7 +2,7 @@
 
 export type ID = string
 
-export type Gender = 'female' | 'male'
+export type Gender = 'female' | 'male' | 'unknown'
 
 export type Severity = 'normal' | 'warning' | 'danger'
 

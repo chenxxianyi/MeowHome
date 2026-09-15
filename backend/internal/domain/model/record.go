@@ -1,7 +1,5 @@
 package model
 
-import "time"
-
 // User 用户（根实体，跨家庭）。
 type User struct {
 	Base
@@ -58,18 +56,3 @@ type CatHealthProfile struct {
 }
 
 func (CatHealthProfile) TableName() string { return "cat_health_profiles" }
-
-// Record 统一事件头。
-type Record struct {
-	Base
-	FamilyID   string    `gorm:"index;type:varchar(26);not null"`
-	CatID      string    `gorm:"index;type:varchar(26);not null"`
-	RecordType string    `gorm:"type:varchar(32);not null"`
-	OccurredAt time.Time `gorm:"index;not null"`
-	Source     string    `gorm:"type:varchar(20);default:manual"`
-	Severity   string    `gorm:"type:varchar(20);default:normal"`
-	Title      string    `gorm:"type:varchar(255)"`
-	Note       string    `gorm:"type:text"`
-}
-
-func (Record) TableName() string { return "daily_records" }

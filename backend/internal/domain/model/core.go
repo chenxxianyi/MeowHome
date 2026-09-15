@@ -17,11 +17,15 @@ func (RefreshToken) TableName() string { return "refresh_tokens" }
 // Reminder 提醒规则。
 type Reminder struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	CatID    string `gorm:"type:varchar(26)"`
-	Type     string `gorm:"type:varchar(32);not null"`
-	Title    string `gorm:"type:varchar(255)"`
-	Rule     string `gorm:"type:text"` // cron 或自定义规则 JSON
+	FamilyID  string `gorm:"index;type:varchar(26);not null"`
+	CatID     string `gorm:"type:varchar(64)"` // 猫咪 ID 或 "both"
+	Type      string `gorm:"type:varchar(32);not null"`
+	Title     string `gorm:"type:varchar(255)"`
+	Subtitle  string `gorm:"type:varchar(255)"`
+	TimeLabel string `gorm:"column:time_label;type:varchar(64)"`
+	State     string `gorm:"type:varchar(20);default:todo"`
+	Icon      string `gorm:"type:varchar(64)"`
+	Rule      string `gorm:"type:text"` // cron 或自定义规则 JSON
 }
 
 func (Reminder) TableName() string { return "reminders" }
@@ -75,10 +79,12 @@ func (InventoryTransaction) TableName() string { return "inventory_transactions"
 // Expense 支出。
 type Expense struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	Amount   int64  `gorm:"not null"` // 最小货币单位
-	Category string `gorm:"type:varchar(64)"`
-	Label    string `gorm:"type:varchar(255)"`
+	FamilyID   string   `gorm:"index;type:varchar(26);not null"`
+	OccurredOn string   `gorm:"type:date"`
+	Amount     int64    `gorm:"not null"` // 最小货币单位
+	Category   string   `gorm:"type:varchar(64)"`
+	Label      string   `gorm:"type:varchar(255)"`
+	CatIDs     []string `gorm:"serializer:json;type:text"`
 }
 
 func (Expense) TableName() string { return "expenses" }
@@ -99,11 +105,14 @@ func (Media) TableName() string { return "media_assets" }
 // TimelineEvent 时光事件。
 type TimelineEvent struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	CatIDs   string `gorm:"type:text"`
-	Title    string `gorm:"type:varchar(255)"`
-	Body     string `gorm:"type:text"`
-	MediaID  string `gorm:"type:varchar(26)"`
+	FamilyID   string   `gorm:"index;type:varchar(26);not null"`
+	CatIDs     []string `gorm:"serializer:json;type:text"`
+	Title      string   `gorm:"type:varchar(255)"`
+	Body       string   `gorm:"type:text"`
+	MediaID    string   `gorm:"type:varchar(26)"`
+	EventType  string   `gorm:"type:varchar(32);default:photo"`
+	OccurredOn string   `gorm:"type:date"`
+	ImageCount int      `gorm:"default:0"`
 }
 
 func (TimelineEvent) TableName() string { return "timeline_events" }
@@ -111,10 +120,11 @@ func (TimelineEvent) TableName() string { return "timeline_events" }
 // CatInteraction 猫咪互动。
 type CatInteraction struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	CatIDs   string `gorm:"type:text"`
-	Type     string `gorm:"type:varchar(32)"`
-	Notes    string `gorm:"type:text"`
+	FamilyID   string   `gorm:"index;type:varchar(26);not null"`
+	CatIDs     []string `gorm:"serializer:json;type:text"`
+	Type       string   `gorm:"type:varchar(32)"`
+	Notes      string   `gorm:"type:text"`
+	OccurredOn string   `gorm:"type:date"`
 }
 
 func (CatInteraction) TableName() string { return "cat_interactions" }
@@ -126,6 +136,7 @@ type AIParseSession struct {
 	OriginalInput string `gorm:"type:text"`
 	Status        string `gorm:"type:varchar(20);default:processing"`
 	Model         string `gorm:"type:varchar(120)"`
+	Result        string `gorm:"type:longtext"` // 解析出的记录 JSON
 }
 
 func (AIParseSession) TableName() string { return "ai_parse_sessions" }
@@ -133,9 +144,11 @@ func (AIParseSession) TableName() string { return "ai_parse_sessions" }
 // AnalysisReport AI 分析报告。
 type AnalysisReport struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	CatID    string `gorm:"type:varchar(26)"`
-	Content  string `gorm:"type:text"`
+	FamilyID    string `gorm:"index;type:varchar(26);not null"`
+	CatID       string `gorm:"type:varchar(26)"`
+	RecordCount int    `gorm:"default:0"`
+	Content     string `gorm:"type:text"`
+	Evidence    string `gorm:"type:text"` // 证据列表 JSON
 }
 
 func (AnalysisReport) TableName() string { return "ai_analysis_reports" }

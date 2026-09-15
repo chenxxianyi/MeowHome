@@ -53,7 +53,7 @@ onMounted(async () => {
           <div class="cat-info">
             <div class="cat-name">{{ cat.name }}</div>
             <div class="cat-meta">
-              {{ cat.age }}岁 · {{ cat.gender === 'female' ? '母' : '公' }} · {{ cat.breed }}
+              {{ cat.age }}岁 · {{ cat.gender === 'female' ? '母' : cat.gender === 'male' ? '公' : '未知' }} · {{ cat.breed }}
               {{ cat.neutered ? ' · 已绝育' : '' }}
             </div>
             <span class="cat-status normal">健康</span>

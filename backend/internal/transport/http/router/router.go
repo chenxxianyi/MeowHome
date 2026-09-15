@@ -2,13 +2,17 @@
 package router
 
 import (
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
 	"github.com/meowhome/backend/internal/platform/config"
+	apperr "github.com/meowhome/backend/internal/platform/errors"
+	"github.com/meowhome/backend/internal/platform/token"
 	"github.com/meowhome/backend/internal/transport/http/handler"
 	my "github.com/meowhome/backend/internal/transport/http/middleware"
 	"github.com/meowhome/backend/internal/transport/http/response"
@@ -85,9 +89,11 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
 	protected := v1.Group("")
 	protected.Use(AuthMiddleware(jwtSecret))
 	protected.GET("/me", h.Me)
+	protected.GET("/me/families", h.ListMyFamilies)
 
 	// 家庭与猫咪
 	familyG := protected.Group("/families")
+	familyG.GET("", h.ListMyFamilies)
 	familyG.POST("", h.CreateFamily)
 	familyG.GET("/:familyId", h.GetFamily)
 	familyG.PATCH("/:familyId", h.UpdateFamily)
@@ -97,6 +103,37 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
 	familyG.GET("/:familyId/cats/:catId", h.GetCat)
 	familyG.PATCH("/:familyId/cats/:catId", h.UpdateCat)
 	familyG.DELETE("/:familyId/cats/:catId", h.DeleteCat)
+
+	// 日常记录
+	familyG.GET("/:familyId/records", h.ListRecords)
+	familyG.POST("/:familyId/records", h.CreateRecord)
+	familyG.POST("/:familyId/records/batch", h.CreateRecordBatch)
+
+	// 聚合视图
+	familyG.GET("/:familyId/today", h.TodayStatus)
+	familyG.GET("/:familyId/focus", h.FocusItems)
+	familyG.GET("/:familyId/trends", h.Trends)
+
+	// 提醒
+	familyG.GET("/:familyId/reminders", h.ListReminders)
+	familyG.POST("/:familyId/reminders", h.CreateReminder)
+	familyG.PATCH("/:familyId/reminders/:reminderId/complete", h.CompleteReminder)
+
+	// 时光
+	familyG.GET("/:familyId/moments", h.ListMoments)
+	familyG.POST("/:familyId/moments", h.CreateMoment)
+
+	// 库存
+	familyG.GET("/:familyId/inventory", h.ListInventory)
+	familyG.POST("/:familyId/inventory", h.CreateInventoryItem)
+
+	// 账目
+	familyG.GET("/:familyId/expenses", h.ListExpenses)
+	familyG.POST("/:familyId/expenses", h.CreateExpense)
+
+	// AI
+	familyG.POST("/:familyId/ai/parse", h.ParseAI)
+	familyG.GET("/:familyId/ai/summary", h.AISummary)
 }
 
 func registerV1Placeholder(r *gin.Engine) {
@@ -106,32 +143,38 @@ func registerV1Placeholder(r *gin.Engine) {
 	})
 }
 
-// AuthMiddleware 校验 Bearer JWT 并注入 user_id。
+// AuthMiddleware 校验 Bearer 访问令牌的 HMAC 签名与过期时间，并注入 user_id。
+// 缺失/篡改的令牌返回 AUTH_REQUIRED，过期返回 TOKEN_EXPIRED。
 func AuthMiddleware(secret string) gin.HandlerFunc {
+	key := []byte(secret)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       "AUTH_REQUIRED",
-				"message":    "token required",
-				"request_id": c.GetString("request_id"),
-			})
-			c.Abort()
+			abortUnauthorized(c, apperr.CodeAuthRequired, "token required")
 			return
 		}
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		lines := strings.Split(tokenStr, ".")
-		if len(lines) != 3 {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       "TOKEN_EXPIRED",
-				"message":    "invalid token",
-				"request_id": c.GetString("request_id"),
-			})
-			c.Abort()
+		raw := strings.TrimPrefix(authHeader, "Bearer ")
+
+		claims, err := token.Parse(key, raw, time.Now().UTC())
+		if err != nil {
+			if errors.Is(err, token.ErrExpired) {
+				abortUnauthorized(c, apperr.CodeTokenExpired, "token expired")
+				return
+			}
+			abortUnauthorized(c, apperr.CodeAuthRequired, "invalid token")
 			return
 		}
-		userID := lines[0]
-		c.Set("user_id", userID)
+
+		c.Set("user_id", claims.UserID)
 		c.Next()
 	}
+}
+
+func abortUnauthorized(c *gin.Context, code, message string) {
+	c.JSON(http.StatusUnauthorized, gin.H{
+		"code":       code,
+		"message":    message,
+		"request_id": c.GetString("request_id"),
+	})
+	c.Abort()
 }

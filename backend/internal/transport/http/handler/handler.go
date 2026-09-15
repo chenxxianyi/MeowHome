@@ -11,19 +11,39 @@ import (
 
 // Handler 聚合所有业务 handler。
 type Handler struct {
-	auth   *app.AuthService
-	family *app.FamilyService
-	cat    *app.CatService
-	member *app.MemberService
+	auth     *app.AuthService
+	family   *app.FamilyService
+	cat      *app.CatService
+	member   *app.MemberService
+	record   *app.RecordService
+	care     *app.CareService
+	reminder *app.ReminderService
+	asset    *app.AssetService
+	ai       *app.AIService
 }
 
 // New 创建 handler 集合。
-func New(auth *app.AuthService, family *app.FamilyService, cat *app.CatService, member *app.MemberService) *Handler {
+func New(
+	auth *app.AuthService,
+	family *app.FamilyService,
+	cat *app.CatService,
+	member *app.MemberService,
+	record *app.RecordService,
+	care *app.CareService,
+	reminder *app.ReminderService,
+	asset *app.AssetService,
+	ai *app.AIService,
+) *Handler {
 	return &Handler{
-		auth:   auth,
-		family: family,
-		cat:    cat,
-		member: member,
+		auth:     auth,
+		family:   family,
+		cat:      cat,
+		member:   member,
+		record:   record,
+		care:     care,
+		reminder: reminder,
+		asset:    asset,
+		ai:       ai,
 	}
 }
 
@@ -107,16 +127,31 @@ func (h *Handler) Logout(c *gin.Context) {
 	response.NoContent(c)
 }
 
-// Me 当前用户（B3 简化版：从 JWT context 返回 userId）。
+// Me 当前用户（含家庭归属与角色，供前端解析 familyId）。
 func (h *Handler) Me(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	// 此处需要 UserRepo 查询完整用户对象，B3 简化版返回 minimal
-	c.JSON(200, gin.H{
-		"code": "SUCCESS",
-		"data": gin.H{
-			"id": userID,
-		},
-	})
+	res, err := h.member.Me(c.Request.Context(), mustUserID(c))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, res)
+}
+
+// ListMyFamilies 列出当前用户所属家庭。
+func (h *Handler) ListMyFamilies(c *gin.Context) {
+	list, err := h.member.ListMyFamilies(c.Request.Context(), mustUserID(c))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// mustUserID 取出认证中间件注入的 user_id。
+func mustUserID(c *gin.Context) string {
+	v, _ := c.Get("user_id")
+	s, _ := v.(string)
+	return s
 }
 
 // --- Family Handlers ---
@@ -135,8 +170,8 @@ func (h *Handler) CreateFamily(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	userID, _ := c.Get("user_id")
-	f, err := h.family.CreateFamily(c.Request.Context(), req.Name, req.Timezone, req.Currency, userID.(string))
+	userID := mustUserID(c)
+	f, err := h.family.CreateFamily(c.Request.Context(), req.Name, req.Timezone, req.Currency, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -152,8 +187,8 @@ func (h *Handler) CreateFamily(c *gin.Context) {
 // GetFamily 获取家庭详情。
 func (h *Handler) GetFamily(c *gin.Context) {
 	familyID := c.Param("familyId")
-	userID, _ := c.Get("user_id")
-	f, err := h.family.GetFamily(c.Request.Context(), familyID, userID.(string))
+	userID := mustUserID(c)
+	f, err := h.family.GetFamily(c.Request.Context(), familyID, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -181,8 +216,8 @@ func (h *Handler) UpdateFamily(c *gin.Context) {
 		return
 	}
 	familyID := c.Param("familyId")
-	userID, _ := c.Get("user_id")
-	f, err := h.family.UpdateFamily(c.Request.Context(), familyID, userID.(string), req.Name, req.Timezone, req.Currency)
+	userID := mustUserID(c)
+	f, err := h.family.UpdateFamily(c.Request.Context(), familyID, userID, req.Name, req.Timezone, req.Currency)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -198,8 +233,8 @@ func (h *Handler) UpdateFamily(c *gin.Context) {
 // ListMembers 成员列表。
 func (h *Handler) ListMembers(c *gin.Context) {
 	familyID := c.Param("familyId")
-	userID, _ := c.Get("user_id")
-	members, err := h.family.ListMembers(c.Request.Context(), familyID, userID.(string))
+	userID := mustUserID(c)
+	members, err := h.family.ListMembers(c.Request.Context(), familyID, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -233,8 +268,8 @@ func (h *Handler) CreateCat(c *gin.Context) {
 		return
 	}
 	familyID := c.Param("familyId")
-	userID, _ := c.Get("user_id")
-	cat, err := h.cat.CreateCat(c.Request.Context(), familyID, req.Name, req.Breed, req.Gender, userID.(string))
+	userID := mustUserID(c)
+	cat, err := h.cat.CreateCat(c.Request.Context(), familyID, req.Name, req.Breed, req.Gender, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -245,8 +280,8 @@ func (h *Handler) CreateCat(c *gin.Context) {
 // GetCat 获取猫咪详情。
 func (h *Handler) GetCat(c *gin.Context) {
 	catID := c.Param("catId")
-	userID, _ := c.Get("user_id")
-	cat, err := h.cat.GetCat(c.Request.Context(), catID, userID.(string))
+	userID := mustUserID(c)
+	cat, err := h.cat.GetCat(c.Request.Context(), catID, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -262,8 +297,8 @@ func (h *Handler) UpdateCat(c *gin.Context) {
 		return
 	}
 	catID := c.Param("catId")
-	userID, _ := c.Get("user_id")
-	cat, err := h.cat.UpdateCat(c.Request.Context(), catID, userID.(string), req.Name, req.Breed, req.Gender)
+	userID := mustUserID(c)
+	cat, err := h.cat.UpdateCat(c.Request.Context(), catID, userID, req.Name, req.Breed, req.Gender)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -281,8 +316,8 @@ type CatUpdateRequest struct {
 // DeleteCat 删除猫咪。
 func (h *Handler) DeleteCat(c *gin.Context) {
 	catID := c.Param("catId")
-	userID, _ := c.Get("user_id")
-	if err := h.cat.DeleteCat(c.Request.Context(), catID, userID.(string)); err != nil {
+	userID := mustUserID(c)
+	if err := h.cat.DeleteCat(c.Request.Context(), catID, userID); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -292,8 +327,8 @@ func (h *Handler) DeleteCat(c *gin.Context) {
 // ListCats 猫咪列表。
 func (h *Handler) ListCats(c *gin.Context) {
 	familyID := c.Param("familyId")
-	userID, _ := c.Get("user_id")
-	cats, err := h.cat.ListCats(c.Request.Context(), familyID, userID.(string))
+	userID := mustUserID(c)
+	cats, err := h.cat.ListCats(c.Request.Context(), familyID, userID)
 	if err != nil {
 		response.Err(c, err)
 		return

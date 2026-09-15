@@ -2,9 +2,13 @@
 package response
 
 import (
+	"encoding/json"
+	stderrors "errors"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 
 	"github.com/meowhome/backend/internal/platform/errors"
 )
@@ -59,7 +63,7 @@ func NoContent(c *gin.Context) {
 func Err(c *gin.Context, err error) {
 	appErr, ok := err.(*errors.AppError)
 	if !ok {
-		appErr = errors.Wrap(errors.TypeInternal, "INTERNAL_ERROR", "internal error", err)
+		appErr = classify(err)
 	}
 
 	status := statusFor(appErr)
@@ -68,6 +72,20 @@ func Err(c *gin.Context, err error) {
 		Message:   appErr.Message,
 		RequestID: RequestID(c),
 	})
+}
+
+// classify 把非 AppError（主要是 gin 的绑定/校验错误）归类为协议错误，
+// 否则请求体格式不对会返回 500，而它实际是客户端问题，应当是 400。
+func classify(err error) *errors.AppError {
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	var validationErrs validator.ValidationErrors
+	if stderrors.As(err, &syntaxErr) || stderrors.As(err, &typeErr) ||
+		stderrors.As(err, &validationErrs) ||
+		stderrors.Is(err, io.EOF) || stderrors.Is(err, io.ErrUnexpectedEOF) {
+		return errors.InvalidRequest(errors.CodeInvalidJSON, err.Error())
+	}
+	return errors.Wrap(errors.TypeInternal, "INTERNAL_ERROR", "internal error", err)
 }
 
 // statusFor 将错误类别映射为 HTTP 状态码。
@@ -80,9 +98,10 @@ func statusFor(e *errors.AppError) int {
 		return http.StatusBadRequest
 	case errors.TypeAuth:
 		switch e.Code {
-		case errors.CodeAuthRequired:
-			return http.StatusUnauthorized
-		case errors.CodeTokenExpired:
+		case errors.CodeFamilyForbidden, errors.CodeForbidden:
+			// 已认证但无权访问该家庭资源 —— 必须是 403，不能与「未认证」混为一谈
+			return http.StatusForbidden
+		case errors.CodeAuthRequired, errors.CodeTokenExpired:
 			return http.StatusUnauthorized
 		default:
 			return http.StatusUnauthorized

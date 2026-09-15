@@ -62,22 +62,36 @@ type RefreshTokenRepo interface {
 	RevokeAllForUser(ctx context.Context, userID string) error
 }
 
-// RecordRepo 记录仓储。
-type RecordRepo interface {
-	Create(ctx context.Context, r *model.Record) error
-	FindByID(ctx context.Context, id string) (*model.Record, error)
-	List(ctx context.Context, q RecordQuery) ([]*model.Record, error)
+// DailyRecordRepo 日常记录仓储。
+// 注意：model.Record 与 model.DailyRecord 都映射到 daily_records 表，
+// 这里统一使用 DailyRecord（支持多猫与就诊关联），避免两个模型同名冲突。
+type DailyRecordRepo interface {
+	Create(ctx context.Context, r *model.DailyRecord) error
+	FindByID(ctx context.Context, id string) (*model.DailyRecord, error)
+	ListByFamily(ctx context.Context, q DailyRecordQuery) ([]*model.DailyRecord, error)
+	Delete(ctx context.Context, id string) error
 }
 
-// RecordQuery 记录查询条件。
-type RecordQuery struct {
+// DailyRecordQuery 记录查询条件。
+type DailyRecordQuery struct {
 	FamilyID string
-	CatID    string
-	Types    []string
-	From     string
+	CatID    string   // 命中 cat_ids JSON 数组中的任一元素
+	Types    []string // 空表示不限
+	From     string   // RFC3339 或 YYYY-MM-DD
 	To       string
-	Page     int
-	PageSize int
+	Limit    int
+}
+
+// TimelineRepo 时光事件仓储。
+type TimelineRepo interface {
+	Create(ctx context.Context, e *model.TimelineEvent) error
+	ListByFamily(ctx context.Context, familyID string, limit int) ([]*model.TimelineEvent, error)
+}
+
+// AnalysisReportRepo AI 分析报告仓储。
+type AnalysisReportRepo interface {
+	Create(ctx context.Context, r *model.AnalysisReport) error
+	LatestByFamily(ctx context.Context, familyID string) (*model.AnalysisReport, error)
 }
 
 // HealthRepo 健康聚合仓储。
@@ -113,6 +127,7 @@ type ReminderQuery struct {
 type InventoryRepo interface {
 	Create(ctx context.Context, i *model.InventoryItem) error
 	FindByID(ctx context.Context, id string) (*model.InventoryItem, error)
+	ListByFamily(ctx context.Context, familyID string) ([]*model.InventoryItem, error)
 	Update(ctx context.Context, i *model.InventoryItem) error
 	Delete(ctx context.Context, id string) error
 }

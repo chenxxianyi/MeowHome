@@ -78,3 +78,71 @@ func (s *MemberService) RemoveMember(ctx context.Context, memberID string) error
 	}
 	return nil
 }
+
+// MeResult 当前用户信息（对应 openapi 的 User schema）。
+type MeResult struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	UserName string `json:"user_name"`
+	FamilyID string `json:"family_id,omitempty"`
+	MemberID string `json:"member_id,omitempty"`
+	Role     string `json:"role,omitempty"`
+	Timezone string `json:"timezone,omitempty"`
+}
+
+// MyFamily 用户所属家庭摘要（含其在该家庭中的成员身份）。
+type MyFamily struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Timezone string `json:"timezone"`
+	Currency string `json:"currency"`
+	MemberID string `json:"member_id"`
+	Role     string `json:"role"`
+}
+
+// Me 返回当前用户的完整信息，并附带其首个家庭的归属与角色。
+// 前端登录后需要 family_id 才能访问家庭资源，因此这里必须一并返回。
+func (s *MemberService) Me(ctx context.Context, userID string) (*MeResult, error) {
+	u, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, errors.NotFound(errors.CodeNotFound, "user not found")
+	}
+
+	res := &MeResult{ID: u.ID, Email: u.Email, UserName: u.Name}
+
+	members, err := s.memberRepo.FindByUser(ctx, userID)
+	if err != nil || len(members) == 0 {
+		return res, nil // 尚未加入任何家庭，返回不带归属的用户信息
+	}
+	m := members[0]
+	res.FamilyID = m.FamilyID
+	res.MemberID = m.ID
+	res.Role = m.Role
+	res.Timezone = m.Timezone
+	return res, nil
+}
+
+// ListMyFamilies 列出当前用户所属的全部家庭。
+func (s *MemberService) ListMyFamilies(ctx context.Context, userID string) ([]*MyFamily, error) {
+	members, err := s.memberRepo.FindByUser(ctx, userID)
+	if err != nil {
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to load memberships", err)
+	}
+
+	out := make([]*MyFamily, 0, len(members))
+	for _, m := range members {
+		f, err := s.familyRepo.FindByID(ctx, m.FamilyID)
+		if err != nil {
+			continue // 家庭已被删除时跳过该成员关系
+		}
+		out = append(out, &MyFamily{
+			ID:       f.ID,
+			Name:     f.Name,
+			Timezone: f.Timezone,
+			Currency: f.Currency,
+			MemberID: m.ID,
+			Role:     m.Role,
+		})
+	}
+	return out, nil
+}

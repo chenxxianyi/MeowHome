@@ -2,9 +2,15 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../../components/app/AppIcon.vue'
+import { catApi, toCat } from '../../api/endpoints'
+import { toApiError } from '../../api/adapter'
+import { useAuthStore } from '../../stores/auth'
+import { useCatStore } from '../../stores/cat'
 import { greeting } from '../../utils/date'
 
 const router = useRouter()
+const auth = useAuthStore()
+const catStore = useCatStore()
 const step = ref(1)
 const totalSteps = 5
 
@@ -13,12 +19,42 @@ const cat1 = reactive({ name: '小白', gender: 'female' as const, breed: '中�
 const cat2 = reactive({ name: '小橘', gender: 'male' as const, breed: '中华田园猫', birthday: '', neutered: true, diseases: '', allergies: '' })
 
 const hasSecondCat = ref(false)
+const submitting = ref(false)
+const error = ref('')
 
 function next() { step.value = Math.min(step.value + 1, totalSteps) }
 function prev() { step.value = Math.max(step.value - 1, 1) }
 
-function finish() {
-  router.push('/today')
+// 引导流程必须真正落库：家庭与猫咪都要创建，
+// 否则路由守卫会因为 familyId 为空把用户反复弹回本页。
+async function finish() {
+  if (submitting.value) return
+  submitting.value = true
+  error.value = ''
+  try {
+    const familyId = auth.familyId || (await auth.createFamily(family.name || '我的猫宅'))
+
+    const drafts = [cat1, ...(hasSecondCat.value ? [cat2] : [])].filter((c) => c.name.trim())
+    const created = []
+    for (const d of drafts) {
+      created.push(
+        await catApi.create(familyId, {
+          name: d.name.trim(),
+          breed: d.breed,
+          gender: d.gender,
+          birth_date: d.birthday || undefined
+        })
+      )
+    }
+    if (created.length) {
+      catStore.setCats(created.map(toCat))
+    }
+    await router.push('/today')
+  } catch (e) {
+    error.value = toApiError(e).message
+  } finally {
+    submitting.value = false
+  }
 }
 
 const stepTitles = ['欢迎与创建家庭', '添加第一只猫', '是否添加第二只猫', '健康基础信息', '完成']
@@ -288,9 +324,10 @@ const stepTitles = ['欢迎与创建家庭', '添加第一只猫', '是否添加
         </button>
         <button
           class="btn-primary"
+          :disabled="submitting"
           @click="finish"
         >
-          完成
+          {{ submitting ? '保存中…' : '完成' }}
         </button>
       </div>
     </div>
@@ -319,10 +356,17 @@ const stepTitles = ['欢迎与创建家庭', '添加第一只猫', '是否添加
       </p>
       <button
         class="btn-primary"
+        :disabled="submitting"
         @click="finish"
       >
-        进入今日首页
+        {{ submitting ? '保存中…' : '进入今日首页' }}
       </button>
+      <p
+        v-if="error"
+        style="color:#b4453a;font-size:var(--font-size-assist);margin-top:var(--space-12);"
+      >
+        {{ error }}
+      </p>
     </div>
   </div>
 </template>
