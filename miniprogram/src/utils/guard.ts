@@ -70,10 +70,13 @@ export function currentPagePath(): string {
 /**
  * 跳转到指定小程序页面。
  * tab 页必须用 `switchTab`（用 `reLaunch`/`navigateTo` 会静默失败），普通页用 `reLaunch`。
+ *
+ * 注意：调用 `switchTab` 前加 10ms 延迟，避免微信 tabBar 尚未完成初始化时报
+ * `switchTab:fail timeout`（登录/注册后的首次导航场景常见）。
  */
 export function navigate(url: string) {
   if (TAB_PAGES.includes(url)) {
-    uni.switchTab({ url })
+    setTimeout(() => uni.switchTab({ url }), 10)
   } else {
     uni.reLaunch({ url })
   }

@@ -14,13 +14,26 @@
  * | `select` | 删除 | 小程序用 `<picker>` 替代 |
  * | `:focus-visible` | 删除 | 不支持该伪类 |
  * | `@media print` | 删除 | 无打印场景 |
+ * | `*, *::before, *::after` | 逐标签列出 | WXSS 解析 `*` 时报 "unexpected token *" |
  *
- * 保留：`*` 归零、`button`/`input`/`textarea` 字体继承、`button` 默认样式归零。
+ * WXSS 不支持 `*` 选择器，`calc(-1 * ...)` 中的 `*` 乘法也会解析失败，
+ * 因此 box-sizing / margin / padding 归零改为逐标签列出。
  */
 
-*,
-*::before,
-*::after {
+page,
+view,
+text,
+image,
+button,
+input,
+label,
+textarea,
+navigator,
+picker,
+scroll-view,
+swiper,
+swiper-item,
+rich-text {
   box-sizing: border-box;
   margin: 0;
   padding: 0;

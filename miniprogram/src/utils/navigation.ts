@@ -50,7 +50,7 @@ function open(path: string, replace = false): Promise<void> {
   return new Promise((resolve, reject) => {
     const callbacks = { url, success: () => resolve(), fail: reject }
     if (TAB_PAGES.includes(pagePath)) {
-      uni.switchTab(callbacks)
+      setTimeout(() => uni.switchTab(callbacks), 10)
     } else if (replace) {
       uni.redirectTo(callbacks)
     } else {

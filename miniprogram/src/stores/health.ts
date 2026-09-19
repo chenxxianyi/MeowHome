@@ -3,16 +3,7 @@ import { defineStore } from 'pinia'
 import { services } from '../services'
 import type { TrendDataPoint } from '../types'
 
-/**
- * 趋势 store。
- *
- * 与 Web 端的差异：Web 端调 `services.getTrends()`（由 services 层解析
- * familyId，并把异常兜底成 `{success,data}`）。小程序端的 `services` 层
- * 属阶段 2/3 范围，此处先直连 `careApi` + 从 storage 取 familyId。
- *
- * **待办**：阶段 2/3 建好 `services` 后，本文件应改回调用
- * `services.getTrends()`，以与 Web 端架构保持一致。
- */
+/** 趋势 store，通过统一业务服务层调用真实 `care.trends` 接口。 */
 interface HealthState {
   trends: TrendDataPoint[]
   range: 7 | 30 | 90
