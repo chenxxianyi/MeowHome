@@ -35,82 +35,45 @@ function onTap() {
 <template>
   <view class="page">
     <view class="section">
-      <view class="section-title">
-        A · HTML 结构标签
-      </view>
-      <view class="section-hint">
-        编译产物 WXML 中应能看出它们被映射成了什么。
-      </view>
+      <view class="section-title"> A · HTML 结构标签 </view>
+      <view class="section-hint"> 编译产物 WXML 中应能看出它们被映射成了什么。 </view>
 
       <div class="box">
         <span>span 内联文本</span>
         <p>p 段落文本</p>
         <h1>h1 标题</h1>
         <h2>h2 标题</h2>
-        <div class="nested">
-          div 嵌套 div
-        </div>
+        <div class="nested">div 嵌套 div</div>
       </div>
     </view>
 
     <view class="section">
-      <view class="section-title">
-        B · 表单与交互标签
-      </view>
+      <view class="section-title"> B · 表单与交互标签 </view>
       <label class="row">
         <span>label + input：</span>
-        <input
-          class="inp"
-          placeholder="输入点什么"
-        />
+        <input class="inp" placeholder="输入点什么" />
       </label>
-      <button
-        class="btn"
-        @click="onTap"
-      >
-        button 点击
-      </button>
+      <button class="btn" @click="onTap">button 点击</button>
       <view class="result">
         {{ tapped }}
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">
-        C · 小程序原生组件（对照组）
-      </view>
-      <view class="section-hint">
-        这些是小程序确定支持的写法，用它对照 A / B 的渲染结果。
-      </view>
+      <view class="section-title"> C · 小程序原生组件（对照组） </view>
+      <view class="section-hint"> 这些是小程序确定支持的写法，用它对照 A / B 的渲染结果。 </view>
       <view class="box">
         <text>text 内联文本</text>
         <view>view 块级</view>
       </view>
-      <button
-        class="btn"
-        @click="onTap"
-      >
-        button（原生同样写法）
-      </button>
-      <image
-        class="img"
-        src="/static/logo.png"
-        mode="aspectFit"
-      />
+      <button class="btn" @click="onTap">button（原生同样写法）</button>
+      <image class="img" src="/static/logo.png" mode="aspectFit" />
     </view>
 
     <view class="section">
-      <view class="section-title">
-        D · 媒体、链接与嵌套限制
-      </view>
-      <view class="section-hint">
-        重点看编译产物：img / a 会被映射成什么；text 内嵌 view 是否报错。
-      </view>
-      <img
-        class="img"
-        src="/static/logo.png"
-        alt="img 标签"
-      >
+      <view class="section-title"> D · 媒体、链接与嵌套限制 </view>
+      <view class="section-hint"> 重点看编译产物：img / a 会被映射成什么；text 内嵌 view 是否报错。 </view>
+      <img class="img" src="/static/logo.png" alt="img 标签" />
       <a href="/pages/index/index">a 标签链接</a>
       <text>
         <view>非法嵌套测试：text 内放 view</view>
@@ -118,12 +81,8 @@ function onTap() {
     </view>
 
     <view class="section">
-      <view class="section-title">
-        E · 语义标签（Web 端实际用到的其余标签）
-      </view>
-      <view class="section-hint">
-        这些在 Web 端共约 59 处，需确认映射目标是否安全。
-      </view>
+      <view class="section-title"> E · 语义标签（Web 端实际用到的其余标签） </view>
+      <view class="section-hint"> 这些在 Web 端共约 59 处，需确认映射目标是否安全。 </view>
       <section>section 区块</section>
       <header>header 页头</header>
       <main>main 主体</main>
@@ -135,9 +94,7 @@ function onTap() {
       <b>b 粗体</b>
     </view>
 
-    <view class="footer">
-      步骤 0.6 标签容错实测页
-    </view>
+    <view class="footer"> 步骤 0.6 标签容错实测页 </view>
   </view>
 </template>
 

@@ -101,11 +101,7 @@ function buildQuery(params?: Record<string, unknown>): string {
   return parts.length ? `?${parts.join('&')}` : ''
 }
 
-function rawRequest(
-  client: ApiClientOptions,
-  config: RequestConfig,
-  token: string | null
-): Promise<RawResponse> {
+function rawRequest(client: ApiClientOptions, config: RequestConfig, token: string | null): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
     const header: Record<string, string> = {
       'Content-Type': 'application/json',

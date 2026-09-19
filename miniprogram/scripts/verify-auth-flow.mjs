@@ -240,7 +240,9 @@ assertEqual('access_token 段数', String(reg.access_token).split('.').length, 2
 check('注册返回 user', !!reg.user && !!reg.user.id, `user.id=${reg.user && reg.user.id}`)
 assertEqual(
   'user 字段名为 snake_case（与其余接口一致）',
-  Object.keys(reg.user || {}).sort().join(','),
+  Object.keys(reg.user || {})
+    .sort()
+    .join(','),
   'email,id,name'
 )
 check(
@@ -256,7 +258,11 @@ storage.set(REFRESH_KEY, reg.refresh_token)
 
 const meBefore = await request({ method: 'GET', url: '/me' })
 check('注册后 /me 可访问', !!meBefore.id)
-check('注册后尚未加入家庭（family_id 为空 → 守卫应送去 onboarding）', !meBefore.family_id, `family_id=${JSON.stringify(meBefore.family_id)}`)
+check(
+  '注册后尚未加入家庭（family_id 为空 → 守卫应送去 onboarding）',
+  !meBefore.family_id,
+  `family_id=${JSON.stringify(meBefore.family_id)}`
+)
 
 const fam = await request({ method: 'POST', url: '/families', data: { name: '爱丽丝的猫宅' } })
 check('POST /families 返回家庭 id', !!fam.id, `id=${fam.id}`)
@@ -334,7 +340,11 @@ try {
 } catch (e) {
   aliceFamily = e
 }
-check('读他人家庭被拒 403', aliceFamily instanceof Error && aliceFamily.statusCode === 403, aliceFamily instanceof Error ? `${aliceFamily.code} / HTTP ${aliceFamily.statusCode}` : 'unexpectedly succeeded')
+check(
+  '读他人家庭被拒 403',
+  aliceFamily instanceof Error && aliceFamily.statusCode === 403,
+  aliceFamily instanceof Error ? `${aliceFamily.code} / HTTP ${aliceFamily.statusCode}` : 'unexpectedly succeeded'
+)
 
 let aliceCats = null
 try {
@@ -342,7 +352,11 @@ try {
 } catch (e) {
   aliceCats = e
 }
-check('读他人猫咪列表被拒 403', aliceCats instanceof Error && aliceCats.statusCode === 403, aliceCats instanceof Error ? `${aliceCats.code} / HTTP ${aliceCats.statusCode}` : 'unexpectedly succeeded')
+check(
+  '读他人猫咪列表被拒 403',
+  aliceCats instanceof Error && aliceCats.statusCode === 403,
+  aliceCats instanceof Error ? `${aliceCats.code} / HTTP ${aliceCats.statusCode}` : 'unexpectedly succeeded'
+)
 
 const bobFamilies = await request({ method: 'GET', url: '/families' })
 assertEqual('鲍勃的家庭列表为空（未泄漏他人家庭）', Array.isArray(bobFamilies) ? bobFamilies.length : -1, 0)
@@ -465,7 +479,9 @@ const lines = [
   '',
   '| 分组 | 检查项 | 结果 | 实测值 |',
   '|---|---|---|---|',
-  ...results.map((r) => `| ${r.group} | ${r.name} | ${r.ok ? '✅' : '❌'} | ${String(r.detail).replace(/\|/g, '\\|')} |`),
+  ...results.map(
+    (r) => `| ${r.group} | ${r.name} | ${r.ok ? '✅' : '❌'} | ${String(r.detail).replace(/\|/g, '\\|')} |`
+  ),
   ''
 ]
 writeFileSync(reportPath, lines.join('\n'), 'utf8')

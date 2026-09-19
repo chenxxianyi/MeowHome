@@ -32,99 +32,48 @@ const sampleNames = iconNames.slice(0, 6)
 <template>
   <view class="page">
     <view class="section">
-      <view class="section-title">
-        1 · 全部 57 个图标（遮罩方案）
-      </view>
-      <view class="section-hint">
-        全部应为清晰的描边线条图标。若出现整块实心色块 → 遮罩未生效。
-      </view>
+      <view class="section-title"> 1 · 全部 57 个图标（遮罩方案） </view>
+      <view class="section-hint"> 全部应为清晰的描边线条图标。若出现整块实心色块 → 遮罩未生效。 </view>
       <view class="grid">
-        <view
-          v-for="name in iconNames"
-          :key="name"
-          class="grid-cell"
-        >
-          <AppIcon
-            :name="name"
-            :size="24"
-          />
+        <view v-for="name in iconNames" :key="name" class="grid-cell">
+          <AppIcon :name="name" :size="24" />
           <text class="grid-label">{{ name }}</text>
         </view>
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">
-        2 · 颜色继承（关键验证）
-      </view>
-      <view class="section-hint">
-        图标颜色应随外层文字色变化，且与左侧文字颜色一致。
-      </view>
-      <view
-        v-for="c in colors"
-        :key="c.value"
-        class="row"
-        :style="{ color: c.value }"
-      >
+      <view class="section-title"> 2 · 颜色继承（关键验证） </view>
+      <view class="section-hint"> 图标颜色应随外层文字色变化，且与左侧文字颜色一致。 </view>
+      <view v-for="c in colors" :key="c.value" class="row" :style="{ color: c.value }">
         <text class="color-label">{{ c.label }}</text>
-        <AppIcon
-          name="cat"
-          :size="28"
-        />
-        <AppIcon
-          name="bell"
-          :size="28"
-        />
-        <AppIcon
-          name="pawPrint"
-          :size="28"
-        />
-        <AppIcon
-          name="warning"
-          :size="28"
-        />
+        <AppIcon name="cat" :size="28" />
+        <AppIcon name="bell" :size="28" />
+        <AppIcon name="pawPrint" :size="28" />
+        <AppIcon name="warning" :size="28" />
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">
-        3 · 尺寸控制
-      </view>
-      <view class="section-hint">
-        16 / 20 / 24 / 32 / 48 px，应由小到大且不变形。
-      </view>
+      <view class="section-title"> 3 · 尺寸控制 </view>
+      <view class="section-hint"> 16 / 20 / 24 / 32 / 48 px，应由小到大且不变形。 </view>
       <view class="row baseline">
-        <AppIcon
-          v-for="s in sizes"
-          :key="s"
-          name="cat"
-          :size="s"
-        />
+        <AppIcon v-for="s in sizes" :key="s" name="cat" :size="s" />
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">
-        4 · 对照组：image 直贴
-      </view>
+      <view class="section-title"> 4 · 对照组：image 直贴 </view>
       <view class="section-hint">
-        若第 1 屏是实心色块、而这里能显示图标 → 遮罩不受支持，需改走 image 方案。
-        注意 image 方案会固定为 SVG 内嵌的黑色，<text>不跟随文字色</text>。
+        若第 1 屏是实心色块、而这里能显示图标 → 遮罩不受支持，需改走 image 方案。 注意 image 方案会固定为 SVG
+        内嵌的黑色，<text>不跟随文字色</text>。
       </view>
       <view class="row baseline">
-        <image
-          v-for="name in sampleNames"
-          :key="name"
-          class="cmp-img"
-          :src="iconDataUris[name]"
-          mode="aspectFit"
-        />
+        <image v-for="name in sampleNames" :key="name" class="cmp-img" :src="iconDataUris[name]" mode="aspectFit" />
       </view>
     </view>
 
-    <view class="footer">
-      步骤 0.5 验证页 · 确认后由步骤 1.1 移除
-    </view>
+    <view class="footer"> 步骤 0.5 验证页 · 确认后由步骤 1.1 移除 </view>
   </view>
 </template>
 

@@ -73,10 +73,7 @@ const MAP = {
 }
 
 /** 匹配选择器中的元素名：前面不能是 . # - 或单词字符，后面不能是单词字符或 - */
-const ELEMENT_RE = new RegExp(
-  `(?<![\\w.#-])(${Object.keys(MAP).join('|')})(?![\\w-])`,
-  'g'
-)
+const ELEMENT_RE = new RegExp(`(?<![\\w.#-])(${Object.keys(MAP).join('|')})(?![\\w-])`, 'g')
 
 /**
  * 只改写选择器部分。做法：按 `{` / `}` 切块，块首到 `{` 之间是选择器。

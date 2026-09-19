@@ -30,6 +30,8 @@
  * 而 `onLoad` 只在页面创建时触发一次。
  */
 import { useAuthStore } from '../stores/auth'
+import { useCatStore } from '../stores/cat'
+import { catApi, toCat } from '../api/endpoints'
 
 /** 无需登录即可访问的页面 */
 const PUBLIC_PAGES = ['/pages/auth/index']
@@ -45,6 +47,7 @@ export const TAB_PAGES = [
 
 /** 会话恢复只需一次；与 Web 端 `let bootstrapped = false` 对应 */
 let bootstrapped = false
+let catsForFamily = ''
 
 /** 恢复登录态（只真正执行一次）。返回是否已登录。 */
 export async function ensureSession(): Promise<boolean> {
@@ -120,5 +123,18 @@ export function guardPage(path: string): boolean {
 /** 页面 `onShow` 里的组合调用：先恢复会话，再执行守卫。 */
 export async function guardOnShow(): Promise<boolean> {
   await ensureSession()
-  return guardPage(currentPagePath())
+  if (!guardPage(currentPagePath())) return false
+
+  // 与 Web 端全局守卫一致：进入受保护页面前，按家庭预载一次猫咪列表。
+  // 加载失败不阻塞页面，下一次 onShow 会自动重试。
+  const auth = useAuthStore()
+  if (auth.familyId && catsForFamily !== auth.familyId) {
+    try {
+      useCatStore().setCats((await catApi.list(auth.familyId)).map(toCat))
+      catsForFamily = auth.familyId
+    } catch {
+      catsForFamily = ''
+    }
+  }
+  return true
 }

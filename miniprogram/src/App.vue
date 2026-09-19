@@ -6,7 +6,7 @@ import { useAppStore } from './stores/app'
 onLaunch(() => {
   console.info('[app] MeowHome 小程序启动')
 
-  // 小程序没有 navigator.onLine，网络状态必须主动查询 + 注册监听。
+  // 小程序没有浏览器在线状态 API，网络状态必须主动查询 + 注册监听。
   // Web 端是在 store 的 state 初始化时同步读取的，这里改为异步校准。
   const app = useAppStore()
   app.syncNetworkStatus()

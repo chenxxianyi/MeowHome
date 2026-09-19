@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { toApiError } from '../api/adapter'
-import { getStoredFamilyId } from '../api/client'
-import { careApi } from '../api/endpoints'
+import { services } from '../services'
 import type { TrendDataPoint } from '../types'
 
 /**
@@ -40,17 +38,8 @@ export const useHealthStore = defineStore('health', {
       this.catId = catId
       this.range = allowedRange
 
-      const familyId = getStoredFamilyId()
-      if (!familyId) {
-        this.trends = []
-        return
-      }
-      try {
-        this.trends = await careApi.trends(familyId, catId, allowedRange)
-      } catch (e) {
-        console.warn(`[health] loadTrends: ${toApiError(e).message}`)
-        this.trends = []
-      }
+      const result = await services.getTrends(catId, allowedRange)
+      this.trends = result.data
     },
     setRange(r: 7 | 30 | 90) {
       this.range = r

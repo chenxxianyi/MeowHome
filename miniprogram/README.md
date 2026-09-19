@@ -45,16 +45,16 @@ go run ./cmd/server
 
 ## 目录说明
 
-| 路径 | 作用 |
-|---|---|
-| `src/pages/` | 页面（对应 Web 端 `frontend/src/views/`） |
-| `src/api/` | 网络层：`client.ts`（uni.request 封装）、`endpoints.ts`、`adapter.ts` |
-| `src/stores/` | Pinia store |
-| `src/utils/guard.ts` | 路由守卫（Web 端 `router.beforeEach` 的等价实现） |
-| `src/styles/` | WXSS 样式（由 Web 端 CSS 适配而来） |
-| `src/components/app/` | `AppIcon`（CSS 遮罩图标） |
-| `scripts/` | 构建期辅助脚本 + 验证脚本 |
-| `dist/build/mp-weixin/` | **编译产物，开发者工具导入这里** |
+| 路径                    | 作用                                                                  |
+| ----------------------- | --------------------------------------------------------------------- |
+| `src/pages/`            | 页面（对应 Web 端 `frontend/src/views/`）                             |
+| `src/api/`              | 网络层：`client.ts`（uni.request 封装）、`endpoints.ts`、`adapter.ts` |
+| `src/stores/`           | Pinia store                                                           |
+| `src/utils/guard.ts`    | 路由守卫（Web 端 `router.beforeEach` 的等价实现）                     |
+| `src/styles/`           | WXSS 样式（由 Web 端 CSS 适配而来）                                   |
+| `src/components/app/`   | `AppIcon`（CSS 遮罩图标）                                             |
+| `scripts/`              | 构建期辅助脚本 + 验证脚本                                             |
+| `dist/build/mp-weixin/` | **编译产物，开发者工具导入这里**                                      |
 
 ## 可运行的验证脚本
 

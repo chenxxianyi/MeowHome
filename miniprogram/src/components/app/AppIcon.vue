@@ -31,12 +31,12 @@ import { computed } from 'vue'
 
 import { iconDataUris, type AppIconName } from './iconData'
 
-const props = withDefaults(defineProps<{ name: AppIconName; size?: number }>(), {
+const props = withDefaults(defineProps<{ name: AppIconName | string; size?: number }>(), {
   size: 20
 })
 
 const iconStyle = computed(() => {
-  const uri = iconDataUris[props.name] || ''
+  const uri = iconDataUris[props.name as AppIconName] || iconDataUris.info
   return {
     width: `${props.size}px`,
     height: `${props.size}px`,
@@ -47,11 +47,7 @@ const iconStyle = computed(() => {
 </script>
 
 <template>
-  <view
-    class="app-icon"
-    :style="iconStyle"
-    aria-hidden="true"
-  />
+  <view class="app-icon" :style="iconStyle" aria-hidden="true" />
 </template>
 
 <style scoped>

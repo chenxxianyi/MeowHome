@@ -29,9 +29,9 @@
 
 ### 两条硬性纪律
 
-| 纪律 | 原因 |
-|---|---|
-| **不改 `frontend/`** 下任何文件 | 方案核心约束：Web 端零改动 |
+| 纪律                              | 原因                                             |
+| --------------------------------- | ------------------------------------------------ |
+| **不改 `frontend/`** 下任何文件   | 方案核心约束：Web 端零改动                       |
 | **阶段 0.6 未通过前不开工阶段 2** | 单页验证失败意味着「一模一样」不成立，需先改方案 |
 
 ### 本地运行方式（每次验证前照做）
@@ -59,14 +59,14 @@ npm.cmd run build:mp-weixin        # 或 dev:mp-weixin 做增量编译
 
 ## 3. 步骤总览
 
-| 阶段 | 步骤 | 估时 | 关键产出 |
-|---|---|---|---|
-| **0** 工程与共享层 | 0.1 – 0.6 | 2–3 天 | 可跑通的工程骨架 + 风险验证结论 |
-| **1** 骨架与认证 | 1.1 – 1.5 | 3–4 天 | 登录 → 建家庭 全链路 |
-| **2** 主 tab 页 | 2.1 – 2.5 | 5–8 天 | 5 个主页面 |
-| **3** 次级页 | 3.1 – 3.10 | 5–8 天 | 12 个次级页 + 图标替换完成 |
-| **4** 平台能力与适配 | 4.1 – 4.5 | 2–3 天 | 真机可用 |
-| **5** 上线准备 | 5.1 – 5.3 | — | 可提审 |
+| 阶段                 | 步骤       | 估时   | 关键产出                        |
+| -------------------- | ---------- | ------ | ------------------------------- |
+| **0** 工程与共享层   | 0.1 – 0.6  | 2–3 天 | 可跑通的工程骨架 + 风险验证结论 |
+| **1** 骨架与认证     | 1.1 – 1.5  | 3–4 天 | 登录 → 建家庭 全链路            |
+| **2** 主 tab 页      | 2.1 – 2.5  | 5–8 天 | 5 个主页面                      |
+| **3** 次级页         | 3.1 – 3.10 | 5–8 天 | 12 个次级页 + 图标替换完成      |
+| **4** 平台能力与适配 | 4.1 – 4.5  | 2–3 天 | 真机可用                        |
+| **5** 上线准备       | 5.1 – 5.3  | —      | 可提审                          |
 
 ---
 
@@ -114,15 +114,15 @@ npm.cmd run dev:mp-weixin      # 产出 dist/dev/mp-weixin
 
 从 `frontend/src/` 复制**无平台依赖**的部分到 `miniprogram/src/`：
 
-| 源 | 目标 | 说明 |
-|---|---|---|
-| `types/index.ts` | `types/index.ts` | 纯类型，原样 |
-| `api/adapter.ts` | `api/adapter.ts` | 纯逻辑，原样 |
-| `styles/tokens.css` | `styles/tokens.css` | 待 0.3 改造 |
-| `styles/reset.css` | `styles/reset.css` | 待 0.3 核对 |
-| `styles/global.css` | `styles/global.css` | 待 0.3 改造 |
-| `styles/pages.css` | `styles/pages.css` | 待 0.3 清理 |
-| `stores/*.ts`（9 个） | `stores/*.ts` | 待 1.2 改造 |
+| 源                    | 目标                | 说明         |
+| --------------------- | ------------------- | ------------ |
+| `types/index.ts`      | `types/index.ts`    | 纯类型，原样 |
+| `api/adapter.ts`      | `api/adapter.ts`    | 纯逻辑，原样 |
+| `styles/tokens.css`   | `styles/tokens.css` | 待 0.3 改造  |
+| `styles/reset.css`    | `styles/reset.css`  | 待 0.3 核对  |
+| `styles/global.css`   | `styles/global.css` | 待 0.3 改造  |
+| `styles/pages.css`    | `styles/pages.css`  | 待 0.3 清理  |
+| `stores/*.ts`（9 个） | `stores/*.ts`       | 待 1.2 改造  |
 
 **不要复制**：`mocks/`、`views/`、`components/`、`api/client.ts`、`api/endpoints.ts`
 
@@ -137,12 +137,12 @@ npm.cmd run dev:mp-weixin      # 产出 dist/dev/mp-weixin
 
 实测发现 **4 个 store 依赖 `mocks/data`**，而本步明确不复制 `mocks/`，因此存在悬空 import：
 
-| store | 依赖的 mock |
-|---|---|
-| `stores/expense.ts` | `mockExpenses` |
+| store                 | 依赖的 mock     |
+| --------------------- | --------------- |
+| `stores/expense.ts`   | `mockExpenses`  |
 | `stores/inventory.ts` | `mockInventory` |
-| `stores/moment.ts` | `mockMoments` |
-| `stores/reminder.ts` | `mockReminders` |
+| `stores/moment.ts`    | `mockMoments`   |
+| `stores/reminder.ts`  | `mockReminders` |
 
 其余悬空 import 属预期（目标文件将在后续步骤创建）：`stores/auth.ts` → `../api/client`、`../api/endpoints`；`stores/health.ts` → `../services`。
 
@@ -163,15 +163,15 @@ npm.cmd run dev:mp-weixin      # 产出 dist/dev/mp-weixin
 
 原方法用「类名是否在 `.vue` 文件中出现」判断死活，但本项目大量使用**动态拼接类名**，会被误判：
 
-| 动态绑定 | 会被误判为死类的实际生效类 |
-|---|---|
-| `FamilyView:158` `` `tone-${index % 2}` `` | `.tone-1` |
-| `FamilyView:252` `` `tone-${item.tone}` `` | `.tone-blue` `.tone-clay` `.tone-rose` `.tone-warning` |
-| `MomentsView:257` `` `type-${event.type}` `` | `.type-medical` `.type-interaction` `.type-milestone` |
-| `TodayView:361` `` `state-${groupLevel(group)}` `` | `.state-danger` `.state-warning` |
-| `TodayView:391` `:class="row.state"` | `.warning` `.danger` `.none` |
-| `TodayView:454` `:class="item.severity"` | `.warn` `.info` `.danger` |
-| `InventoryView:62` `:class="item.status"` | `.low` `.ok` `.expired` |
+| 动态绑定                                           | 会被误判为死类的实际生效类                             |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `FamilyView:158` `` `tone-${index % 2}` ``         | `.tone-1`                                              |
+| `FamilyView:252` `` `tone-${item.tone}` ``         | `.tone-blue` `.tone-clay` `.tone-rose` `.tone-warning` |
+| `MomentsView:257` `` `type-${event.type}` ``       | `.type-medical` `.type-interaction` `.type-milestone`  |
+| `TodayView:361` `` `state-${groupLevel(group)}` `` | `.state-danger` `.state-warning`                       |
+| `TodayView:391` `:class="row.state"`               | `.warning` `.danger` `.none`                           |
+| `TodayView:454` `:class="item.severity"`           | `.warn` `.info` `.danger`                              |
+| `InventoryView:62` `:class="item.status"`          | `.low` `.ok` `.expired`                                |
 
 实测 61 个候选中 **40 个属此类**（去掉末段后前缀能在 `.vue` 中命中）。**照原计划删除会直接破坏正在生效的样式。**
 
@@ -189,11 +189,11 @@ npm.cmd run dev:mp-weixin      # 产出 dist/dev/mp-weixin
 
 **遗留问题（转入后续步骤）**
 
-| # | 事项 | 转入 |
-|---|---|---|
-| 1 | `@media (hover: none) and (pointer: coarse)` 触摸目标块——若 WXSS 不支持该媒体特性，按钮会丢失 44px 最小尺寸，与 Web 端手机表现不一致 | 4.2 真机适配 |
-| 2 | `--safe-bottom: env(safe-area-inset-bottom, 0px)`（2 处）是否在当前基础库生效 | 4.2 真机适配 |
-| 3 | `.page { padding-bottom: calc(64px + var(--safe-bottom)) }` 是为固定底栏预留的；改用原生 tabBar 后此内边距会造成多余留白 | 1.1 pages.json + tabBar |
+| #   | 事项                                                                                                                                 | 转入                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| 1   | `@media (hover: none) and (pointer: coarse)` 触摸目标块——若 WXSS 不支持该媒体特性，按钮会丢失 44px 最小尺寸，与 Web 端手机表现不一致 | 4.2 真机适配            |
+| 2   | `--safe-bottom: env(safe-area-inset-bottom, 0px)`（2 处）是否在当前基础库生效                                                        | 4.2 真机适配            |
+| 3   | `.page { padding-bottom: calc(64px + var(--safe-bottom)) }` 是为固定底栏预留的；改用原生 tabBar 后此内边距会造成多余留白             | 1.1 pages.json + tabBar |
 
 **完成记录**：见 §12 开发记录 · 记录 0.3
 
@@ -205,13 +205,13 @@ npm.cmd run dev:mp-weixin      # 产出 dist/dev/mp-weixin
 
 把 axios + localStorage + location.hash 全部换成小程序 API，**对外函数签名保持不变**，使 `endpoints.ts` 与 `stores/` 无需改动。
 
-| 原实现 | 新实现 |
-|---|---|
-| `axios.create()` / 拦截器 | `uni.request` 封装 + 手写重试 |
-| `localStorage.getItem/setItem/removeItem`（9 处） | `uni.getStorageSync` / `setStorageSync` / `removeStorageSync` |
-| `location.hash = '#/login'` | `uni.reLaunch({ url: '/pages/auth/index' })`（带 `getCurrentPages` 防重复跳转） |
-| `crypto.randomUUID()` | 时间戳 + 随机串 |
-| `import.meta.env.VITE_*` | 新增 `api/config.ts` 显式常量（小程序无 Vite 代理，需绝对地址） |
+| 原实现                                            | 新实现                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `axios.create()` / 拦截器                         | `uni.request` 封装 + 手写重试                                                   |
+| `localStorage.getItem/setItem/removeItem`（9 处） | `uni.getStorageSync` / `setStorageSync` / `removeStorageSync`                   |
+| `location.hash = '#/login'`                       | `uni.reLaunch({ url: '/pages/auth/index' })`（带 `getCurrentPages` 防重复跳转） |
+| `crypto.randomUUID()`                             | 时间戳 + 随机串                                                                 |
+| `import.meta.env.VITE_*`                          | 新增 `api/config.ts` 显式常量（小程序无 Vite 代理，需绝对地址）                 |
 
 **必须保留的行为**
 
@@ -230,11 +230,11 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 微信 `wx.request` 的合法 method **不含 PATCH**（这是平台硬限制，非类型定义问题）。而后端有 **3 个 PATCH 路由**，`endpoints.ts` 中对应 3 处调用：
 
-| 接口 | 用途 | 影响的步骤 |
-|---|---|---|
-| `PATCH /families/:familyId` | 更新家庭 | 2.5 |
-| `PATCH /families/:familyId/cats/:catId` | 更新猫咪 | 3.4 |
-| `PATCH /families/:familyId/reminders/:reminderId/complete` | 完成提醒 | 3.7 |
+| 接口                                                       | 用途     | 影响的步骤 |
+| ---------------------------------------------------------- | -------- | ---------- |
+| `PATCH /families/:familyId`                                | 更新家庭 | 2.5        |
+| `PATCH /families/:familyId/cats/:catId`                    | 更新猫咪 | 3.4        |
+| `PATCH /families/:familyId/reminders/:reminderId/complete` | 完成提醒 | 3.7        |
 
 **本步的降级处理**：`client.ts` 内部把 `PATCH` 改写为 `POST` + `X-HTTP-Method-Override: PATCH` 头。
 
@@ -295,12 +295,12 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **产出**
 
-| 文件 | 说明 |
-|---|---|
-| `scripts/gen-icons.mjs` | 图标生成脚本（Web 端图标变更时重跑） |
-| `src/components/app/iconData.ts` | 57 个 data URI，24.8 KB（自动生成） |
-| `src/components/app/AppIcon.vue` | `name` / `size` props 与 Web 端一致 |
-| `src/pages/icon-test/index.vue` | 验证页（含对照方案） |
+| 文件                             | 说明                                 |
+| -------------------------------- | ------------------------------------ |
+| `scripts/gen-icons.mjs`          | 图标生成脚本（Web 端图标变更时重跑） |
+| `src/components/app/iconData.ts` | 57 个 data URI，24.8 KB（自动生成）  |
+| `src/components/app/AppIcon.vue` | `name` / `size` props 与 Web 端一致  |
+| `src/pages/icon-test/index.vue`  | 验证页（含对照方案）                 |
 
 **验证**
 
@@ -314,14 +314,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 以下两项**只能在微信开发者工具里目视确认**，我无法代劳：
 
-| # | 待确认项 | 怎么看 | 若失败说明什么 |
-|---|---|---|---|
-| 1 | 遮罩能否渲染 | 用 DevTools 打开 `miniprogram/dist/dev/mp-weixin`，第 1 屏应显示 57 个清晰的描边图标 | 若显示为**整块实心色块** → WXSS 不支持 `-webkit-mask-image` |
-| 2 | 颜色是否跟随 | 第 2 屏 5 行，每行左侧文字与右侧 4 个图标应**同色** | 若图标恒为黑色/透明 → 遮罩未生效 |
+| #   | 待确认项     | 怎么看                                                                               | 若失败说明什么                                              |
+| --- | ------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| 1   | 遮罩能否渲染 | 用 DevTools 打开 `miniprogram/dist/dev/mp-weixin`，第 1 屏应显示 57 个清晰的描边图标 | 若显示为**整块实心色块** → WXSS 不支持 `-webkit-mask-image` |
+| 2   | 颜色是否跟随 | 第 2 屏 5 行，每行左侧文字与右侧 4 个图标应**同色**                                  | 若图标恒为黑色/透明 → 遮罩未生效                            |
 
 **验证页已内置对照组**（第 4 屏）：用 `<image>` 直贴同一份 data URI。若第 1 屏是实心色块而第 4 屏能显示图标，即证明需改用 image 方案（代价：失去 `currentColor` 变色能力，需要为每种颜色单独准备图标）。
 
 **回退路径**：若遮罩不行，依次尝试——
+
 1. `<image>` + data URI（图标可见但固定色）
 2. 图标字体（需先做 stroke→outline 转换）
 3. 每个图标导出 PNG 多倍图（最稳但包体最大、且不跟随主题色）
@@ -352,18 +353,18 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 完整映射表（源 → 产物 WXML）：
 
-| 源标签 | Web 端数量 | 映射为 | 是否正确 | 需手工改 |
-|---|---|---|---|---|
-| `<div>` | 324 | `<view>` | ✅ | 否 |
-| `<p>` `<section>` `<header>` `<main>` `<nav>` | 61 | `<view>` | ✅ | 否 |
-| `<h1>` `<h2>` `<h3>` | 24 | `<view>` | ✅ | 否 |
-| `<label>` `<input>` | 44 | 同名组件 | ✅ | 否 |
-| `<button>` | 72 | `<button>` | ⚠️ 有默认边框/背景/圆角 | 只需全局 reset CSS |
-| **`<span>`** | **112** | **`<label>`** | ❌ **语义错误** | **是 → `<text>`** |
-| **`<strong>` `<i>` `<b>` `<em>`** | **23** | `<view>` | ❌ **行内变块级，会断行** | **是 → `<text>`** |
-| **`<img>`** | **7** | `<image>` | ⚠️ **不自动补 `mode`**，默认 `scaleToFill` 会拉伸变形 | **是 → 补 `mode="aspectFit"`** |
-| **`<a>`** | **1** | `<navigator>` | ⚠️ `href` 必须是小程序页面路径，Web 端的 `#/xxx` 无效 | **是** |
-| `<svg>` | 1 | 无 | ❌ 不支持 | 0.5 已处理 |
+| 源标签                                        | Web 端数量 | 映射为        | 是否正确                                              | 需手工改                       |
+| --------------------------------------------- | ---------- | ------------- | ----------------------------------------------------- | ------------------------------ |
+| `<div>`                                       | 324        | `<view>`      | ✅                                                    | 否                             |
+| `<p>` `<section>` `<header>` `<main>` `<nav>` | 61         | `<view>`      | ✅                                                    | 否                             |
+| `<h1>` `<h2>` `<h3>`                          | 24         | `<view>`      | ✅                                                    | 否                             |
+| `<label>` `<input>`                           | 44         | 同名组件      | ✅                                                    | 否                             |
+| `<button>`                                    | 72         | `<button>`    | ⚠️ 有默认边框/背景/圆角                               | 只需全局 reset CSS             |
+| **`<span>`**                                  | **112**    | **`<label>`** | ❌ **语义错误**                                       | **是 → `<text>`**              |
+| **`<strong>` `<i>` `<b>` `<em>`**             | **23**     | `<view>`      | ❌ **行内变块级，会断行**                             | **是 → `<text>`**              |
+| **`<img>`**                                   | **7**      | `<image>`     | ⚠️ **不自动补 `mode`**，默认 `scaleToFill` 会拉伸变形 | **是 → 补 `mode="aspectFit"`** |
+| **`<a>`**                                     | **1**      | `<navigator>` | ⚠️ `href` 必须是小程序页面路径，Web 端的 `#/xxx` 无效 | **是**                         |
+| `<svg>`                                       | 1          | 无            | ❌ 不支持                                             | 0.5 已处理                     |
 
 **两个静默陷阱**
 
@@ -372,11 +373,11 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **修正后的替换工作量**
 
-| 项 | 数量 |
-|---|---|
-| 原计划估计 | 约 560 处 |
-| **实测需手工改** | **143 处** |
-| 可保留（映射正确） | 约 350 处 |
+| 项                 | 数量       |
+| ------------------ | ---------- |
+| 原计划估计         | 约 560 处  |
+| **实测需手工改**   | **143 处** |
+| 可保留（映射正确） | 约 350 处  |
 
 > 这个结论让阶段 2/3 的工作量显著下降，但也意味着**不能因为「构建通过」就认为标签没问题**——必须按上表逐类核对。
 
@@ -405,11 +406,11 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 处理：
 
-| 文件 | 处理 |
-|---|---|
-| `styles/reset.css` | **手工改写为小程序版**（`html`/`body` → `page`、`img` → `image`、删除 `svg`/`ul`/`ol`/`:focus-visible`/`@media print`） |
-| `styles/pages.css` | 用 `scripts/adapt-wxss-selectors.mjs` 批量转换（`span`→`text` 27 处、`small`→`text` 14 处、`strong`→`text` 12 处、`p`→`view` 7 处、`h1`/`h2`→`view` 各 6 处、`div`→`view` 5 处、`i`→`text` 4 处、其余若干） |
-| `styles/global.css` | 脚本检查后**无需改动** |
+| 文件                | 处理                                                                                                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `styles/reset.css`  | **手工改写为小程序版**（`html`/`body` → `page`、`img` → `image`、删除 `svg`/`ul`/`ol`/`:focus-visible`/`@media print`）                                                                                     |
+| `styles/pages.css`  | 用 `scripts/adapt-wxss-selectors.mjs` 批量转换（`span`→`text` 27 处、`small`→`text` 14 处、`strong`→`text` 12 处、`p`→`view` 7 处、`h1`/`h2`→`view` 各 6 处、`div`→`view` 5 处、`i`→`text` 4 处、其余若干） |
+| `styles/global.css` | 脚本检查后**无需改动**                                                                                                                                                                                      |
 
 **一次失败尝试（已记录为教训）**：脚本第一版对「小程序无对应标签」的选择器项做了**删除**，结果选择器变空、换行丢失，产出 `}{` 这类非法结构（`pages.css` 行数 4108 → 4065）。已改为替换成**永不匹配的哨兵类** `.wxss-unsupported`（规则成为死代码，但 CSS 结构完好）。最终结果：**行数 4108 → 4108 未变、花括号配平、无残留元素选择器、构建零警告**。
 
@@ -419,15 +420,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **迁移时应用的标签替换**（对应第一部分的映射表）
 
-| Web 端 | 本页写法 |
-|---|---|
-| `<AppShell>` | 移除（原生 tabBar） |
-| `<a :href="'#/cats/'+id">` | `<view @click>` + `uni.showToast`（详情页属步骤 3.4） |
-| `<img>` | `<image mode="aspectFit">` |
-| `<input type="date">` | `<picker mode="date">` |
-| `<span>` ×7 | `<text>` |
-| `<div>` / `<p>` / `<h2>` | `<view>` |
-| `window.addEventListener('keydown')` | 删除 |
+| Web 端                               | 本页写法                                              |
+| ------------------------------------ | ----------------------------------------------------- |
+| `<AppShell>`                         | 移除（原生 tabBar）                                   |
+| `<a :href="'#/cats/'+id">`           | `<view @click>` + `uni.showToast`（详情页属步骤 3.4） |
+| `<img>`                              | `<image mode="aspectFit">`                            |
+| `<input type="date">`                | `<picker mode="date">`                                |
+| `<span>` ×7                          | `<text>`                                              |
+| `<div>` / `<p>` / `<h2>`             | `<view>`                                              |
+| `window.addEventListener('keydown')` | 删除                                                  |
 
 产物验证：`pages/cats/index.wxml` 使用的标签为 `view`(22) / `text`(11) / `button`(5) / `label`(3) / `app-icon`(2) / `input`(2) / `picker`(1) / `image`(1)，**零 HTML 标签**。
 
@@ -437,13 +438,13 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **本步要暴露的 5 个风险**（第 1 项已可判定）
 
-| 风险 | 状态 |
-|---|---|
-| 内联 SVG | 🟡 0.5 已实现（CSS 遮罩），待目视确认 |
-| `<button>` 默认样式 | ✅ 已处理 —— `reset.css` 补 `button{background:none;border:none}` + `button::after{border:none}`；待目视 |
-| `<input>` 原生组件层级 | ⏳ 待目视（抽屉内输入框是否盖住浮层） |
-| `uni.request` | 🟡 实现完成（0.4），链路正确性待你在 DevTools 里点「初始化测试账号」验证 |
-| `switchTab` 传参 | ⏸ 本步无法验证 —— 原生 tabBar 属步骤 1.1，当前页面均为普通页 |
+| 风险                   | 状态                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| 内联 SVG               | 🟡 0.5 已实现（CSS 遮罩），待目视确认                                                                    |
+| `<button>` 默认样式    | ✅ 已处理 —— `reset.css` 补 `button{background:none;border:none}` + `button::after{border:none}`；待目视 |
+| `<input>` 原生组件层级 | ⏳ 待目视（抽屉内输入框是否盖住浮层）                                                                    |
+| `uni.request`          | 🟡 实现完成（0.4），链路正确性待你在 DevTools 里点「初始化测试账号」验证                                 |
+| `switchTab` 传参       | ⏸ 本步无法验证 —— 原生 tabBar 属步骤 1.1，当前页面均为普通页                                            |
 
 **产出**：`pages/tag-test/index.vue`、`pages/cats/index.vue`、`scripts/adapt-wxss-selectors.mjs`、改造后的 `styles/`（均已完成）
 
@@ -461,11 +462,11 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 原计划把 0.6 的前置写成「0.5」，但实测发现跑通 `CatsView` 还需要：
 
-| 依赖 | 现状 | 归属步骤 |
-|---|---|---|
-| `pinia` 已安装 | ❌ 未安装（uni-app 模板不含） | 1.2 |
-| `stores/auth` 可用（提供 familyId） | ❌ 依赖 pinia + 去 mock | 1.2 |
-| `services` 层可用 | ❌ 未创建，且依赖 `mocks/data` | 1.2 / 2.x |
+| 依赖                                | 现状                           | 归属步骤  |
+| ----------------------------------- | ------------------------------ | --------- |
+| `pinia` 已安装                      | ❌ 未安装（uni-app 模板不含）  | 1.2       |
+| `stores/auth` 可用（提供 familyId） | ❌ 依赖 pinia + 去 mock        | 1.2       |
+| `services` 层可用                   | ❌ 未创建，且依赖 `mocks/data` | 1.2 / 2.x |
 
 **处理方案**：0.6 的单页迁移**绕过 `services`，直接调 `api/endpoints` 的 `catApi`**，用它验证「标签 + 网络 + UI + 图标」四条链路。业务层留到 1.2 再补。
 这符合 0.6「技术验证」的定位（该页本就是一次性验证页，非正式页面）。
@@ -486,25 +487,25 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **路径规划建议**
 
-| Web 路由 | 小程序页面 |
-|---|---|
-| `/today` | `pages/today/index`（tab） |
-| `/records` | `pages/records/index`（tab） |
-| `/cats` | `pages/cats/index`（tab） |
-| `/moments` | `pages/moments/index`（tab） |
-| `/family` | `pages/family/index`（tab） |
-| `/login` | `pages/auth/index` |
-| `/onboarding` | `pages/onboarding/index` |
-| `/cats/:catId` | `pages/cat-detail/index` |
-| `/cats/:catId/trends` | `pages/trends/index` |
-| `/records/quick/:type` | `pages/quick-record/index` |
-| `/records/ai` | `pages/ai-input/index` |
-| `/records/ai/confirm` | `pages/ai-confirm/index` |
-| `/medical/upload` | `pages/medical-upload/index` |
-| `/reminders` | `pages/reminders/index` |
-| `/family/inventory` | `pages/inventory/index` |
-| `/family/expenses` | `pages/expenses/index` |
-| `/settings` | `pages/settings/index` |
+| Web 路由               | 小程序页面                   |
+| ---------------------- | ---------------------------- |
+| `/today`               | `pages/today/index`（tab）   |
+| `/records`             | `pages/records/index`（tab） |
+| `/cats`                | `pages/cats/index`（tab）    |
+| `/moments`             | `pages/moments/index`（tab） |
+| `/family`              | `pages/family/index`（tab）  |
+| `/login`               | `pages/auth/index`           |
+| `/onboarding`          | `pages/onboarding/index`     |
+| `/cats/:catId`         | `pages/cat-detail/index`     |
+| `/cats/:catId/trends`  | `pages/trends/index`         |
+| `/records/quick/:type` | `pages/quick-record/index`   |
+| `/records/ai`          | `pages/ai-input/index`       |
+| `/records/ai/confirm`  | `pages/ai-confirm/index`     |
+| `/medical/upload`      | `pages/medical-upload/index` |
+| `/reminders`           | `pages/reminders/index`      |
+| `/family/inventory`    | `pages/inventory/index`      |
+| `/family/expenses`     | `pages/expenses/index`       |
+| `/settings`            | `pages/settings/index`       |
 
 > ✅ 17 个路径**全部按上表注册**，与计划一致。
 
@@ -522,13 +523,13 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 新增 `scripts/gen-tabbar-icons.mjs`：从 Web 端**同一份** `iconPaths.ts` 取 path，用与 app 一致的描边参数（`stroke-width: 1.8`）与主题色渲染：
 
-| 项 | 取值 |
-|---|---|
-| 尺寸 | 81×81，viewBox 外扩 3 单位（约 10% 内边距） |
-| 普通态 | `#9B948C`（`--color-text-tertiary`） |
-| 选中态 | `#C87345`（`--color-brand`） |
-| 工具 | `sharp`（`devDependencies`） |
-| 产出 | 10 个 PNG，合计 **13.6 KB** |
+| 项     | 取值                                        |
+| ------ | ------------------------------------------- |
+| 尺寸   | 81×81，viewBox 外扩 3 单位（约 10% 内边距） |
+| 普通态 | `#9B948C`（`--color-text-tertiary`）        |
+| 选中态 | `#C87345`（`--color-brand`）                |
+| 工具   | `sharp`（`devDependencies`）                |
+| 产出   | 10 个 PNG，合计 **13.6 KB**                 |
 
 **验证**
 
@@ -560,6 +561,7 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
   - `stores/app.ts` 的 `navigator.onLine`（2 处）→ `uni.getNetworkType` + `uni.onNetworkStatusChange`
   - `stores/cat.ts` / `stores/auth.ts` 的持久化调用（若直接用了 storage，改走 `api/client.ts` 封装）
 - **移除 mock 种子**（0.2 记录中发现的遗留问题）：以下 4 个 store 目前 `import ... from '../mocks/data'`，因不复制 `mocks/` 会编译失败。改为**空初始值 + 由接口加载**：
+
   - `stores/expense.ts`（`mockExpenses`）
   - `stores/inventory.ts`（`mockInventory`）
   - `stores/moment.ts`（`mockMoments`）
@@ -573,12 +575,12 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **① 依赖安装遇到三层 peer 冲突（已解决）**
 
-| 尝试 | 结果 | 原因 |
-|---|---|---|
-| `npm i pinia` | ❌ | 默认装 pinia 3.x，要求 `vue ^3.5.11`，项目是 3.4.21 |
-| `npm i pinia@^2.3.0` | ❌ | 同上（2.2/2.3 都要求 vue ^3.5.11） |
-| `npm i vue@^3.5.13 pinia@^2.3.0` | ❌ | vue 被其它依赖锁在 3.4.21，升不上去 |
-| **`npm i pinia@2.1.7 --legacy-peer-deps`** | ✅ | 见下 |
+| 尝试                                       | 结果 | 原因                                                |
+| ------------------------------------------ | ---- | --------------------------------------------------- |
+| `npm i pinia`                              | ❌   | 默认装 pinia 3.x，要求 `vue ^3.5.11`，项目是 3.4.21 |
+| `npm i pinia@^2.3.0`                       | ❌   | 同上（2.2/2.3 都要求 vue ^3.5.11）                  |
+| `npm i vue@^3.5.13 pinia@^2.3.0`           | ❌   | vue 被其它依赖锁在 3.4.21，升不上去                 |
+| **`npm i pinia@2.1.7 --legacy-peer-deps`** | ✅   | 见下                                                |
 
 `pinia@2.1.7` 本身 peer 是 `vue ^2.6.14 \|\| ^3.3.0`，与 vue 3.4.21 兼容。它仍报错，是因为带了一个**可选 peer** `@vue/composition-api`（仅服务 Vue 2），而该包声明 `vue >= 2.5 < 2.7`——npm 对 optional peer 也会做严格解析。
 
@@ -586,10 +588,10 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **版本对照**：
 
-| | 小程序 | Web 端 | 说明 |
-|---|---|---|---|
-| vue | 3.4.21 | 3.5.13 | 小程序端由 uni-app 模板锁定，**升级失败**（被其它依赖约束） |
-| pinia | 2.1.7 | 2.3.0 | 为兼容 vue 3.4 而选择 2.1.7 |
+|       | 小程序 | Web 端 | 说明                                                        |
+| ----- | ------ | ------ | ----------------------------------------------------------- |
+| vue   | 3.4.21 | 3.5.13 | 小程序端由 uni-app 模板锁定，**升级失败**（被其它依赖约束） |
+| pinia | 2.1.7  | 2.3.0  | 为兼容 vue 3.4 而选择 2.1.7                                 |
 
 > 9 个 store 只用了 Pinia 的 options API（`state`/`getters`/`actions`），两个版本行为一致，不影响功能。
 
@@ -597,12 +599,12 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 计划里我写了「请勿想当然，逐个核对」——照做了，结果与预期不同：
 
-| store | Web 端引用 | 实际情况 | 处理 |
-|---|---|---|---|
-| `moment.ts` | **0 处** | **完全死代码**（`MomentsView` 直接调 services） | 去 mock，保留结构 |
-| `expense.ts` | `ExpensesView` 2 处 | 实例化后**从未读任何字段**（用自己的 ref + services） | 去 mock，加 `set()` |
-| `inventory.ts` | `InventoryView` 2 处 | 同上，**未读任何字段** | 去 mock，加 `set()` |
-| `reminder.ts` | `RemindersView` 9 处 | **真的在用** `filter` / `setFilter` / `complete` | 去 mock，**保留全部逻辑** + 加 `set()` |
+| store          | Web 端引用           | 实际情况                                              | 处理                                   |
+| -------------- | -------------------- | ----------------------------------------------------- | -------------------------------------- |
+| `moment.ts`    | **0 处**             | **完全死代码**（`MomentsView` 直接调 services）       | 去 mock，保留结构                      |
+| `expense.ts`   | `ExpensesView` 2 处  | 实例化后**从未读任何字段**（用自己的 ref + services） | 去 mock，加 `set()`                    |
+| `inventory.ts` | `InventoryView` 2 处 | 同上，**未读任何字段**                                | 去 mock，加 `set()`                    |
+| `reminder.ts`  | `RemindersView` 9 处 | **真的在用** `filter` / `setFilter` / `complete`      | 去 mock，**保留全部逻辑** + 加 `set()` |
 
 结论：4 个里 3 个在 Web 端其实是残留（`reminder` 只用到 filter 状态）。小程序端统一改为**空初始值 + `set()` 写入**，作为纯缓存层——避免「mock 种子」与「接口数据」两套数据源并存。
 
@@ -671,12 +673,12 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 现有 Web 端在 `router/index.ts` 的 `beforeEach` 里做了三件事，小程序没有全局守卫，需重新落位：
 
-| Web 守卫逻辑 | 小程序落位 |
-|---|---|
-| 首次会话恢复（`bootstrap`） | `App.vue` 的 `onLaunch` |
-| 未登录 → 跳登录页 | `onLaunch` 检查 + 各页 `onShow` 兜底 |
-| 无家庭 → 跳 onboarding | 同上 |
-| 预载猫咪列表 | `onLaunch` 成功后执行一次 |
+| Web 守卫逻辑                | 小程序落位                           |
+| --------------------------- | ------------------------------------ |
+| 首次会话恢复（`bootstrap`） | `App.vue` 的 `onLaunch`              |
+| 未登录 → 跳登录页           | `onLaunch` 检查 + 各页 `onShow` 兜底 |
+| 无家庭 → 跳 onboarding      | 同上                                 |
+| 预载猫咪列表                | `onLaunch` 成功后执行一次            |
 
 **产出**：`src/utils/guard.ts`（**规格修正**：原计划写「`App.vue` 约 20–30 行」，实测该落位不可行，改为独立模块 + 各页 `onShow` 调用，理由见 §12 记录 1.4）
 
@@ -728,63 +730,64 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 ## 6. 阶段 2：5 个主 tab 页（5–8 天）
 
 > 每页通用流程（后续步骤不再重复）：
+>
 > 1. 迁移 template，做标签替换
 > 2. 迁移 scoped style，核对 `tokens.css` 变量、单位
 > 3. 接真实接口，去掉 mock 残留
 > 4. 与 Web 端 375px 截图逐项比对
 > 5. 处理空 / 加载 / 错误三态
 
-### 步骤 2.1　今日　`1.5d`　前置：阶段 1 完成
+### 步骤 2.1　今日　`1.5d`　前置：阶段 1 完成　🟡 **实现完成，待 DevTools 视觉验收（2026-09-19）**
 
 **要点**：`TodayView` 含手搓 toast（`document.querySelector` + `createElement`，2 处）→ 换 `uni.showToast`；聚合展示依赖 `careApi.today` + `focus` + `ai.summary` 三个接口并发。
 
 **验证**
 
-- [ ] 今日状态、焦点项、AI 摘要三块数据均来自真实接口
-- [ ] 猫咪切换器可切换且数据随之刷新
-- [ ] toast 用 `uni.showToast` 实现
-- [ ] 空数据时有合理展示
+- [x] 今日状态、焦点项、AI 摘要三块数据均来自真实接口
+- [x] 猫咪切换器可切换且数据随之刷新
+- [x] toast 用 `uni.showToast` 实现
+- [x] 空数据与全接口失败时均有合理展示
 
 ---
 
-### 步骤 2.2　记录　`1d`　前置：2.1
+### 步骤 2.2　记录　`1d`　前置：2.1　🟡 **实现完成，待 DevTools 视觉验收（2026-09-19）**
 
 **验证**
 
-- [ ] 记录列表按日期分组正确
+- [x] 记录列表按日期倒序分组，数据来自真实 `GET /records`
 - [ ] 与 Web 端展示一致
 
 ---
 
-### 步骤 2.3　猫咪　`1d`　前置：2.1
+### 步骤 2.3　猫咪　`1d`　前置：2.1　🟡 **实现完成，待 DevTools 层级验收（2026-09-19）**
 
 **要点**：`CatsView` 已在步骤 0.6 跑通，此步做**收尾与对齐**（样式细节、`window.addEventListener('keydown')` 已删、抽屉层级用 `pages.json` 原生导航替代后重新确认不被遮挡）。
 
 **验证**
 
-- [ ] 添加猫咪抽屉**底部按钮不被 tabBar 遮挡**（Web 端曾出现此问题，小程序 tabBar 是原生的，需重新验证）
-- [ ] 列表空态提示正常
+- [x] 添加猫咪抽屉操作区预留原生 tabBar（56px）与安全区空间；是否仍被原生层遮挡待真机确认
+- [x] 列表空态、错误态提示正常
 
 ---
 
-### 步骤 2.4　时光　`1d`　前置：2.1
+### 步骤 2.4　时光　`1d`　前置：2.1　🟡 **实现完成，待 DevTools 视觉验收（2026-09-19）**
 
 **验证**
 
-- [ ] 时光列表按日期倒序
-- [ ] 图片数量、类型标签展示正确
+- [x] 时光列表按日期倒序
+- [x] 图片数量、类型标签展示来自真实接口；AI 摘要已去除 mock
 
 ---
 
-### 步骤 2.5　家庭　`1.5d`　前置：2.1
+### 步骤 2.5　家庭　`1.5d`　前置：2.1　🟡 **实现完成，待 DevTools 视觉验收（2026-09-19）**
 
 **要点**：家庭页聚合了 `getFamily` + `getInventory` + `getExpenses` 三个接口。
 
 **验证**
 
-- [ ] 家庭名称、成员列表正确
-- [ ] 库存与账目概览正确
-- [ ] **已知缺口**：后端 `GET /families/{id}/members` 目前**不返回 `user_name`**，成员列表会显示 ULID。此步需决定：先用 `user_id` 兜底，或先修后端
+- [x] 家庭名称、成员列表使用真实接口；后端已补 `user_name`
+- [x] 库存与账目概览正确（账目接口已在后端完成“分 → 元”转换）
+- [x] **原已知缺口已解除**：`GET /families/{id}/members` 通过显式 `MemberEnvelope` 返回 `user_name`，查不到用户时才以 `user_id` 兜底
 
 **阶段 2 完成标志**：5 个 tab 页与 Web 端视觉一致、数据真实、三态完整。
 
@@ -792,91 +795,104 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 ## 7. 阶段 3：12 个次级页 + 图标收尾（5–8 天）
 
-### 步骤 3.1　Onboarding（引导）　`1d`
+### 步骤 3.1　Onboarding（引导）　`1d`　🟡 实现完成，待 DevTools 联调
 
 **要点**：必须真正落库（创建家庭 + 猫咪），否则 1.4 的守卫会把用户反复弹回本页形成死循环——Web 端曾出现此问题。
 
 **验证**
 
-- [ ] 完成引导后 `familyId` 已写入，不再被弹回
-- [ ] 猫咪确实创建成功（后端可查）
+- [x] 完成引导后 `familyId` 写入本地会话，守卫不再重复弹回
+- [x] 家庭、猫咪、生日、绝育状态、疾病与过敏信息均接入真实后端持久化链路
+- [ ] 在 DevTools 连接真实数据库完成一次端到端回读
 
 ---
 
-### 步骤 3.2　快捷记录　`0.5d`
+### 步骤 3.2　快捷记录　`0.5d`　🟡 实现完成，待 DevTools 联调
 
 **要点**：`route.query.catId` → `onLoad(options)`；`document.getElementById`（1 处）→ 模板 `ref`。
 
 **验证**
 
-- [ ] 从不同入口进入时默认猫咪正确
-- [ ] 保存成功与失败（离线草稿兜底）两条路径都可用
+- [x] `onLoad(options)` 接收入口参数并设置默认猫咪
+- [x] 保存成功走真实接口，失败写入本地草稿并给出提示
 
 ---
 
-### 步骤 3.3　AI 输入 + AI 确认　`1d`
+### 步骤 3.3　AI 输入 + AI 确认　`1d`　🟡 实现完成，待 DevTools 联调
 
 **要点**：`AIInputView` 的三个图标按钮（相机/上传/病历）在 Web 端**是死按钮**，小程序端需决定实现或隐藏——**注意后端没有媒体上传接口**，相机/上传无法真正实现。
 
 **验证**
 
-- [ ] 自然语言解析走真实 `ai.parse` 接口
-- [ ] 确认入库走 `records/batch`
-- [ ] 对无法实现的按钮做了明确处理（隐藏或提示「敬请期待」），不留死按钮
+- [x] 自然语言解析走真实 `ai.parse` 接口
+- [x] 确认入库走 `records/batch`，失败不再伪装成功
+- [x] 相机/上传明确提示后端能力未开放，病历入口跳转真实页面，无死按钮
 
 ---
 
-### 步骤 3.4　猫咪详情　`1d`
+### 步骤 3.4　猫咪详情　`1d`　🟡 实现完成，待视觉验收
 
 **要点**：`CatDetailView` 有 3 个死按钮（7天/30天/90天区间），迁移时一并接上或移除。
 
+**验证**
+
+- [x] 猫咪资料、今日数据与趋势使用真实接口
+- [x] 7 / 30 / 90 天按钮均会重新请求对应区间
+
 ---
 
-### 步骤 3.5　趋势　`1d`
+### 步骤 3.5　趋势　`1d`　🟡 实现完成，待视觉验收
 
 **验证**
 
-- [ ] 趋势数据来自 `care.trends`
-- [ ] 区间切换可用（与 3.4 联动）
-- [ ] 图表在小程序中正常渲染
+- [x] 趋势数据来自 `care.trends`
+- [x] 区间切换可用（与 3.4 联动）
+- [x] 图表已改为小程序原生 `view` 柱形结构并成功编译
+- [ ] DevTools / 真机目视确认图表尺寸和标签
 
 ---
 
-### 步骤 3.6　医疗上传　`1d`
+### 步骤 3.6　医疗上传　`1d`　🟡 降级实现完成
 
 **要点**：`document.createElement` 手搓 toast（2 处）→ `uni.showToast`。**注意后端无媒体上传接口**，此页需明确降级策略。
 
+**验证**
+
+- [x] 使用 `uni.chooseMedia` 选择并本地预览图片
+- [x] 上传/OCR 明确说明后端能力未开放，不生成伪造识别结果
+
 ---
 
-### 步骤 3.7　提醒　`0.5d`
+### 步骤 3.7　提醒　`0.5d`　🟡 实现完成，待 DevTools 联调
 
 **要点**：`RemindersView` 的「稍后」按钮在 Web 端是死按钮，需处理。
 
 **验证**
 
-- [ ] todo/done 筛选可用
-- [ ] 完成提醒走真实接口
+- [x] todo/done 筛选可用
+- [x] 完成提醒走真实接口；「稍后」明确提示暂未开放
 
 ---
 
-### 步骤 3.8　库存 + 账目　`1d`
+### 步骤 3.8　库存 + 账目　`1d`　🟡 实现完成，待视觉验收
 
 **验证**
 
-- [ ] 库存状态（low/ok/expired）由后端推导，前端只展示
-- [ ] 账目金额小数正确（后端以分存储，前端展示元）
+- [x] 库存状态（low/ok/expired）由后端推导，前端只展示
+- [x] 账目金额小数正确（后端以分存储，前端展示元）
 
 ---
 
-### 步骤 3.9　设置　`0.5d`
+### 步骤 3.9　设置　`0.5d`　🟡 实现完成，待视觉验收
 
 **验证**
 
-- [ ] 退出登录清空本地存储并跳登录页
+- [x] 退出登录清空认证与猫咪状态并跳登录页
+- [x] 尚无后端能力的设置项均有明确说明，无静默死按钮
 
 ---
 
-### 步骤 3.10　`AppIcon` 全量替换收尾　`1d`
+### 步骤 3.10　`AppIcon` 全量替换收尾　`1d`　🟡 代码收尾完成，待目视
 
 **做什么**
 
@@ -885,35 +901,35 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 **验证**
 
-- [ ] 全项目无 Web 端 `AppIcon` 的 `<svg v-html>` 实现残留
-- [ ] 58 个图标逐一比对通过
-- [ ] 所有页面的图标颜色随主题正确变化
+- [x] 全项目无 Web 端 `AppIcon` 的 `<svg v-html>` 实现残留
+- [ ] 57 个图标逐一目视比对（保留 `icon-test` 验证页至完成此项）
+- [x] 图标使用 `currentColor` / CSS mask，页面颜色绑定已完成
 
-**阶段 3 完成标志**：17 个页面全部完成，无 mock 残留、无死按钮。
+**阶段 3 当前结论**：17 个正式页面的代码迁移完成，无 mock import、无静默死按钮；DevTools 视觉与真实后端端到端验证仍待人工环境完成。
 
 ---
 
 ## 8. 阶段 4：平台能力与真机适配（2–3 天）
 
-### 步骤 4.1　原生能力接入　`1d`
+### 步骤 4.1　原生能力接入　`1d`　✅
 
-- [ ] `uni.showToast` 全量替换手搓 toast（确认无 `document.*` 残留）
-- [ ] 下拉刷新（按页面需要）
-- [ ] 分享（`onShareAppMessage`）
-- [ ] 网络状态监听与离线提示（`stores/app.ts` 已有 `isOffline`，确认有 UI 消费）
+- [x] `uni.showToast` 全量替换手搓 toast
+- [x] 5 个主 tab 接入下拉刷新
+- [x] 5 个主 tab 接入 `onShareAppMessage`
+- [x] 网络状态监听由 5 个主 tab 的 `OfflineBanner` 消费
 
 **验证**
 
-- [ ] 全项目 `document.` / `window.` / `navigator.` 零残留
+- [x] 可执行源码中 `document.` / `window.` / `navigator.` 零残留
 
 ---
 
-### 步骤 4.2　真机适配　`1d`
+### 步骤 4.2　真机适配　`1d`　🟡 代码适配完成，待真机
 
-- [ ] iOS 安全区（顶部刘海、底部横条）
-- [ ] Android 各屏宽（375 / 393 / 414 / 430）
-- [ ] `<input>` 原生组件与键盘弹起时的布局
-- [ ] 长列表滚动性能
+- [x] 底部安全区统一使用 `safe-area-inset-bottom`，原生导航栏负责顶部安全区
+- [x] 取消仅依赖 hover/pointer 媒体查询，触控目标统一至少 44px
+- [x] 快捷记录底部操作区改为 sticky，降低键盘顶起遮挡风险
+- [x] 列表保持原生页面滚动，未引入额外滚动容器
 
 **验证**
 
@@ -922,25 +938,27 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 ---
 
-### 步骤 4.3　包体检查　`0.5d`
+### 步骤 4.3　包体检查　`0.5d`　✅
 
-- [ ] 主包 < **2 MB**（微信硬限制）
-- [ ] 未带入 `vant` / `echarts` / `mocks`（实测 Web 端 `vant` CSS 死重 264 KB）
-- [ ] 图标字体文件大小已确认
+- [x] 主包 **346.8 KB / 2 MB（16.9%）**
+- [x] 构建产物未带入 `vant` / `echarts` / `mocks`
+- [x] 未引入图标字体；57 个图标为内联 SVG data URI 的 CSS mask
 
 > 若超标，用 `pages.json` 的 `subPackages` 分包。按现有规模（Web 端 dist 560 KB）**大概率不需要**。
 
 ---
 
-### 步骤 4.4　质量门禁　`0.5d`
+### 步骤 4.4　质量门禁　`0.5d`　✅
 
-- [ ] `type-check` 通过
-- [ ] 单元测试通过（可复用 Web 端测试思路，见 `frontend/tests/`）
-- [ ] ESLint / Prettier 通过
+- [x] `type-check` 通过
+- [x] Node 单元测试 3 / 3 通过
+- [x] ESLint / Prettier 通过
+- [x] 迁移专用静态检查通过
+- [x] 微信小程序生产构建通过
 
 ---
 
-### 步骤 4.5　逐页视觉验收　`1d`
+### 步骤 4.5　逐页视觉验收　`1d`　⏳ 需要 DevTools / 真机
 
 - [ ] 17 个页面与 Web 端 375px 截图逐页比对
 - [ ] 颜色、字号、间距、圆角与 `tokens.css` 一致
@@ -949,6 +967,8 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 ---
 
 ## 9. 阶段 5：上线准备
+
+> 已新增 `npm.cmd run verify:release` 上线门禁。当前会主动拦截：非 HTTPS/本地 API 地址、关闭合法域名校验、appid 缺失或不一致、验证页未移除、主包超过 2 MB。域名、微信后台与提审需要项目方账号/资质，代码侧不能代办。
 
 ### 步骤 5.1　域名与证书（**建议第一天就启动**）
 
@@ -987,58 +1007,59 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 ## 10. 进度追踪
 
-| 阶段 | 步骤 | 状态 | 完成日期 | 备注 |
-|---|---|---|---|---|
-| 0 | 0.1 初始化工程 | ✅ | 2026-09-17 | 见 §12 记录 0.1；待 DevTools 人工确认渲染 |
-| 0 | 0.2 复制共享层 | ✅ | 2026-09-17 | 见 §12 记录 0.2；4 个 store 的 mock 依赖转入 1.2 |
-| 0 | 0.3 样式改造 | ✅ | 2026-09-17 | 见 §12 记录 0.3；**「61 个死类」方案已废止**（检测方法不可靠） |
-| 0 | 0.4 重写网络层 | ✅ | 2026-09-17 | 见 §12 记录 0.4；**发现 wx.request 不支持 PATCH**，需后端配合 |
-| 0 | 0.5 图标方案验证 | 🟡 | 2026-09-17 | 见 §12 记录 0.5；实现完成，**待你在 DevTools 目视确认** |
-| 0 | 0.6 单页跑通 | 🟡 | 2026-09-17 | 见 §12 记录 0.6；标签容错 + 单页迁移**实现均完成**，待你在 DevTools 验证；另暴露 **WXSS 不支持元素选择器**（100+ 处） |
-| 1 | 1.1 pages.json + tabBar | 🟡 | 2026-09-17 | 见 §12 记录 1.1；17 页注册 + 原生 tabBar + 10 个图标**实现完成**，待 DevTools 验证 |
-| 1 | 1.2 迁移 stores | 🟡 | 2026-09-17 | 见 §12 记录 1.2；9 个 store 迁移完成、**类型错误 103→0**，待 DevTools 验证网络状态 |
-| 1 | 1.3 登录/注册页 | 🟡 | 2026-09-17 | 见 §12 记录 1.3；4 项验证逻辑全部落位，待 1.5 联调确认 |
-| 1 | 1.4 守卫等价逻辑 | 🟡 | 2026-09-17 | 见 §12 记录 1.4；**规格修正**——守卫落在 `utils/guard.ts` 而非 `App.vue` |
-| 1 | 1.5 认证联调 | 🟡 | 2026-09-17 | 见 §12 记录 1.5；**协议层 35/35 通过**；联调发现并修复 3 处缺陷（含后端密码哈希泄漏）；**§11 #7 解除**；UI 层待目视 |
-| 2 | 2.1 今日 | ☐ | | |
-| 2 | 2.2 记录 | ☐ | | |
-| 2 | 2.3 猫咪 | ☐ | | |
-| 2 | 2.4 时光 | ☐ | | |
-| 2 | 2.5 家庭 | ☐ | | 依赖后端补 user_name |
-| 3 | 3.1 Onboarding | ☐ | | |
-| 3 | 3.2 快捷记录 | ☐ | | |
-| 3 | 3.3 AI 输入+确认 | ☐ | | 后端无媒体上传 |
-| 3 | 3.4 猫咪详情 | ☐ | | |
-| 3 | 3.5 趋势 | ☐ | | |
-| 3 | 3.6 医疗上传 | ☐ | | 后端无媒体上传 |
-| 3 | 3.7 提醒 | ☐ | | |
-| 3 | 3.8 库存+账目 | ☐ | | |
-| 3 | 3.9 设置 | ☐ | | |
-| 3 | 3.10 图标替换收尾 | ☐ | | |
-| 4 | 4.1 原生能力接入 | ☐ | | |
-| 4 | 4.2 真机适配 | ☐ | | |
-| 4 | 4.3 包体检查 | ☐ | | |
-| 4 | 4.4 质量门禁 | ☐ | | |
-| 4 | 4.5 逐页视觉验收 | ☐ | | |
-| 5 | 5.1 域名与证书 | ☐ | | 建议提前启动 |
-| 5 | 5.2 微信后台配置 | ☐ | | |
-| 5 | 5.3 提审 | ☐ | | |
+| 阶段 | 步骤                    | 状态 | 完成日期   | 备注                                                                                                                  |
+| ---- | ----------------------- | ---- | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| 0    | 0.1 初始化工程          | ✅   | 2026-09-17 | 见 §12 记录 0.1；待 DevTools 人工确认渲染                                                                             |
+| 0    | 0.2 复制共享层          | ✅   | 2026-09-17 | 见 §12 记录 0.2；4 个 store 的 mock 依赖转入 1.2                                                                      |
+| 0    | 0.3 样式改造            | ✅   | 2026-09-17 | 见 §12 记录 0.3；**「61 个死类」方案已废止**（检测方法不可靠）                                                        |
+| 0    | 0.4 重写网络层          | ✅   | 2026-09-17 | 见 §12 记录 0.4；**发现 wx.request 不支持 PATCH**，需后端配合                                                         |
+| 0    | 0.5 图标方案验证        | 🟡   | 2026-09-17 | 见 §12 记录 0.5；实现完成，**待你在 DevTools 目视确认**                                                               |
+| 0    | 0.6 单页跑通            | 🟡   | 2026-09-17 | 见 §12 记录 0.6；标签容错 + 单页迁移**实现均完成**，待你在 DevTools 验证；另暴露 **WXSS 不支持元素选择器**（100+ 处） |
+| 1    | 1.1 pages.json + tabBar | 🟡   | 2026-09-17 | 见 §12 记录 1.1；17 页注册 + 原生 tabBar + 10 个图标**实现完成**，待 DevTools 验证                                    |
+| 1    | 1.2 迁移 stores         | 🟡   | 2026-09-17 | 见 §12 记录 1.2；9 个 store 迁移完成、**类型错误 103→0**，待 DevTools 验证网络状态                                    |
+| 1    | 1.3 登录/注册页         | 🟡   | 2026-09-17 | 见 §12 记录 1.3；4 项验证逻辑全部落位，待 1.5 联调确认                                                                |
+| 1    | 1.4 守卫等价逻辑        | 🟡   | 2026-09-17 | 见 §12 记录 1.4；**规格修正**——守卫落在 `utils/guard.ts` 而非 `App.vue`                                               |
+| 1    | 1.5 认证联调            | 🟡   | 2026-09-17 | 见 §12 记录 1.5；**协议层 35/35 通过**；联调发现并修复 3 处缺陷（含后端密码哈希泄漏）；**§11 #7 解除**；UI 层待目视   |
+| 2    | 2.1 今日                | 🟡   | 2026-09-19 | 真实聚合接口、切猫、toast、三态完成；待视觉验收                                                                       |
+| 2    | 2.2 记录                | 🟡   | 2026-09-19 | 新增真实记录列表与日期分组；待视觉验收                                                                                |
+| 2    | 2.3 猫咪                | 🟡   | 2026-09-19 | 详情导航与 store 同步完成；抽屉原生层待真机确认                                                                       |
+| 2    | 2.4 时光                | 🟡   | 2026-09-19 | 去除 mock AI 摘要，真实接口完成；待视觉验收                                                                           |
+| 2    | 2.5 家庭                | 🟡   | 2026-09-19 | 后端已补 `user_name`；聚合与成员列表完成                                                                              |
+| 3    | 3.1 Onboarding          | 🟡   | 2026-09-19 | 家庭、猫咪及健康基础资料真实落库链路完成；待端到端回读                                                                |
+| 3    | 3.2 快捷记录            | 🟡   | 2026-09-19 | 入口参数、真实保存与本地草稿兜底完成                                                                                  |
+| 3    | 3.3 AI 输入+确认        | 🟡   | 2026-09-19 | 真实解析/批量入库；媒体按钮明确降级                                                                                   |
+| 3    | 3.4 猫咪详情            | 🟡   | 2026-09-19 | 真实数据与 7/30/90 天联动完成                                                                                         |
+| 3    | 3.5 趋势                | 🟡   | 2026-09-19 | 真实趋势与原生图形结构完成；待目视                                                                                    |
+| 3    | 3.6 医疗上传            | 🟡   | 2026-09-19 | 本地选图/预览完成；无后端上传/OCR 时明确降级                                                                          |
+| 3    | 3.7 提醒                | 🟡   | 2026-09-19 | 筛选与完成接口完成；稍后功能明确未开放                                                                                |
+| 3    | 3.8 库存+账目           | 🟡   | 2026-09-19 | 真实接口、状态和金额映射完成                                                                                          |
+| 3    | 3.9 设置                | 🟡   | 2026-09-19 | 退出闭环及不可用项反馈完成                                                                                            |
+| 3    | 3.10 图标替换收尾       | 🟡   | 2026-09-19 | 代码替换完成；57 图标待 DevTools 逐一目视                                                                             |
+| 4    | 4.1 原生能力接入        | ✅   | 2026-09-19 | 下拉刷新、分享、离线提示及原生 toast 完成                                                                             |
+| 4    | 4.2 真机适配            | 🟡   | 2026-09-19 | 安全区/触控/键盘代码适配完成，待 iOS/Android 真机                                                                     |
+| 4    | 4.3 包体检查            | ✅   | 2026-09-19 | 346.8 KB（16.9%）；无 vant/echarts/mocks                                                                              |
+| 4    | 4.4 质量门禁            | ✅   | 2026-09-19 | 类型、测试、静态迁移检查、格式、构建均通过                                                                            |
+| 4    | 4.5 逐页视觉验收        | ⏳   |            | 必须在 DevTools/真机逐页执行                                                                                          |
+| 5    | 5.1 域名与证书          | ⏳   |            | 需项目方提供已备案 HTTPS 域名                                                                                         |
+| 5    | 5.2 微信后台配置        | ⏳   |            | 需微信公众平台权限；当前仍为本地 API 且 urlCheck=false                                                                |
+| 5    | 5.3 提审                | ⏳   |            | 需隐私协议、体验版验证及管理员提交                                                                                    |
 
 ---
 
 ## 11. 阻塞项与前置决策
 
-| # | 事项 | 阻塞哪些步骤 | 需谁决策 |
-|---|---|---|---|
-| 1 | **登录方式**（邮箱密码 / 微信一键登录） | 1.3、1.5、5.2 | 产品 |
-| | ↳ 现状：**已按「邮箱密码」实现并跑通**（1.5 协议层 35/35）。若产品要改「微信一键登录」，需后端加 `openid` 字段 + `code2Session` 接口，1.3/1.5 需返工 | | |
-| 2 | **`CatsView` 之外页面是否也要「添加」入口** | 阶段 3 各页 | 产品 |
-| 3 | **成员列表 `user_name`**：改后端 or 前端兜底 | 2.5 | 技术 |
-| 4 | **媒体上传**：后端无接口，AI 输入/医疗上传如何降级 | 3.3、3.6 | 产品 + 技术 |
-| 5 | **备案域名**是否已有 | 5.1、5.2 | 运维 |
-| 6 | 图标方案（0.5 验证后定） | 0.5、3.10 | 技术 |
-| 7 | ✅ **已解除**（2026-09-17）—— 曾为 🔴：后端需识别 `X-HTTP-Method-Override: PATCH`（`wx.request` 不支持 PATCH，小程序端降级为 POST + 覆盖头）。已新增 `middleware/method_override.go`，**包在 gin engine 外层**（Gin 在进入中间件链前就完成路由匹配，`engine.Use()` 里改 Method 太晚）；只放行 PATCH，避免被用来把 POST 变 DELETE | ~~2.5、3.4、3.7~~ | 已完成 |
-| 8 | **后端响应可能是原始 model**：`AuthResult.User` 曾直接序列化 `*model.User`，而 `model.User` / `model.Base` 都没有 json tag → 字段名变 PascalCase 且**密码哈希被下发**。已改为显式 DTO 修复，但**其余接口是否还有同类问题未逐一审计** | 阶段 2/3 各页 | 技术 |
+| #   | 事项                                                                                                                                                                                                                                                                                                                             | 阻塞哪些步骤      | 需谁决策     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------ |
+| 1   | **登录方式**（邮箱密码 / 微信一键登录）                                                                                                                                                                                                                                                                                          | 1.3、1.5、5.2     | 产品         |
+|     | ↳ 现状：**已按「邮箱密码」实现并跑通**（1.5 协议层 35/35）。若产品要改「微信一键登录」，需后端加 `openid` 字段 + `code2Session` 接口，1.3/1.5 需返工                                                                                                                                                                             |                   |              |
+| 2   | **`CatsView` 之外页面是否也要「添加」入口**                                                                                                                                                                                                                                                                                      | 阶段 3 各页       | 产品         |
+| 3   | ✅ **已解除**（2026-09-19）—— 后端 `FamilyService.ListMembers` 组装显式 `MemberEnvelope` 并查询用户名，接口返回 `user_name`；仅用户记录异常缺失时回退 `user_id`                                                                                                                                                                  | ~~2.5~~           | 已完成       |
+| 4   | ✅ **迁移侧已解除**（2026-09-19）—— 后端仍无媒体上传/OCR 接口；AI 输入明确提示未开放，医疗页仅做 `uni.chooseMedia` 本地预览并说明无法上传，不再伪造 OCR/AI 结果。未来启用上传仍需新增后端能力                                                                                                                                    | ~~3.3、3.6~~      | 当前降级完成 |
+| 5   | **备案域名**是否已有                                                                                                                                                                                                                                                                                                             | 5.1、5.2          | 运维         |
+| 6   | 图标方案（0.5 验证后定）                                                                                                                                                                                                                                                                                                         | 0.5、3.10         | 技术         |
+| 7   | ✅ **已解除**（2026-09-17）—— 曾为 🔴：后端需识别 `X-HTTP-Method-Override: PATCH`（`wx.request` 不支持 PATCH，小程序端降级为 POST + 覆盖头）。已新增 `middleware/method_override.go`，**包在 gin engine 外层**（Gin 在进入中间件链前就完成路由匹配，`engine.Use()` 里改 Method 太晚）；只放行 PATCH，避免被用来把 POST 变 DELETE | ~~2.5、3.4、3.7~~ | 已完成       |
+| 8   | ✅ **已解除**（2026-09-19）—— 已审计阶段 2/3 使用的全部响应：记录、提醒、时光、库存、账目、今日、焦点、趋势、AI 均由带 JSON tag 的应用层 Envelope/DTO 返回；家庭/猫咪 handler 显式映射；成员接口本轮改为 `MemberEnvelope`                                                                                                        | ~~阶段 2/3 各页~~ | 已完成       |
+| 9   | **本机 Go 测试受应用控制策略阻止**：`gofmt` 可执行，但 `go test ./...` 无法启动 `D:\tool\bin\go.exe`；后端改动已格式化并静态核对全部调用点，仍需在允许执行 Go 的 CI/开发机补跑                                                                                                                                                   | 后端最终回归      | 开发环境/CI  |
 
 ## 12. 开发记录
 
@@ -1051,25 +1072,25 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 #### 实际改动的文件
 
-| 文件 | 操作 |
-|---|---|
-| `miniprogram/` | 新增（degit 拉取官方 `uni-preset-vue#vite-ts` 模板，956 个依赖包） |
-| `miniprogram/package.json` | `@dcloudio/types` 由 `^3.4.8` 固定为 `3.4.8` |
-| `miniprogram/src/manifest.json` | 填入 `name`=「猫宅 MeowHome」、`description`、`mp-weixin.appid` |
-| `miniprogram/project.config.json` | **从仓库根目录移入**（详见下方「发现 5」） |
-| `miniprogram/project.private.config.json` | **从仓库根目录移入** + `urlCheck` 改 `false` + 去除 BOM |
-| `miniprogram/.gitignore` | 追加 `project.private.config.json`（本地个人配置不入库） |
-| `frontend/` | **未改动** ✓ |
-| 仓库根目录 | 清理了过程中产生的 `.npm-cache/`、`.degit-cache/`，恢复干净 |
+| 文件                                      | 操作                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `miniprogram/`                            | 新增（degit 拉取官方 `uni-preset-vue#vite-ts` 模板，956 个依赖包） |
+| `miniprogram/package.json`                | `@dcloudio/types` 由 `^3.4.8` 固定为 `3.4.8`                       |
+| `miniprogram/src/manifest.json`           | 填入 `name`=「猫宅 MeowHome」、`description`、`mp-weixin.appid`    |
+| `miniprogram/project.config.json`         | **从仓库根目录移入**（详见下方「发现 5」）                         |
+| `miniprogram/project.private.config.json` | **从仓库根目录移入** + `urlCheck` 改 `false` + 去除 BOM            |
+| `miniprogram/.gitignore`                  | 追加 `project.private.config.json`（本地个人配置不入库）           |
+| `frontend/`                               | **未改动** ✓                                                       |
+| 仓库根目录                                | 清理了过程中产生的 `.npm-cache/`、`.degit-cache/`，恢复干净        |
 
 #### 遇到的问题与处理
 
-| # | 问题 | 现象 | 处理 |
-|---|---|---|---|
-| 1 | PowerShell 执行策略 | `npx.ps1` 被拒（`UnauthorizedAccess`） | 改用 `npx.cmd` / `npm.cmd` |
-| 2 | npm 缓存位于工作区外 | `EPERM ... AppData\Local\npm-cache\_cacache` | 设 `npm_config_cache` 指向 `%TEMP%\dsh-npm-cache` |
-| 3 | degit 硬编码缓存路径 | `EPERM mkdir %LOCALAPPDATA%\degit`，且**忽略 `DEGIT_CACHE` 环境变量** | 需一次性更宽执行权限 |
-| 4 | 依赖 postinstall 与 esbuild 构建 | `spawn EPERM` | 同上。esbuild 必须经管道 stdio 启动服务进程，**无法绕过** |
+| #   | 问题                             | 现象                                                                  | 处理                                                      |
+| --- | -------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1   | PowerShell 执行策略              | `npx.ps1` 被拒（`UnauthorizedAccess`）                                | 改用 `npx.cmd` / `npm.cmd`                                |
+| 2   | npm 缓存位于工作区外             | `EPERM ... AppData\Local\npm-cache\_cacache`                          | 设 `npm_config_cache` 指向 `%TEMP%\dsh-npm-cache`         |
+| 3   | degit 硬编码缓存路径             | `EPERM mkdir %LOCALAPPDATA%\degit`，且**忽略 `DEGIT_CACHE` 环境变量** | 需一次性更宽执行权限                                      |
+| 4   | 依赖 postinstall 与 esbuild 构建 | `spawn EPERM`                                                         | 同上。esbuild 必须经管道 stdio 启动服务进程，**无法绕过** |
 
 > ⚠️ **这 4 条对你无影响**：2/3/4 全部源自我运行环境的文件沙箱（只能写工作区内），esbuild 的 `spawn` 在沙箱下恒被拒。你在本机用普通终端执行文档中的命令不会有任何问题。
 
@@ -1088,13 +1109,13 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 #### 产物验证
 
-| 检查 | 结果 |
-|---|---|
-| `dist/dev/mp-weixin/app.json` | ✅ 存在 |
-| `dist/build/mp-weixin/app.json` | ✅ 存在 |
-| 产物文件齐全度 | ✅ `app.js` `app.json` `app.wxss` `common/vendor.js` `pages/index/*` `static/logo.png` |
-| `project.config.json` 带入 appid | ✅ `wxb376a5d7842bf256` |
-| 待人工确认 | ⏳ 用微信开发者工具打开 `miniprogram/dist/dev/mp-weixin` 是否正常渲染 |
+| 检查                             | 结果                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| `dist/dev/mp-weixin/app.json`    | ✅ 存在                                                                                |
+| `dist/build/mp-weixin/app.json`  | ✅ 存在                                                                                |
+| 产物文件齐全度                   | ✅ `app.js` `app.json` `app.wxss` `common/vendor.js` `pages/index/*` `static/logo.png` |
+| `project.config.json` 带入 appid | ✅ `wxb376a5d7842bf256`                                                                |
+| 待人工确认                       | ⏳ 用微信开发者工具打开 `miniprogram/dist/dev/mp-weixin` 是否正常渲染                  |
 
 **下一步**：0.2 复制共享层（`types/`、`api/adapter.ts`、`styles/`、`stores/`）
 
@@ -1106,12 +1127,12 @@ Web 端在 store 的 `state` 初始化里同步读 `navigator.onLine`；小程�
 
 #### 实际复制的内容（15 个文件）
 
-| 类别 | 文件 | 大小 |
-|---|---|---|
-| 类型 | `types/index.ts` | 7,006 B |
-| 适配器 | `api/adapter.ts` | 2,665 B |
-| 样式 | `styles/tokens.css` / `reset.css` / `global.css` / `pages.css` | 1,873 / 1,105 / 3,728 / 87,916 B |
-| 状态 | `stores/` 共 9 个（app / auth / cat / expense / health / inventory / moment / record / reminder） | — |
+| 类别   | 文件                                                                                              | 大小                             |
+| ------ | ------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 类型   | `types/index.ts`                                                                                  | 7,006 B                          |
+| 适配器 | `api/adapter.ts`                                                                                  | 2,665 B                          |
+| 样式   | `styles/tokens.css` / `reset.css` / `global.css` / `pages.css`                                    | 1,873 / 1,105 / 3,728 / 87,916 B |
+| 状态   | `stores/` 共 9 个（app / auth / cat / expense / health / inventory / moment / record / reminder） | —                                |
 
 **按计划未复制**：`mocks/`、`views/`、`components/`、`api/client.ts`、`api/endpoints.ts` —— 已逐一确认不存在 ✓
 
@@ -1154,14 +1175,14 @@ stores/auth.ts       → import ... from '../api/client'、'../api/endpoints'
 
 #### 实际改动
 
-| 文件 | 改动 | 数量 |
-|---|---|---|
-| `styles/tokens.css` | `:root {` → `page {` | 1 处 |
-| `styles/global.css` | `100dvh` → `100vh` | 1 处 |
-| `styles/reset.css` | `100dvh` → `100vh` | 1 处 |
-| `styles/pages.css` | `dvh` → `vh` | 5 处 |
-| `styles/pages.css` | 删除桌面/平板响应式块 | 50 行（4158 → 4108） |
-| `frontend/` | **未改动** ✓ | — |
+| 文件                | 改动                  | 数量                 |
+| ------------------- | --------------------- | -------------------- |
+| `styles/tokens.css` | `:root {` → `page {`  | 1 处                 |
+| `styles/global.css` | `100dvh` → `100vh`    | 1 处                 |
+| `styles/reset.css`  | `100dvh` → `100vh`    | 1 处                 |
+| `styles/pages.css`  | `dvh` → `vh`          | 5 处                 |
+| `styles/pages.css`  | 删除桌面/平板响应式块 | 50 行（4158 → 4108） |
+| `frontend/`         | **未改动** ✓          | —                    |
 
 #### 重要：推翻了原计划的「清理 61 个死 CSS 类」
 
@@ -1172,37 +1193,38 @@ stores/auth.ts       → import ... from '../api/client'、'../api/endpoints'
 - 61 个候选里 **40 个命中前缀** → 疑似动态拼接
 - 进一步实测确认了 7 组真实的动态绑定：
 
-| 动态绑定位置 | 会误判为死类的**实际生效**类 |
-|---|---|
-| `FamilyView.vue:158` `` :class="`tone-${index % 2}`" `` | `.tone-1` |
-| `FamilyView.vue:252` `` :class="`tone-${item.tone}`" `` | `.tone-blue` `.tone-clay` `.tone-rose` `.tone-warning` |
-| `MomentsView.vue:257` `` :class="[`type-${event.type}`, ...]" `` | `.type-medical` `.type-interaction` `.type-milestone` |
-| `TodayView.vue:361` `` :class="[..., `state-${groupLevel(group)}`]" `` | `.state-danger` `.state-warning` |
-| `TodayView.vue:391` `:class="row.state"` | `.warning` `.danger` `.none` |
-| `TodayView.vue:454` `:class="item.severity"` | `.warn` `.info` `.danger` |
-| `InventoryView.vue:62` `:class="item.status"` | `.low` `.ok` `.expired` |
+| 动态绑定位置                                                         | 会误判为死类的**实际生效**类                           |
+| -------------------------------------------------------------------- | ------------------------------------------------------ |
+| `FamilyView.vue:158` ``:class="`tone-${index % 2}`"``                | `.tone-1`                                              |
+| `FamilyView.vue:252` ``:class="`tone-${item.tone}`"``                | `.tone-blue` `.tone-clay` `.tone-rose` `.tone-warning` |
+| `MomentsView.vue:257` ``:class="[`type-${event.type}`, ...]"``       | `.type-medical` `.type-interaction` `.type-milestone`  |
+| `TodayView.vue:361` ``:class="[..., `state-${groupLevel(group)}`]"`` | `.state-danger` `.state-warning`                       |
+| `TodayView.vue:391` `:class="row.state"`                             | `.warning` `.danger` `.none`                           |
+| `TodayView.vue:454` `:class="item.severity"`                         | `.warn` `.info` `.danger`                              |
+| `InventoryView.vue:62` `:class="item.status"`                        | `.low` `.ok` `.expired`                                |
 
 其中 `.warn` 最具迷惑性：它在 `.vue` 里有 **24 处命中**，但**全部来自 `iconPaths.ts` 的图标名和 `health.ts` 的数据字段**，没有一处是 CSS 类名——所以字面检测判定它是死类；而实际上 `TodayView:454` 的 `:class="item.severity"` 会在运行时产生 `warn`，它**是活的**。
 
 **决定**：**放弃批量删除**。只删除可证明安全的部分——桌面/平板响应式块（含 `.desktop-*` 4 个类），依据是：
+
 1. 这 4 个类在 `frontend/` 中出现 **0 次**
 2. `@media (min-width: 768px/1024px)` 在手机上**恒不成立**，属结构性死代码，不依赖类名检测
 
 #### 偏差说明
 
-| 项 | 原计划 | 实际 |
-|---|---|---|
-| `dvh` 数量 | 「10 处」 | **7 处**（原统计把 `.vue` 里的也算进了 CSS 步骤） |
-| 死类清理 | 删 61 个 | **删 4 个类 / 50 行**，其余经风险评估主动保留 |
-| 构建验证 | 未要求 | 未执行（本步纯 CSS 改动，改用花括号配平作语法代理检查） |
+| 项         | 原计划    | 实际                                                    |
+| ---------- | --------- | ------------------------------------------------------- |
+| `dvh` 数量 | 「10 处」 | **7 处**（原统计把 `.vue` 里的也算进了 CSS 步骤）       |
+| 死类清理   | 删 61 个  | **删 4 个类 / 50 行**，其余经风险评估主动保留           |
+| 构建验证   | 未要求    | 未执行（本步纯 CSS 改动，改用花括号配平作语法代理检查） |
 
 #### 遗留问题（已写入步骤 0.3 与后续步骤）
 
-| # | 事项 | 转入 |
-|---|---|---|
-| 1 | `@media (hover: none) and (pointer: coarse)` 触摸目标块——若 WXSS 不支持这些媒体特性，按钮会丢失 44px 最小尺寸 | 4.2 |
-| 2 | `env(safe-area-inset-*)`（2 处）在目标基础库是否生效 | 4.2 |
-| 3 | `.page { padding-bottom: calc(64px + var(--safe-bottom)) }` 是为固定底栏预留，改用原生 tabBar 后会多出留白 | 1.1 |
+| #   | 事项                                                                                                          | 转入 |
+| --- | ------------------------------------------------------------------------------------------------------------- | ---- |
+| 1   | `@media (hover: none) and (pointer: coarse)` 触摸目标块——若 WXSS 不支持这些媒体特性，按钮会丢失 44px 最小尺寸 | 4.2  |
+| 2   | `env(safe-area-inset-*)`（2 处）在目标基础库是否生效                                                          | 4.2  |
+| 3   | `.page { padding-bottom: calc(64px + var(--safe-bottom)) }` 是为固定底栏预留，改用原生 tabBar 后会多出留白    | 1.1  |
 
 **下一步**：0.4 重写网络层 `api/client.ts`（axios → `uni.request`、`localStorage` → `uni.*Storage`）
 
@@ -1214,13 +1236,13 @@ stores/auth.ts       → import ... from '../api/client'、'../api/endpoints'
 
 #### 实际改动
 
-| 文件 | 操作 |
-|---|---|
-| `src/api/config.ts` | **新增** —— 后端地址常量（小程序无 Vite 代理，必须直连绝对地址） |
-| `src/api/client.ts` | **重写** —— axios → `uni.request`，7,305 B |
-| `src/api/endpoints.ts` | **从 Web 端复制，零改动** |
-| `src/api/adapter.ts` | 0.2 已复制，未改动 |
-| `frontend/` | **未改动** ✓ |
+| 文件                   | 操作                                                             |
+| ---------------------- | ---------------------------------------------------------------- |
+| `src/api/config.ts`    | **新增** —— 后端地址常量（小程序无 Vite 代理，必须直连绝对地址） |
+| `src/api/client.ts`    | **重写** —— axios → `uni.request`，7,305 B                       |
+| `src/api/endpoints.ts` | **从 Web 端复制，零改动**                                        |
+| `src/api/adapter.ts`   | 0.2 已复制，未改动                                               |
+| `frontend/`            | **未改动** ✓                                                     |
 
 #### 关键成果：`endpoints.ts` 完全不用改
 
@@ -1247,11 +1269,11 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **影响**：后端有 3 个 PATCH 路由，`endpoints.ts` 中对应 3 处调用：
 
-| 接口 | 用途 | 影响步骤 |
-|---|---|---|
-| `PATCH /families/:familyId` | 更新家庭 | 2.5 |
-| `PATCH /families/:familyId/cats/:catId` | 更新猫咪 | 3.4 |
-| `PATCH /families/:familyId/reminders/:reminderId/complete` | 完成提醒 | 3.7 |
+| 接口                                                       | 用途     | 影响步骤 |
+| ---------------------------------------------------------- | -------- | -------- |
+| `PATCH /families/:familyId`                                | 更新家庭 | 2.5      |
+| `PATCH /families/:familyId/cats/:catId`                    | 更新猫咪 | 3.4      |
+| `PATCH /families/:familyId/reminders/:reminderId/complete` | 完成提醒 | 3.7      |
 
 **处理**：`client.ts` 内部把 `PATCH` 改写为 `POST` + `X-HTTP-Method-Override: PATCH`，并保留对外 `HttpMethod` 类型含 `'PATCH'`（否则 `endpoints.ts` 编译不过）。
 
@@ -1261,24 +1283,24 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 验证方法与结果
 
-| 检查 | 结果 |
-|---|---|
+| 检查                              | 结果                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 平台专有 API 残留（**排除注释**） | `axios` / `localStorage` / `location.` / `crypto.` / `window.` / `document.` / `navigator.` 实际代码 **0 处** |
-| `endpoints.ts` 与源文件 | SHA256 **一致**（零改动） |
-| `stores/` 是否被改 | 9 个哈希集合与 Web 端一致 ✓ |
-| `src/api/` 类型检查 | **0 错误** ✓ |
-| 对外导出 | 确认 5 个：`apiBase` / `http` / `aiHttp` / `request` / `requestEnvelope` |
-| `frontend/` 回归 | 7 条，与 0.3 时一致，未新增 ✓ |
+| `endpoints.ts` 与源文件           | SHA256 **一致**（零改动）                                                                                     |
+| `stores/` 是否被改                | 9 个哈希集合与 Web 端一致 ✓                                                                                   |
+| `src/api/` 类型检查               | **0 错误** ✓                                                                                                  |
+| 对外导出                          | 确认 5 个：`apiBase` / `http` / `aiHttp` / `request` / `requestEnvelope`                                      |
+| `frontend/` 回归                  | 7 条，与 0.3 时一致，未新增 ✓                                                                                 |
 
 > 「排除注释」是必要的：`client.ts` 的注释里写有 `axios → uni.request`、`location.hash → uni.reLaunch` 这类替换说明，朴素 grep 会误报。我在验证脚本里加了「跳过 `//` 与 `*` 开头的行」的过滤。
 
 #### 偏差说明
 
-| 项 | 原计划 | 实际 |
-|---|---|---|
-| `endpoints.ts` | 「仅改 import」 | **零改动**（比预期更好） |
-| 新增文件 | 未提及 | 增加了 `api/config.ts`（小程序无代理，需显式配置绝对地址） |
-| PATCH | 未预见 | 平台不支持，已降级 + 列入阻塞项 |
+| 项             | 原计划          | 实际                                                       |
+| -------------- | --------------- | ---------------------------------------------------------- |
+| `endpoints.ts` | 「仅改 import」 | **零改动**（比预期更好）                                   |
+| 新增文件       | 未提及          | 增加了 `api/config.ts`（小程序无代理，需显式配置绝对地址） |
+| PATCH          | 未预见          | 平台不支持，已降级 + 列入阻塞项                            |
 
 #### 发现的另一项（转入 1.2）
 
@@ -1321,8 +1343,8 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 ```html
 <svg fill="none" stroke="currentColor" stroke-width="1.8" ...>
-  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-  <polyline points="9 22 9 12 15 12 15 22"/>
+  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  <polyline points="9 22 9 12 15 12 15 22" />
 </svg>
 ```
 
@@ -1337,35 +1359,35 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 遮罩只取 **alpha 通道**，SVG 内 stroke 的颜色（`#000`）不参与显示，真正上色的是 `currentColor` —— 与 Web 端 `stroke="currentColor"` **语义等价**。
 
-| 维度 | 图标字体 | CSS 遮罩（采用） |
-|---|---|---|
+| 维度     | 图标字体                       | CSS 遮罩（采用）          |
+| -------- | ------------------------------ | ------------------------- |
 | 几何保真 | 需 stroke→outline 转换，有误差 | **复用原始 path，零损失** |
-| 工具链 | 需字体生成工具 | **无** |
-| 变色能力 | 支持 | **支持** |
-| 包体 | 字体文件通常更小 | 24.7 KB（可接受） |
+| 工具链   | 需字体生成工具                 | **无**                    |
+| 变色能力 | 支持                           | **支持**                  |
+| 包体     | 字体文件通常更小               | 24.7 KB（可接受）         |
 
 #### 实际产出
 
-| 文件 | 说明 |
-|---|---|
-| `scripts/gen-icons.mjs` | **新增** —— 从 Web 端 `iconPaths.ts` 生成图标数据；Web 端图标变更时必须重跑 |
-| `src/components/app/iconData.ts` | **新增** —— 57 个 base64 data URI，24.8 KB（自动生成，勿手改） |
-| `src/components/app/AppIcon.vue` | **新增** —— props（`name` / `size`）与 Web 端完全一致，调用点零改动 |
-| `src/pages/icon-test/index.vue` | **新增** —— 验证页 |
-| `src/pages.json` | 注册页面，并**把验证页设为启动页**（便于你打开即可见；步骤 1.1 会替换） |
-| `frontend/` | **未改动** ✓ |
+| 文件                             | 说明                                                                        |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `scripts/gen-icons.mjs`          | **新增** —— 从 Web 端 `iconPaths.ts` 生成图标数据；Web 端图标变更时必须重跑 |
+| `src/components/app/iconData.ts` | **新增** —— 57 个 base64 data URI，24.8 KB（自动生成，勿手改）              |
+| `src/components/app/AppIcon.vue` | **新增** —— props（`name` / `size`）与 Web 端完全一致，调用点零改动         |
+| `src/pages/icon-test/index.vue`  | **新增** —— 验证页                                                          |
+| `src/pages.json`                 | 注册页面，并**把验证页设为启动页**（便于你打开即可见；步骤 1.1 会替换）     |
+| `frontend/`                      | **未改动** ✓                                                                |
 
 #### 已验证的部分（可复现）
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 图标数据完整性 | 逐个 base64 解码 → 提取 path → 与 Web 端源文件比对 | **57 / 57 逐字节一致** |
-| 编译通过 | `npm.cmd run build:mp-weixin` | `DONE Build complete.` |
-| 遮罩样式进入产物 | 读 `dist/build/mp-weixin/components/app/AppIcon.wxss` | `background-color:currentColor` + `-webkit-mask-*` 全在 |
-| 动态样式进入产物 | 读 `.../AppIcon.js` | `"-webkit-mask-image": url("...")` 保留 |
-| data URI 进入产物 | 扫描产物 JS | 命中 57 处 |
-| 包体 | 统计 `dist/build/mp-weixin` 全量 | **101.1 KB / 2048 KB**，余量充足 |
-| `frontend/` 回归 | `git status` | 7 条，未新增 ✓ |
+| 检查              | 方法                                                  | 结果                                                    |
+| ----------------- | ----------------------------------------------------- | ------------------------------------------------------- |
+| 图标数据完整性    | 逐个 base64 解码 → 提取 path → 与 Web 端源文件比对    | **57 / 57 逐字节一致**                                  |
+| 编译通过          | `npm.cmd run build:mp-weixin`                         | `DONE Build complete.`                                  |
+| 遮罩样式进入产物  | 读 `dist/build/mp-weixin/components/app/AppIcon.wxss` | `background-color:currentColor` + `-webkit-mask-*` 全在 |
+| 动态样式进入产物  | 读 `.../AppIcon.js`                                   | `"-webkit-mask-image": url("...")` 保留                 |
+| data URI 进入产物 | 扫描产物 JS                                           | 命中 57 处                                              |
+| 包体              | 统计 `dist/build/mp-weixin` 全量                      | **101.1 KB / 2048 KB**，余量充足                        |
+| `frontend/` 回归  | `git status`                                          | 7 条，未新增 ✓                                          |
 
 #### ⚠️ 未验证的部分（需要你）
 
@@ -1382,10 +1404,10 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 数字修正
 
-| 项 | 原文档 | 实测 |
-|---|---|---|
-| 图标定义数 | 58 | **57** |
-| `<AppIcon>` 引用数 | 71 | 71 ✓ |
+| 项                 | 原文档 | 实测   |
+| ------------------ | ------ | ------ |
+| 图标定义数         | 58     | **57** |
+| `<AppIcon>` 引用数 | 71     | 71 ✓   |
 
 #### 偏差说明
 
@@ -1406,6 +1428,7 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 原计划只让「放一个含 `<div>` / `<span>` 的页面」观察。我把它做成覆盖**全部 20 种** Web 端实际用到的标签的对照实验，一次测完，避免后续步反复试错。
 
 新建 `src/pages/tag-test/index.vue`，分 5 组：
+
 - A 结构标签：`div` / `span` / `p` / `h1` / `h2`
 - B 表单交互：`label` / `input` / `button`
 - C 原生组件对照组：`view` / `text` / `image`
@@ -1437,20 +1460,20 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 修正后的标签替换工作量
 
-| 分类 | 数量 | 处理 |
-|---|---|---|
-| 映射正确，**可保留** | 约 350 处 | `div` `p` `section` `header` `main` `nav` `h1` `h2` `h3` `label` `input` |
-| 只需全局 reset CSS | 72 处 | `button`（默认边框/圆角/背景） |
-| **必须手工改** | **143 处** | 见下 |
+| 分类                 | 数量       | 处理                                                                     |
+| -------------------- | ---------- | ------------------------------------------------------------------------ |
+| 映射正确，**可保留** | 约 350 处  | `div` `p` `section` `header` `main` `nav` `h1` `h2` `h3` `label` `input` |
+| 只需全局 reset CSS   | 72 处      | `button`（默认边框/圆角/背景）                                           |
+| **必须手工改**       | **143 处** | 见下                                                                     |
 
 143 处的构成：
 
-| 标签 | 数量 | 改为 |
-|---|---|---|
-| `<span>` | 112 | `<text>`（其中 12 处需重构嵌套） |
-| `<strong>` `<i>` `<b>` `<em>` | 23 | `<text>` |
-| `<img>` | 7 | `<image mode="aspectFit">` |
-| `<a>` | 1 | `<navigator>`（路径需从 `#/xxx` 改为小程序页面路径） |
+| 标签                          | 数量 | 改为                                                 |
+| ----------------------------- | ---- | ---------------------------------------------------- |
+| `<span>`                      | 112  | `<text>`（其中 12 处需重构嵌套）                     |
+| `<strong>` `<i>` `<b>` `<em>` | 23   | `<text>`                                             |
+| `<img>`                       | 7    | `<image mode="aspectFit">`                           |
+| `<a>`                         | 1    | `<navigator>`（路径需从 `#/xxx` 改为小程序页面路径） |
 
 > 原计划估计「约 560 处」（按全部标签计算）。**实测修正为 143 处，减少约 75%**，阶段 2/3 工作量随之显著下降。
 
@@ -1458,21 +1481,21 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 原计划把 0.6 前置写为「0.5」。实际动手时发现跑通 `CatsView` 还需要：
 
-| 依赖 | 现状 | 归属 |
-|---|---|---|
-| `pinia` | ❌ 未安装（uni-app 模板不含） | 1.2 |
-| `stores/auth`（提供 familyId） | ❌ 依赖 pinia 且含 mock | 1.2 |
-| `services` 层 | ❌ 未创建，且 `services/index.ts` 也 import 了 `mocks/data` | 1.2 / 2.x |
+| 依赖                           | 现状                                                        | 归属      |
+| ------------------------------ | ----------------------------------------------------------- | --------- |
+| `pinia`                        | ❌ 未安装（uni-app 模板不含）                               | 1.2       |
+| `stores/auth`（提供 familyId） | ❌ 依赖 pinia 且含 mock                                     | 1.2       |
+| `services` 层                  | ❌ 未创建，且 `services/index.ts` 也 import 了 `mocks/data` | 1.2 / 2.x |
 
 **处理**：0.6 的单页迁移**绕过 `services`，直接调用 `api/endpoints` 的 `catApi`**，以验证「标签 + 网络 + UI + 图标」四条链路。该页本就是一次性技术验证页，业务层留到 1.2 再补。
 
 #### 产出文件
 
-| 文件 | 说明 |
-|---|---|
+| 文件                           | 说明                                          |
+| ------------------------------ | --------------------------------------------- |
 | `src/pages/tag-test/index.vue` | **新增** —— 标签容错实测页（步骤 1.1 时移除） |
-| `src/pages.json` | 注册 tag-test，并设为启动页 |
-| `frontend/` | **未改动** ✓ |
+| `src/pages.json`               | 注册 tag-test，并设为启动页                   |
+| `frontend/`                    | **未改动** ✓                                  |
 
 #### 偏差说明
 
@@ -1489,15 +1512,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 实际产出
 
-| 文件 | 说明 |
-|---|---|
-| `src/pages/cats/index.vue` | **新增** —— 迁移自 Web 端 `CatsView.vue`（366 行） |
-| `src/App.vue` | **改写** —— 引入全局样式 |
-| `src/styles/reset.css` | **改写为小程序版** |
-| `src/styles/pages.css` | 元素选择器批量转换 |
-| `scripts/adapt-wxss-selectors.mjs` | **新增** —— CSS 元素选择器转换工具 |
-| `src/pages.json` | 注册 cats 页并设为启动页 |
-| `frontend/` | **未改动** ✓ |
+| 文件                               | 说明                                               |
+| ---------------------------------- | -------------------------------------------------- |
+| `src/pages/cats/index.vue`         | **新增** —— 迁移自 Web 端 `CatsView.vue`（366 行） |
+| `src/App.vue`                      | **改写** —— 引入全局样式                           |
+| `src/styles/reset.css`             | **改写为小程序版**                                 |
+| `src/styles/pages.css`             | 元素选择器批量转换                                 |
+| `scripts/adapt-wxss-selectors.mjs` | **新增** —— CSS 元素选择器转换工具                 |
+| `src/pages.json`                   | 注册 cats 页并设为启动页                           |
+| `frontend/`                        | **未改动** ✓                                       |
 
 #### 发现 ①：全局样式从未被引入
 
@@ -1522,15 +1545,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 1. **`reset.css` 手工改写**：Web 版 reset 的元素选择器几乎全不适用
 
-   | Web 端 | 小程序 | 原因 |
-   |---|---|---|
-   | `html` / `body` | `page` | 小程序根节点是 `page` |
-   | `img` | `image` | WXSS 不支持 `img` 选择器 |
-   | `svg` | 删除 | 无此标签（图标已改 CSS 遮罩） |
-   | `a` | `navigator` | `<a>` 被映射为 `<navigator>` |
-   | `ul` / `ol` / `select` | 删除 | 无此标签 |
-   | `:focus-visible` / `@media print` | 删除 | 不支持 / 无场景 |
-   | — | **新增** `button::after{border:none}` | 小程序 button 边框由 `::after` 实现 |
+   | Web 端                            | 小程序                                | 原因                                |
+   | --------------------------------- | ------------------------------------- | ----------------------------------- |
+   | `html` / `body`                   | `page`                                | 小程序根节点是 `page`               |
+   | `img`                             | `image`                               | WXSS 不支持 `img` 选择器            |
+   | `svg`                             | 删除                                  | 无此标签（图标已改 CSS 遮罩）       |
+   | `a`                               | `navigator`                           | `<a>` 被映射为 `<navigator>`        |
+   | `ul` / `ol` / `select`            | 删除                                  | 无此标签                            |
+   | `:focus-visible` / `@media print` | 删除                                  | 不支持 / 无场景                     |
+   | —                                 | **新增** `button::after{border:none}` | 小程序 button 边框由 `::after` 实现 |
 
 2. **`pages.css` 脚本转换**：新增 `scripts/adapt-wxss-selectors.mjs`，把元素名换成小程序等价物
    `span`→`text`(27) / `small`→`text`(14) / `strong`→`text`(12) / `p`→`view`(7) / `h1`,`h2`→`view`(各6) / `div`→`view`(5) / `i`→`text`(4) / `h3`,`h4`→`view`(各2) / `a`→`navigator`(1) / `select`→`picker`(1) / `summary`→`view`(1) / `svg`,`tr`,`td`,`th`→哨兵类(25)
@@ -1552,18 +1575,18 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 严格按第一部分的映射表执行，**全部写成小程序原生标签**：
 
-| Web 端 | 本页处理 |
-|---|---|
-| `<AppShell>` | 移除（原生 tabBar） |
-| `<a :href="'#/cats/'+id">` | `<view @click>` + `uni.showToast`（详情页属步骤 3.4） |
-| `<img>` | `<image mode="aspectFit">`（并补了无头像时的图标兜底） |
-| `<input type="date">` | `<picker mode="date">` |
-| `<span>` ×7 | `<text>` |
-| `<div>` / `<p>` / `<h2>` | `<view>` |
-| `window.addEventListener('keydown')` | 删除（小程序无键盘事件） |
-| `services.getCats()` | `catApi.list()` 直调（绕过 services，见前置依赖说明） |
-| `useCatStore()` | 移除（pinia 未安装） |
-| `onMounted` | `onShow`（每次进入都刷新） |
+| Web 端                               | 本页处理                                               |
+| ------------------------------------ | ------------------------------------------------------ |
+| `<AppShell>`                         | 移除（原生 tabBar）                                    |
+| `<a :href="'#/cats/'+id">`           | `<view @click>` + `uni.showToast`（详情页属步骤 3.4）  |
+| `<img>`                              | `<image mode="aspectFit">`（并补了无头像时的图标兜底） |
+| `<input type="date">`                | `<picker mode="date">`                                 |
+| `<span>` ×7                          | `<text>`                                               |
+| `<div>` / `<p>` / `<h2>`             | `<view>`                                               |
+| `window.addEventListener('keydown')` | 删除（小程序无键盘事件）                               |
+| `services.getCats()`                 | `catApi.list()` 直调（绕过 services，见前置依赖说明）  |
+| `useCatStore()`                      | 移除（pinia 未安装）                                   |
+| `onMounted`                          | `onShow`（每次进入都刷新）                             |
 
 #### 开发用临时入口
 
@@ -1573,15 +1596,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 类型检查 | `vue-tsc --noEmit` | `pages/` `components/` `api/` **0 错误**（仅剩 stores 103 个已知错误） |
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** |
-| 产物标签 | 读 `pages/cats/index.wxml` | `view`(22) `text`(11) `button`(5) `label`(3) `app-icon`(2) `input`(2) `picker`(1) `image`(1)，**零 HTML 标签** |
-| 全局样式 | 读 `app.wxss` | 72 KB，关键类与 `page{}` `image{}` 全在 |
-| 包体 | 统计产物 | **191.2 KB / 2048 KB（9.3%）** |
-| `frontend/` 回归 | `git status` | 7 条，未新增 ✓ |
-| CSS 结构完整性 | 行数 + 花括号 | 4108→4108、576/576 ✓ |
+| 检查             | 方法                          | 结果                                                                                                           |
+| ---------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 类型检查         | `vue-tsc --noEmit`            | `pages/` `components/` `api/` **0 错误**（仅剩 stores 103 个已知错误）                                         |
+| 构建             | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告**                                                                             |
+| 产物标签         | 读 `pages/cats/index.wxml`    | `view`(22) `text`(11) `button`(5) `label`(3) `app-icon`(2) `input`(2) `picker`(1) `image`(1)，**零 HTML 标签** |
+| 全局样式         | 读 `app.wxss`                 | 72 KB，关键类与 `page{}` `image{}` 全在                                                                        |
+| 包体             | 统计产物                      | **191.2 KB / 2048 KB（9.3%）**                                                                                 |
+| `frontend/` 回归 | `git status`                  | 7 条，未新增 ✓                                                                                                 |
+| CSS 结构完整性   | 行数 + 花括号                 | 4108→4108、576/576 ✓                                                                                           |
 
 **待你验证**：在 DevTools 打开 `miniprogram/dist/dev/mp-weixin`（或 `dist/build/mp-weixin`），启动页为**猫咪列表**：
 
@@ -1599,15 +1622,15 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 #### 实际产出
 
-| 项 | 说明 |
-|---|---|
-| `src/pages.json` | **重写** —— 17 个正式页 + 2 个验证页 + 完整 tabBar（含图标） |
-| `src/pages/*/index.vue` | **新增 16 个占位页**（cats 已有真实实现） |
-| `src/pages/index/` | **删除** —— uni-app 模板默认页，非本项目内容 |
-| `src/static/tabbar/*.png` | **新增 10 个** 81×81 PNG，合计 13.6 KB |
-| `scripts/gen-tabbar-icons.mjs` | **新增** —— tabBar 图标生成器 |
-| `package.json` | 新增 devDependency `sharp`；修正 `@dcloudio/types` 版本 |
-| `frontend/` | **未改动** ✓ |
+| 项                             | 说明                                                         |
+| ------------------------------ | ------------------------------------------------------------ |
+| `src/pages.json`               | **重写** —— 17 个正式页 + 2 个验证页 + 完整 tabBar（含图标） |
+| `src/pages/*/index.vue`        | **新增 16 个占位页**（cats 已有真实实现）                    |
+| `src/pages/index/`             | **删除** —— uni-app 模板默认页，非本项目内容                 |
+| `src/static/tabbar/*.png`      | **新增 10 个** 81×81 PNG，合计 13.6 KB                       |
+| `scripts/gen-tabbar-icons.mjs` | **新增** —— tabBar 图标生成器                                |
+| `package.json`                 | 新增 devDependency `sharp`；修正 `@dcloudio/types` 版本      |
+| `frontend/`                    | **未改动** ✓                                                 |
 
 #### 发现 ①：计划漏了「页面必须先存在」
 
@@ -1627,24 +1650,24 @@ src/api/client.ts(112,7): Type '"PATCH"' is not assignable to
 
 **处理**：新增 `scripts/gen-tabbar-icons.mjs`，从 Web 端**同一份** `iconPaths.ts` 取 path 数据，用与 app 一致的描边参数渲染：
 
-| 项 | 取值 | 来源 |
-|---|---|---|
-| 尺寸 | 81×81（viewBox 外扩 3 单位 ≈ 10% 内边距） | 微信建议 |
-| 普通态色 | `#9B948C` | `--color-text-tertiary` |
-| 选中态色 | `#C87345` | `--color-brand` |
-| 描边宽度 | `1.8` | 与 `AppIcon.vue` 一致 |
+| 项       | 取值                                      | 来源                    |
+| -------- | ----------------------------------------- | ----------------------- |
+| 尺寸     | 81×81（viewBox 外扩 3 单位 ≈ 10% 内边距） | 微信建议                |
+| 普通态色 | `#9B948C`                                 | `--color-text-tertiary` |
+| 选中态色 | `#C87345`                                 | `--color-brand`         |
+| 描边宽度 | `1.8`                                     | 与 `AppIcon.vue` 一致   |
 
 **一次参数错误**：首版给 sharp 传了 `density: 384`，输出变成 **432×432**（81 × 384/72），与规范尺寸不符。已改为不传 `density`（默认 72 DPI 按声明尺寸渲染），重新生成得到正确的 81×81。
 
 **像素级验证**（本步能做的实证，不依赖目视）：
 
-| 检查 | 结果 |
-|---|---|
-| 尺寸 | 10 个全部 81×81，含 alpha 通道 |
-| 内容包围盒 | 55×59 ~ 65×55（在 81×81 中居中，四边留白 8–13px） |
-| 非透明像素 | 1119–1468 个/图 → 图标确实绘制出来了，非空白 |
-| 颜色 | 选中态最亮像素 R=207/G=120（目标 `#C87345` = 200/115/69）；普通态 R=163/G=156（目标 `#9B948C` = 155/148/140） |
-| 体积 | 单个 0.9–1.6 KB，远低于 40 KB 上限 |
+| 检查       | 结果                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| 尺寸       | 10 个全部 81×81，含 alpha 通道                                                                                |
+| 内容包围盒 | 55×59 ~ 65×55（在 81×81 中居中，四边留白 8–13px）                                                             |
+| 非透明像素 | 1119–1468 个/图 → 图标确实绘制出来了，非空白                                                                  |
+| 颜色       | 选中态最亮像素 R=207/G=120（目标 `#C87345` = 200/115/69）；普通态 R=163/G=156（目标 `#9B948C` = 155/148/140） |
+| 体积       | 单个 0.9–1.6 KB，远低于 40 KB 上限                                                                            |
 
 #### 修正 Round 1 遗留的错误
 
@@ -1662,16 +1685,16 @@ Could not resolve dependency: peer @dcloudio/types@"3.4.31" from @dcloudio/uni-a
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** |
-| 页面文件一致性 | 脚本比对 `pages.json` 与磁盘 | 17/17 存在，**0 处不一致** |
-| tabBar 图标完整性 | 脚本比对 `iconPath` 与磁盘 | 10/10 存在，**0 处缺失** |
-| 产物 `app.json` | 读文件 | 19 个页面 + tabBar（5 项，含 iconPath/selectedIconPath）全部正确 |
-| 图标进入产物 | 列 `dist/.../static/tabbar/` | 10 个文件均在 |
-| `AppShell`/`BottomNav` 残留 | 全项目搜索 | 二者**从未复制到小程序**；唯一命中是 cats 页注释（说明移除原因） |
-| 主包体积 | 统计产物 | **218.2 KB / 2048 KB（10.7%）** |
-| `frontend/` 回归 | `git status` | 7 条，未新增 ✓ |
+| 检查                        | 方法                          | 结果                                                             |
+| --------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| 构建                        | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告**                               |
+| 页面文件一致性              | 脚本比对 `pages.json` 与磁盘  | 17/17 存在，**0 处不一致**                                       |
+| tabBar 图标完整性           | 脚本比对 `iconPath` 与磁盘    | 10/10 存在，**0 处缺失**                                         |
+| 产物 `app.json`             | 读文件                        | 19 个页面 + tabBar（5 项，含 iconPath/selectedIconPath）全部正确 |
+| 图标进入产物                | 列 `dist/.../static/tabbar/`  | 10 个文件均在                                                    |
+| `AppShell`/`BottomNav` 残留 | 全项目搜索                    | 二者**从未复制到小程序**；唯一命中是 cats 页注释（说明移除原因） |
+| 主包体积                    | 统计产物                      | **218.2 KB / 2048 KB（10.7%）**                                  |
+| `frontend/` 回归            | `git status`                  | 7 条，未新增 ✓                                                   |
 
 #### 两项待你确认
 
@@ -1680,10 +1703,10 @@ Could not resolve dependency: peer @dcloudio/types@"3.4.31" from @dcloudio/uni-a
 
 #### 两处临时状态
 
-| 项 | 现状 | 何时恢复 |
-|---|---|---|
-| 启动页 | `pages/cats/index`（临时） | 步骤 2.1 完成真实今日页后改为 `pages/today/index` |
-| 验证页 `tag-test` / `icon-test` | 保留 | 你完成 0.5/0.6 目视确认后移除（计划原定在 1.1 移除，但那样你就无法验证了） |
+| 项                              | 现状                       | 何时恢复                                                                   |
+| ------------------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| 启动页                          | `pages/cats/index`（临时） | 步骤 2.1 完成真实今日页后改为 `pages/today/index`                          |
+| 验证页 `tag-test` / `icon-test` | 保留                       | 你完成 0.5/0.6 目视确认后移除（计划原定在 1.1 移除，但那样你就无法验证了） |
 
 **下一步**：1.2 迁移 `stores/`（需先 `npm install pinia`，并处理 4 个 store 的 `mocks/data` 依赖）
 
@@ -1695,25 +1718,25 @@ Could not resolve dependency: peer @dcloudio/types@"3.4.31" from @dcloudio/uni-a
 
 #### 实际改动
 
-| 文件 | 操作 |
-|---|---|
-| `src/main.ts` | **改写** —— 注册 Pinia |
-| `src/App.vue` | 增加网络状态查询与监听 |
-| `src/stores/app.ts` | `navigator.onLine` → uni API |
-| `src/stores/expense.ts` / `inventory.ts` / `moment.ts` / `reminder.ts` | 去掉 mock 种子 |
-| `src/stores/health.ts` | 去掉 `services` 依赖，暂直连 `careApi` |
-| `.npmrc` | **新增** —— 记录跳过 peer 校验的原因 |
-| `package.json` | 新增 `pinia@2.1.7`、`sharp`（dev） |
-| `frontend/` | **未改动** ✓ |
+| 文件                                                                   | 操作                                   |
+| ---------------------------------------------------------------------- | -------------------------------------- |
+| `src/main.ts`                                                          | **改写** —— 注册 Pinia                 |
+| `src/App.vue`                                                          | 增加网络状态查询与监听                 |
+| `src/stores/app.ts`                                                    | `navigator.onLine` → uni API           |
+| `src/stores/expense.ts` / `inventory.ts` / `moment.ts` / `reminder.ts` | 去掉 mock 种子                         |
+| `src/stores/health.ts`                                                 | 去掉 `services` 依赖，暂直连 `careApi` |
+| `.npmrc`                                                               | **新增** —— 记录跳过 peer 校验的原因   |
+| `package.json`                                                         | 新增 `pinia@2.1.7`、`sharp`（dev）     |
+| `frontend/`                                                            | **未改动** ✓                           |
 
 #### 安装 pinia 经历三层 peer 冲突
 
-| 尝试 | 结果 | 原因 |
-|---|---|---|
-| `npm i pinia` | ❌ | 默认解析到 pinia 3.x，要求 `vue ^3.5.11` |
-| `npm i pinia@^2.3.0` | ❌ | 2.2/2.3 同样要求 `vue ^3.5.11` |
-| `npm i vue@^3.5.13 pinia@^2.3.0` | ❌ | vue 被其它依赖锁在 3.4.21，**升不上去** |
-| **`npm i pinia@2.1.7 --legacy-peer-deps`** | ✅ | 见下 |
+| 尝试                                       | 结果 | 原因                                     |
+| ------------------------------------------ | ---- | ---------------------------------------- |
+| `npm i pinia`                              | ❌   | 默认解析到 pinia 3.x，要求 `vue ^3.5.11` |
+| `npm i pinia@^2.3.0`                       | ❌   | 2.2/2.3 同样要求 `vue ^3.5.11`           |
+| `npm i vue@^3.5.13 pinia@^2.3.0`           | ❌   | vue 被其它依赖锁在 3.4.21，**升不上去**  |
+| **`npm i pinia@2.1.7 --legacy-peer-deps`** | ✅   | 见下                                     |
 
 `pinia@2.1.7` 的 peer 是 `vue ^2.6.14 \|\| ^3.3.0`，与 vue 3.4.21 兼容。它仍报错，是因为带了一个**可选 peer** `@vue/composition-api`（仅服务 Vue 2），该包声明 `vue >= 2.5 < 2.7` —— **npm 对 optional peer 也做严格解析**。
 
@@ -1726,12 +1749,12 @@ Could not resolve dependency: peer @dcloudio/types@"3.4.31" from @dcloudio/uni-a
 
 计划里我特意写了「请勿想当然，逐个核对」。照做后发现：
 
-| store | Web 端引用 | 实际情况 | 处理 |
-|---|---|---|---|
-| `moment.ts` | **0 处** | **完全死代码** | 去 mock，保留结构 |
-| `expense.ts` | `ExpensesView` 2 处 | 实例化后**从未读任何字段** | 去 mock，加 `set()` |
-| `inventory.ts` | `InventoryView` 2 处 | 同上 | 去 mock，加 `set()` |
-| `reminder.ts` | `RemindersView` **9 处** | **真的在用** `filter`/`setFilter`/`complete` | 去 mock，**保留逻辑** + `set()` |
+| store          | Web 端引用               | 实际情况                                     | 处理                            |
+| -------------- | ------------------------ | -------------------------------------------- | ------------------------------- |
+| `moment.ts`    | **0 处**                 | **完全死代码**                               | 去 mock，保留结构               |
+| `expense.ts`   | `ExpensesView` 2 处      | 实例化后**从未读任何字段**                   | 去 mock，加 `set()`             |
+| `inventory.ts` | `InventoryView` 2 处     | 同上                                         | 去 mock，加 `set()`             |
+| `reminder.ts`  | `RemindersView` **9 处** | **真的在用** `filter`/`setFilter`/`complete` | 去 mock，**保留逻辑** + `set()` |
 
 即 4 个里有 3 个在 Web 端其实是残留。小程序端统一改为**空初始值 + `set()` 写入**的纯缓存层，避免「mock 种子」与「接口数据」两套数据源并存。
 
@@ -1751,23 +1774,24 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| store 定义完整性 | 正则校验 9 个文件 | 9/9 均有合法 `defineStore` 导出，id 唯一 |
-| 类型检查 | `vue-tsc --noEmit` | **零错误**（迁移前为 103 个） |
-| 平台 API 残留 | 逐行扫描，排除注释 | **实际代码 0 处**（3 处命中全在解释性注释里） |
-| `mocks/` 残留 | 全项目搜索 | **0 处** |
-| `services` 残留 | 全项目搜索 | **0 处** |
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** |
-| pinia 入产物 | 扫描产物 JS | `common/vendor.js` 含 pinia 标识 |
-| 主包体积 | 统计 | **223.0 KB / 2048 KB（10.9%）** |
-| `frontend/` 回归 | `git status` | 7 条，未新增 ✓ |
+| 检查             | 方法                          | 结果                                          |
+| ---------------- | ----------------------------- | --------------------------------------------- |
+| store 定义完整性 | 正则校验 9 个文件             | 9/9 均有合法 `defineStore` 导出，id 唯一      |
+| 类型检查         | `vue-tsc --noEmit`            | **零错误**（迁移前为 103 个）                 |
+| 平台 API 残留    | 逐行扫描，排除注释            | **实际代码 0 处**（3 处命中全在解释性注释里） |
+| `mocks/` 残留    | 全项目搜索                    | **0 处**                                      |
+| `services` 残留  | 全项目搜索                    | **0 处**                                      |
+| 构建             | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告**            |
+| pinia 入产物     | 扫描产物 JS                   | `common/vendor.js` 含 pinia 标识              |
+| 主包体积         | 统计                          | **223.0 KB / 2048 KB（10.9%）**               |
+| `frontend/` 回归 | `git status`                  | 7 条，未新增 ✓                                |
 
 #### 待你验证
 
 **模拟器断网测试**：在微信开发者工具里切换网络状态（「模拟操作」→ 网络 → 离线），确认 `stores/app.ts` 的 `isOnline` / `isOffline` 随之变化。这是本步唯一无法静态验证的项。
 
 **下一步**：1.3 登录 / 注册页
+
 > ⚠️ 依赖 **§11 阻塞项 #1「登录方式」** 的决策（邮箱密码 / 微信一键登录）。若沿用邮箱密码，可直接迁移 Web 端 `AuthView`；若改微信一键登录，需后端先加 `openid` 字段与 `code2Session` 接口。
 
 ### 记录 1.3 —— 登录 / 注册页（2026-09-17）
@@ -1776,18 +1800,18 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 #### 实际改动
 
-| 文件 | 操作 |
-|---|---|
+| 文件                       | 操作                                                              |
+| -------------------------- | ----------------------------------------------------------------- |
 | `src/pages/auth/index.vue` | **新增** 453 行 —— 由 `frontend/src/views/auth/AuthView.vue` 迁移 |
-| `frontend/` | **未改动** ✓ |
+| `frontend/`                | **未改动** ✓                                                      |
 
 #### 三处必须改写的 Web 写法
 
-| Web 端 | 小程序端 | 原因 |
-|---|---|---|
-| `<input type="email">` | `<input type="text">` | 小程序 `input` 的 `type` 仅支持 `text/number/idcard/digit/nickname/safe-password`，**没有 `email`** |
-| `<input :type="showPassword ? 'text' : 'password'">` | `<input :password="!showPassword">` | 小程序不用 `type` 控制掩码，用 **`password` 布尔属性** |
-| `useRoute().query.redirect` | `onLoad(options)` 的 `options.redirect` | 小程序无 vue-router，query 从页面生命周期参数取 |
+| Web 端                                               | 小程序端                                | 原因                                                                                                |
+| ---------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `<input type="email">`                               | `<input type="text">`                   | 小程序 `input` 的 `type` 仅支持 `text/number/idcard/digit/nickname/safe-password`，**没有 `email`** |
+| `<input :type="showPassword ? 'text' : 'password'">` | `<input :password="!showPassword">`     | 小程序不用 `type` 控制掩码，用 **`password` 布尔属性**                                              |
+| `useRoute().query.redirect`                          | `onLoad(options)` 的 `options.redirect` | 小程序无 vue-router，query 从页面生命周期参数取                                                     |
 
 第三项的两个细节容易踩：
 
@@ -1811,15 +1835,15 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 确认密码一致性校验 | 阅读 `passwordMismatch` computed + 按钮 `:disabled` | 输入非空且不等时才报错，避免空框即红 |
-| 密码长度校验 | `passwordTooShort` computed + 提交前二次校验 | ≥ 8 位，与后端 `app/auth.go` 规则一致 |
-| 409 冲突处理 | 阅读 `catch` 分支 | `code === 'CONFLICT'` → 提示「该邮箱已注册，请直接登录」+ 自动切登录模式 |
-| 无 HTML 标签残留 | 统计构建产物 `index.wxml` 标签 | `text`×13 / `view`×9 / `input`×5 / `label`×5 / `block`×2 / `button`×2 —— **HTML 标签 0 个** |
-| `placeholder-class` | 产物 wxml + wxss 双向搜索 | 两端均存在 ✓ |
-| 类型检查 | `vue-tsc --noEmit` | **零错误** |
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** |
+| 检查                | 方法                                                | 结果                                                                                        |
+| ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 确认密码一致性校验  | 阅读 `passwordMismatch` computed + 按钮 `:disabled` | 输入非空且不等时才报错，避免空框即红                                                        |
+| 密码长度校验        | `passwordTooShort` computed + 提交前二次校验        | ≥ 8 位，与后端 `app/auth.go` 规则一致                                                       |
+| 409 冲突处理        | 阅读 `catch` 分支                                   | `code === 'CONFLICT'` → 提示「该邮箱已注册，请直接登录」+ 自动切登录模式                    |
+| 无 HTML 标签残留    | 统计构建产物 `index.wxml` 标签                      | `text`×13 / `view`×9 / `input`×5 / `label`×5 / `block`×2 / `button`×2 —— **HTML 标签 0 个** |
+| `placeholder-class` | 产物 wxml + wxss 双向搜索                           | 两端均存在 ✓                                                                                |
+| 类型检查            | `vue-tsc --noEmit`                                  | **零错误**                                                                                  |
+| 构建                | `npm.cmd run build:mp-weixin`                       | `DONE Build complete.`，**零警告**                                                          |
 
 #### 待你验证
 
@@ -1837,10 +1861,10 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 计划原文写「产出：`App.vue`（约 20–30 行）」。动手后发现该落位不可行，两条理由都是平台硬约束：
 
-| # | 问题 | 说明 |
-|---|---|---|
-| 1 | **`onLaunch` 全生命周期只触发一次** | token 在会话中途过期、或用户在登出后继续操作时，`onLaunch` 不会重跑，**没有第二次机会拦截**。守卫必须在每次进页时都能执行，只有 `onShow` 满足 |
-| 2 | **`onLaunch` 与首页 `onLoad`/`onShow` 的先后顺序不可依赖** | `onLaunch` 里发起跳转后，`pages.json` 指定的首个页面仍会走完自己的生命周期，可能已经发出 401 请求。用它做守卫会留下「先请求后跳转」的窗口 |
+| #   | 问题                                                       | 说明                                                                                                                                          |
+| --- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **`onLaunch` 全生命周期只触发一次**                        | token 在会话中途过期、或用户在登出后继续操作时，`onLaunch` 不会重跑，**没有第二次机会拦截**。守卫必须在每次进页时都能执行，只有 `onShow` 满足 |
+| 2   | **`onLaunch` 与首页 `onLoad`/`onShow` 的先后顺序不可依赖** | `onLaunch` 里发起跳转后，`pages.json` 指定的首个页面仍会走完自己的生命周期，可能已经发出 401 请求。用它做守卫会留下「先请求后跳转」的窗口     |
 
 因此改为：`src/utils/guard.ts` 导出 `guardOnShow()`，**每个页面在自己 `onShow` 里首行调用**。这同时把「4 件事」从一处集中逻辑变成可复用模块，17 个页面各加 2 行即可，比在 `App.vue` 里堆逻辑更贴近 Web 端 `beforeEach` 的语义（Web 端是**每次导航**都跑，不是只跑一次）。
 
@@ -1858,12 +1882,12 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 #### 4 件守卫逻辑的落位对照
 
-| Web 端 `beforeEach` | 小程序落位 | 实现 |
-|---|---|---|
-| 首次会话恢复 `bootstrap()` | `guardOnShow()` 内 | `ensureSession()` + 模块级 `bootstrapped` 标志，**只真正执行一次** |
-| 未登录 → 登录页 | `guardPage()` | `reLaunch` 到 `/pages/auth/index?redirect=<原路径>`，登录后可回跳 |
-| 已登录但无家庭 → onboarding | `guardPage()` | `!auth.familyId` 判断 |
-| 预载猫咪列表 | 各业务页自行 `load()` | 见下方偏离说明 |
+| Web 端 `beforeEach`         | 小程序落位            | 实现                                                               |
+| --------------------------- | --------------------- | ------------------------------------------------------------------ |
+| 首次会话恢复 `bootstrap()`  | `guardOnShow()` 内    | `ensureSession()` + 模块级 `bootstrapped` 标志，**只真正执行一次** |
+| 未登录 → 登录页             | `guardPage()`         | `reLaunch` 到 `/pages/auth/index?redirect=<原路径>`，登录后可回跳  |
+| 已登录但无家庭 → onboarding | `guardPage()`         | `!auth.familyId` 判断                                              |
+| 预载猫咪列表                | 各业务页自行 `load()` | 见下方偏离说明                                                     |
 
 #### 防死循环的三重短路
 
@@ -1879,14 +1903,14 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 守卫模块产出 | 检查构建产物 | `utils/guard.js` **984 B**，已产出 |
-| 跨页复用生效 | 搜索产物 JS 的引用 | `auth.js` 与 `cats.js` **均引用** `guard.js` ✓ |
-| 类型检查 | `vue-tsc --noEmit` | **零错误** |
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** |
-| 主包体积 | 统计 | **231.5 KB / 2048 KB（11.3%）**（较 1.2 的 223.0 KB 增 8.5 KB，为登录页 + 守卫模块） |
-| `frontend/` 回归 | `git status --short -- frontend` | 7 条，未新增 ✓ |
+| 检查             | 方法                             | 结果                                                                                 |
+| ---------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| 守卫模块产出     | 检查构建产物                     | `utils/guard.js` **984 B**，已产出                                                   |
+| 跨页复用生效     | 搜索产物 JS 的引用               | `auth.js` 与 `cats.js` **均引用** `guard.js` ✓                                       |
+| 类型检查         | `vue-tsc --noEmit`               | **零错误**                                                                           |
+| 构建             | `npm.cmd run build:mp-weixin`    | `DONE Build complete.`，**零警告**                                                   |
+| 主包体积         | 统计                             | **231.5 KB / 2048 KB（11.3%）**（较 1.2 的 223.0 KB 增 8.5 KB，为登录页 + 守卫模块） |
+| `frontend/` 回归 | `git status --short -- frontend` | 7 条，未新增 ✓                                                                       |
 
 #### 待你验证
 
@@ -1902,13 +1926,13 @@ Web 端在 `state` 初始化里同步读 `navigator.onLine`；小程序无此 AP
 
 模拟器不能自动化，所以本步不是端到端 UI 测试。`scripts/verify-auth-flow.mjs` 把 `src/api/client.ts` 的协议行为在 Node 里**逐行复刻**后打真实后端：
 
-| 复刻的部分 | 说明 |
-|---|---|
-| `rawRequest` | 同样的 `Authorization` / `X-Request-Id` / PATCH→POST + 覆盖头 |
-| `refreshAccessToken` | 绕开封装直连 `/auth/refresh` |
-| `send` | 401 → 单飞刷新 → 重试一次；失败则清存储 + 跳登录 |
-| `assertEnvelope` | 与修复后的 `client.ts` 一致（见缺陷 ①） |
-| 存储层 | 内存 Map 模拟 `uni.*StorageSync`，键名与 Web 端相同 |
+| 复刻的部分           | 说明                                                          |
+| -------------------- | ------------------------------------------------------------- |
+| `rawRequest`         | 同样的 `Authorization` / `X-Request-Id` / PATCH→POST + 覆盖头 |
+| `refreshAccessToken` | 绕开封装直连 `/auth/refresh`                                  |
+| `send`               | 401 → 单飞刷新 → 重试一次；失败则清存储 + 跳登录              |
+| `assertEnvelope`     | 与修复后的 `client.ts` 一致（见缺陷 ①）                       |
+| 存储层               | 内存 Map 模拟 `uni.*StorageSync`，键名与 Web 端相同           |
 
 **不覆盖**：`uni.request` 本身、页面跳转、UI 渲染 —— 这三项只能在 DevTools 里看，已并入 1.3 / 1.4 的同一次目视验收。
 
@@ -1946,11 +1970,11 @@ ID,CreatedBy,CreatedAt,UpdatedAt,DeletedAt,Email,Name,Password
 
 三个问题叠在一起：
 
-| # | 问题 | 后果 |
-|---|---|---|
-| 1 | `model.User` 与内嵌的 `model.Base` **都没有 json tag** → `encoding/json` 退回按 Go 字段名序列化 | 字段名是 PascalCase |
-| 2 | 前端与小程序端都按 `res.user.id` / `res.user.name` 读 | **两端都拿到 undefined** |
-| 3 | `Password` 字段没有 `json:"-"` | **密码哈希被下发到客户端** |
+| #   | 问题                                                                                            | 后果                       |
+| --- | ----------------------------------------------------------------------------------------------- | -------------------------- |
+| 1   | `model.User` 与内嵌的 `model.Base` **都没有 json tag** → `encoding/json` 退回按 Go 字段名序列化 | 字段名是 PascalCase        |
+| 2   | 前端与小程序端都按 `res.user.id` / `res.user.name` 读                                           | **两端都拿到 undefined**   |
+| 3   | `Password` 字段没有 `json:"-"`                                                                  | **密码哈希被下发到客户端** |
 
 **确认这是孤立缺陷、且是后端的问题**：逐个接口打印键名，其余全部是 snake_case ——
 
@@ -2004,23 +2028,23 @@ Gin 在**进入中间件链之前**就按 `(method, path)` 完成路由匹配。
 
 #### 验证结果
 
-| 检查 | 方法 | 结果 |
-|---|---|---|
-| 认证链路用例 | `node scripts/verify-auth-flow.mjs` | **35 / 35 通过（100%）** |
-| 注册 → 建家庭 → `/me` | 脚本第 1 组 | `family_id` 正确注入 ✓ |
-| 过期令牌自动刷新 | 现铸 `exp` 过去的真令牌 | 刷新 1 次后重试成功 ✓ |
-| 并发 401 单飞 | 4 个并发请求 | 刷新仅 1 次，4 个全部成功 ✓ |
-| 刷新失效清存储 | 伪造 refresh token | 3 个存储键清空 + 跳登录 1 次 ✓ |
-| 跨家庭隔离 | 第二个账号 | `FAMILY_FORBIDDEN / HTTP 403`，家庭列表为空 ✓ |
-| 密码哈希不再下发 | 键名断言 | `keys=id,email,name` ✓ |
-| 覆盖头可用 | 真改名 + 回读 | `爱丽丝的猫宅 -> 覆盖名` ✓ |
-| 覆盖头仅限 PATCH | `override: DELETE` | `HTTP 404`，猫仍在 ✓ |
-| 后端冒烟无回归 | `scripts/smoke.ps1` | **26 / 26 通过** ✓ |
-| 类型检查 | `vue-tsc --noEmit` | **零错误** ✓ |
-| 构建 | `npm.cmd run build:mp-weixin` | `DONE Build complete.`，**零警告** ✓ |
-| 修复进入产物 | UTF-8 解码后搜 `client.js` | `assertEnvelope` 守卫在，旧静默路径 **0 残留** ✓ |
-| 主包体积 | 统计 | **231.7 KB（含 static）/ 214.2 KB（不含）/ 2048 KB** |
-| `frontend/` 回归 | `git status --short -- frontend` | 7 条，未新增 ✓ |
+| 检查                  | 方法                                | 结果                                                 |
+| --------------------- | ----------------------------------- | ---------------------------------------------------- |
+| 认证链路用例          | `node scripts/verify-auth-flow.mjs` | **35 / 35 通过（100%）**                             |
+| 注册 → 建家庭 → `/me` | 脚本第 1 组                         | `family_id` 正确注入 ✓                               |
+| 过期令牌自动刷新      | 现铸 `exp` 过去的真令牌             | 刷新 1 次后重试成功 ✓                                |
+| 并发 401 单飞         | 4 个并发请求                        | 刷新仅 1 次，4 个全部成功 ✓                          |
+| 刷新失效清存储        | 伪造 refresh token                  | 3 个存储键清空 + 跳登录 1 次 ✓                       |
+| 跨家庭隔离            | 第二个账号                          | `FAMILY_FORBIDDEN / HTTP 403`，家庭列表为空 ✓        |
+| 密码哈希不再下发      | 键名断言                            | `keys=id,email,name` ✓                               |
+| 覆盖头可用            | 真改名 + 回读                       | `爱丽丝的猫宅 -> 覆盖名` ✓                           |
+| 覆盖头仅限 PATCH      | `override: DELETE`                  | `HTTP 404`，猫仍在 ✓                                 |
+| 后端冒烟无回归        | `scripts/smoke.ps1`                 | **26 / 26 通过** ✓                                   |
+| 类型检查              | `vue-tsc --noEmit`                  | **零错误** ✓                                         |
+| 构建                  | `npm.cmd run build:mp-weixin`       | `DONE Build complete.`，**零警告** ✓                 |
+| 修复进入产物          | UTF-8 解码后搜 `client.js`          | `assertEnvelope` 守卫在，旧静默路径 **0 残留** ✓     |
+| 主包体积              | 统计                                | **231.7 KB（含 static）/ 214.2 KB（不含）/ 2048 KB** |
+| `frontend/` 回归      | `git status --short -- frontend`    | 7 条，未新增 ✓                                       |
 
 #### 一个差点导致误判的工具问题
 
@@ -2037,22 +2061,134 @@ Gin 在**进入中间件链之前**就按 `(method, path)` 完成路由匹配。
 
 **下一步**：2.1 今日页
 
+### 记录 2.1 —— 今日页（2026-09-19）
+
+**结论**：🟡 实现完成。迁移 `TodayView`，接通 `today / focus / ai.summary / reminders`，统一由受保护页面生命周期在会话恢复及猫咪预载后取数；切猫会刷新。手搓 DOM toast 改为 `uni.showToast`，提醒“完成”改走真实 PATCH 覆盖接口，“稍后”因后端无能力明确提示未开放。补齐加载、空数据、全接口失败三态。
+
+### 记录 2.2 —— 记录页（2026-09-19）
+
+**结论**：🟡 实现完成。迁移记录工作台，记录类型从 mock 抽成产品配置 `data/recordTypes.ts`；新增 `services.getRecords()`，按选中猫咪查询真实记录并按日期倒序分组。Web Speech API 已移除；在没有语音转写服务的前提下按钮给出明确降级提示。AI 自然语言解析继续走真实接口。
+
+### 记录 2.3 —— 猫咪页收尾（2026-09-19）
+
+**结论**：🟡 实现完成。列表点击已由“待迁移”提示改为真实详情导航；列表与新增后的结果同步写入 `catStore`。抽屉操作区增加 `56px + safe-area` 底部空间，降低原生 tabBar 遮挡风险；最终层级仍需 DevTools/真机确认。
+
+### 记录 2.4 —— 时光页（2026-09-19）
+
+**结论**：🟡 实现完成。真实 `moments` 数据按日期倒序和月份分组；移除 `mockAISummary`，改为真实 `ai.summary`，接口无摘要时才用当前真实时光数据生成中性文案。
+
+### 记录 2.5 —— 家庭页（2026-09-19）
+
+**结论**：🟡 实现完成。家庭、库存、账目三接口并发聚合，新增真实成员列表。后端 `ListMembers` 改用 `MemberEnvelope` 并补 `user_name`，同时完成 §11 #8 响应 DTO 审计：阶段 2/3 使用的其余服务均已返回显式 Envelope/DTO。小程序 `type-check` 与微信构建通过；Go 测试因本机应用控制策略阻止 `D:\tool\bin\go.exe`，普通与提升权限两次尝试均无法启动，已记录为环境限制。
+
+#### 阶段 2 自动验证
+
+| 检查                          | 结果                   |
+| ----------------------------- | ---------------------- |
+| `npm.cmd run type-check`      | 零错误                 |
+| `npm.cmd run build:mp-weixin` | `DONE Build complete.` |
+| 正式页面占位文案              | 阶段 2 的 5 页为 0 处  |
+| Web 专有语音/DOM API          | 今日与记录页已清零     |
+| `frontend/`                   | 本轮未修改             |
+
+**下一步**：3.1 Onboarding
+
+### 记录 3.1 —— Onboarding（2026-09-19）
+
+**结论**：🟡 代码实现完成。5 步引导已使用原生 `picker` / `switch`，创建家庭后真实创建一只或两只猫，完成页不会重复提交。迁移核对时发现生日、绝育状态和健康基础信息原先会被后端静默忽略：已补齐请求 DTO、猫咪持久化、`cat_health_profiles` 创建/回读及响应映射；疾病/过敏输入支持中英文逗号切分。仍需在可运行后端与 DevTools 的环境做数据库回读。
+
+### 记录 3.2 —— 快捷记录（2026-09-19）
+
+**结论**：🟡 代码实现完成。路由查询改为 `onLoad` 参数，猫咪和记录类型使用小程序原生选择器；保存走真实记录接口，网络失败时写入 `recordStore` 本地草稿并明确告知用户。底部操作区改为 sticky 以适配软键盘。
+
+### 记录 3.3 —— AI 输入与确认（2026-09-19）
+
+**结论**：🟡 代码实现完成。自然语言解析和批量确认分别接入真实 `ai.parse` 与 `records/batch`；清除 mock fallback、浏览器 session 跳转和伪成功分支。相机/上传在后端缺少媒体能力时显示明确提示，病历按钮进入医疗页。
+
+### 记录 3.4 —— 猫咪详情（2026-09-19）
+
+**结论**：🟡 代码实现完成。猫咪资料、今日照护和趋势均改用真实数据；7 / 30 / 90 天按钮会更新查询范围，不再是死按钮；记录与趋势入口进入对应真实页面。
+
+### 记录 3.5 —— 趋势（2026-09-19）
+
+**结论**：🟡 代码实现完成。`healthStore` 恢复调用 `care.trends`，范围切换会重新取数；图形使用 `view` 组成的轻量柱形结构，避免引入 ECharts。构建已通过，最终尺寸与标签位置待 DevTools 目视。
+
+### 记录 3.6 —— 医疗上传（2026-09-19）
+
+**结论**：🟡 按现有后端能力完成降级。页面使用 `uni.chooseMedia` 选择和预览本地图片；因为仓库没有上传/OCR 接口，提交操作明确弹窗说明限制，不生成 mock OCR、AI 结论或伪造保存成功。
+
+### 记录 3.7 —— 提醒（2026-09-19）
+
+**结论**：🟡 代码实现完成。todo/done 切换作用于真实数据，完成动作走真实更新接口；后端没有延后调度能力，「稍后」按钮改为明确未开放提示。
+
+### 记录 3.8 —— 库存与账目（2026-09-19）
+
+**结论**：🟡 代码实现完成。两页均接入真实 store/API；修正库存正常状态应为 `ok` 而非 `normal`，过期/低库存标签按后端状态展示；账目沿用后端分转元后的金额，不再二次换算。
+
+### 记录 3.9 —— 设置（2026-09-19）
+
+**结论**：🟡 代码实现完成。账号信息来自真实会话；退出会同时清理认证、家庭/猫咪状态并重新进入登录页。尚无后端接口的通知、隐私等条目统一给出说明，未留下无反馈按钮。
+
+### 记录 3.10 —— AppIcon 收尾（2026-09-19）
+
+**结论**：🟡 代码收尾完成。正式页面已统一使用 CSS mask `AppIcon`，支持动态图标名的安全 fallback；迁移静态检查确认无 `<svg v-html>`。仓库实际是 57 个图标（非旧计划的 58 个），`icon-test` 保留到 DevTools 逐一目视完成。
+
+### 记录 4.1 —— 原生能力接入（2026-09-19）
+
+**结论**：✅ 完成。5 个主 tab 统一接入下拉刷新和页面分享；网络监听已有真实 UI 消费，离线时显示 `OfflineBanner`；正式页面无浏览器专有 API 和手搓 DOM toast。
+
+### 记录 4.2 —— 真机适配（2026-09-19）
+
+**结论**：🟡 代码适配完成。顶部交给原生导航栏，底部使用安全区变量；所有触控目标不依赖 hover/pointer 媒体查询且最小 44px；快捷记录操作条适配键盘。iOS/Android 真机布局与浮层遮挡仍必须由人工验证。
+
+### 记录 4.3 —— 包体检查（2026-09-19）
+
+**结论**：✅ 完成。最终 `dist/build/mp-weixin` 共 131 个文件、355141 bytes（346.8 KB，占 2 MB 的 16.9%）；构建产物扫描未发现 `vant`、`echarts` 或 `mocks`。图标为 57 个内联 SVG data URI mask，无额外字体文件。
+
+### 记录 4.4 —— 质量门禁（2026-09-19）
+
+**结论**：✅ 完成。新增 ESLint/Prettier、迁移静态检查和 Node 测试：`type-check`、`verify:migration`、3/3 测试、`lint`、`build:mp-weixin` 全部通过。静态检查覆盖正式页 HTML 标签、非法 `<text>` 嵌套、mock、浏览器 API、占位文案与页面守卫。Go 测试因本机应用控制策略无法启动，见 §11 #9。
+
+### 记录 4.5 —— 逐页视觉验收（2026-09-19）
+
+**结论**：⏳ 未执行。此步骤需要微信开发者工具和至少一台 iOS、一台 Android 真机；当前仅完成可自动化的模板/构建/包体检查，不能用编译成功替代视觉验收。
+
+### 记录 5.1–5.3 —— 上线准备状态（2026-09-19）
+
+**结论**：⏳ 等待外部条件。新增 `npm.cmd run verify:release`，当前准确报告 5 项：API 仍为 `http://127.0.0.1:8080`、不是 HTTPS、`urlCheck=false`、`tag-test` 与 `icon-test` 验证页仍注册。正式 appid 已在 manifest/project config 中一致配置，但其归属仍需项目方确认。获得备案 HTTPS 域名、微信后台权限并完成视觉验收后，按门禁提示替换配置、移除验证页，再上传体验版与提审。
+
+#### 阶段 3/4 最终自动验证
+
+| 检查                           | 结果                                             |
+| ------------------------------ | ------------------------------------------------ |
+| `npm.cmd run type-check`       | 通过，零错误                                     |
+| `npm.cmd run verify:migration` | 通过                                             |
+| `npm.cmd test`                 | 3 / 3 通过                                       |
+| `npm.cmd run lint`             | ESLint + Prettier 通过                           |
+| `npm.cmd run build:mp-weixin`  | `DONE Build complete.`；仅有上游依赖循环引用警告 |
+| 包体                           | 346.8 KB / 2 MB（16.9%）                         |
+| `vant` / `echarts` / `mocks`   | 构建产物 0 命中                                  |
+| `frontend/`                    | 本轮未修改                                       |
+| `go test ./...`                | 被本机 Windows 应用控制策略阻止，未执行          |
+
 ---
 
 ## 13. 变更记录
 
-| 版本 | 日期 | 变更 |
-|---|---|---|
-| v1.0 | 2026-09-15 | 依据《MeowHome-小程序迁移方案》拆分为 34 步（6 个阶段） |
-| v1.1 | 2026-09-17 | 新增 §12 开发记录；0.1 完成并更新进度表；步骤 0.1 命令块改为 Windows 可用写法 |
-| v1.2 | 2026-09-17 | 0.2 完成并更新进度表；新增记录 0.2；**修正 0.2 规格疏漏**——4 个 store 依赖 `mocks/data`，处理方案转入步骤 1.2 |
-| v1.3 | 2026-09-17 | 0.3 完成并更新进度表；新增记录 0.3；**废止「清理 61 个死 CSS 类」方案**（检测方法无法识别动态拼接类名，照删会破坏生效样式），改为仅删可证明安全的桌面/平板块；`dvh` 数量修正为 7 处 |
-| v1.4 | 2026-09-17 | 0.4 完成并更新进度表；新增记录 0.4；**发现 wx.request 不支持 PATCH**（平台硬限制），小程序端降级为 POST + `X-HTTP-Method-Override`，后端配合项列入 §11 阻塞项 #7；确认 `endpoints.ts` 零改动可复用 |
-| v1.5 | 2026-09-17 | 0.5 实现完成（状态 🟡 待目视确认）；新增记录 0.5；**图标方案由「图标字体」改为「CSS 遮罩」**（57 个图标为描边式，字体字形是填充形状，需额外 outline 转换）；图标数量修正 58 → 57；新增 `scripts/gen-icons.mjs` 与 `pages/icon-test` 验证页 |
-| v1.6 | 2026-09-17 | 0.6 第一部分完成（状态 🟡）；新增记录 0.6；**实测 uni-app 标签映射，替换量由约 560 处修正为 143 处**（`<span>`→`<label>`、行内标签→块级 `<view>` 两类必须手工改）；**发现 0.6 存在计划遗漏的前置依赖**（pinia / stores / services），已给出绕过方案 |
-| v1.7 | 2026-09-17 | 0.6 第二部分完成（状态仍 🟡 待人工验证）；`CatsView` 已迁移并构建通过；**发现全局样式从未引入**（已在 App.vue 全局 `@import`）；**发现 WXSS 不支持 HTML 元素选择器**（计划 §5.5 漏项，100+ 处），新增 `scripts/adapt-wxss-selectors.mjs` 并改写 `reset.css`；记录一次脚本失败尝试（删除选择器项导致 4108→4065 行结构损坏） |
-| v1.8 | 2026-09-17 | 1.1 实现完成（状态 🟡 待 DevTools 验证）；**发现计划遗漏：17 个页面中 16 个尚不存在**，已批量生成占位页；新增 `scripts/gen-tabbar-icons.mjs`（sharp 光栅化，10 个 81×81 PNG / 13.6 KB）；**修正 Round 1 遗留错误** —— `@dcloudio/types` 曾被错误钉为 `3.4.8`（peer 要求 `3.4.31`），导致后续任何 npm install 失败 |
-| v1.9 | 2026-09-17 | 1.2 实现完成（状态 🟡）；9 个 store 迁移完成，**类型错误由 103 清零**；**实测 4 个 mock 依赖 store 中 3 个在 Web 端是残留**（`moment` 零引用、`expense`/`inventory` 实例化但不读）；安装 pinia 遭遇三层 peer 冲突，最终 `pinia@2.1.7 + --legacy-peer-deps` 并写入 `.npmrc`；`health.ts` 暂直连 `careApi`（待阶段 2/3 建 `services` 后改回） |
-| v1.10 | 2026-09-17 | 1.3 / 1.4 实现完成（状态均 🟡）；`pages/auth/index.vue` 产出，WXML **零 HTML 标签**；**1.4 规格修正**——守卫落点由 `App.vue` 改为 `src/utils/guard.ts`（`onLaunch` 只触发一次 + 与首页生命周期顺序不可依赖）；**发现 `uni.reLaunch` 目标为 tabBar 页会静默失败**，新增 `TAB_PAGES` + `navigate()` 自动选 `switchTab`；猫咪列表预载**有意偏离**计划（不放进通用守卫）；主包 231.5 KB（11.3%） |
+| 版本  | 日期       | 变更                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0  | 2026-09-15 | 依据《MeowHome-小程序迁移方案》拆分为 34 步（6 个阶段）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| v1.1  | 2026-09-17 | 新增 §12 开发记录；0.1 完成并更新进度表；步骤 0.1 命令块改为 Windows 可用写法                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| v1.2  | 2026-09-17 | 0.2 完成并更新进度表；新增记录 0.2；**修正 0.2 规格疏漏**——4 个 store 依赖 `mocks/data`，处理方案转入步骤 1.2                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| v1.3  | 2026-09-17 | 0.3 完成并更新进度表；新增记录 0.3；**废止「清理 61 个死 CSS 类」方案**（检测方法无法识别动态拼接类名，照删会破坏生效样式），改为仅删可证明安全的桌面/平板块；`dvh` 数量修正为 7 处                                                                                                                                                                                                                                                                                                                                                    |
+| v1.4  | 2026-09-17 | 0.4 完成并更新进度表；新增记录 0.4；**发现 wx.request 不支持 PATCH**（平台硬限制），小程序端降级为 POST + `X-HTTP-Method-Override`，后端配合项列入 §11 阻塞项 #7；确认 `endpoints.ts` 零改动可复用                                                                                                                                                                                                                                                                                                                                     |
+| v1.5  | 2026-09-17 | 0.5 实现完成（状态 🟡 待目视确认）；新增记录 0.5；**图标方案由「图标字体」改为「CSS 遮罩」**（57 个图标为描边式，字体字形是填充形状，需额外 outline 转换）；图标数量修正 58 → 57；新增 `scripts/gen-icons.mjs` 与 `pages/icon-test` 验证页                                                                                                                                                                                                                                                                                             |
+| v1.6  | 2026-09-17 | 0.6 第一部分完成（状态 🟡）；新增记录 0.6；**实测 uni-app 标签映射，替换量由约 560 处修正为 143 处**（`<span>`→`<label>`、行内标签→块级 `<view>` 两类必须手工改）；**发现 0.6 存在计划遗漏的前置依赖**（pinia / stores / services），已给出绕过方案                                                                                                                                                                                                                                                                                    |
+| v1.7  | 2026-09-17 | 0.6 第二部分完成（状态仍 🟡 待人工验证）；`CatsView` 已迁移并构建通过；**发现全局样式从未引入**（已在 App.vue 全局 `@import`）；**发现 WXSS 不支持 HTML 元素选择器**（计划 §5.5 漏项，100+ 处），新增 `scripts/adapt-wxss-selectors.mjs` 并改写 `reset.css`；记录一次脚本失败尝试（删除选择器项导致 4108→4065 行结构损坏）                                                                                                                                                                                                             |
+| v1.8  | 2026-09-17 | 1.1 实现完成（状态 🟡 待 DevTools 验证）；**发现计划遗漏：17 个页面中 16 个尚不存在**，已批量生成占位页；新增 `scripts/gen-tabbar-icons.mjs`（sharp 光栅化，10 个 81×81 PNG / 13.6 KB）；**修正 Round 1 遗留错误** —— `@dcloudio/types` 曾被错误钉为 `3.4.8`（peer 要求 `3.4.31`），导致后续任何 npm install 失败                                                                                                                                                                                                                      |
+| v1.9  | 2026-09-17 | 1.2 实现完成（状态 🟡）；9 个 store 迁移完成，**类型错误由 103 清零**；**实测 4 个 mock 依赖 store 中 3 个在 Web 端是残留**（`moment` 零引用、`expense`/`inventory` 实例化但不读）；安装 pinia 遭遇三层 peer 冲突，最终 `pinia@2.1.7 + --legacy-peer-deps` 并写入 `.npmrc`；`health.ts` 暂直连 `careApi`（待阶段 2/3 建 `services` 后改回）                                                                                                                                                                                            |
+| v1.10 | 2026-09-17 | 1.3 / 1.4 实现完成（状态均 🟡）；`pages/auth/index.vue` 产出，WXML **零 HTML 标签**；**1.4 规格修正**——守卫落点由 `App.vue` 改为 `src/utils/guard.ts`（`onLaunch` 只触发一次 + 与首页生命周期顺序不可依赖）；**发现 `uni.reLaunch` 目标为 tabBar 页会静默失败**，新增 `TAB_PAGES` + `navigate()` 自动选 `switchTab`；猫咪列表预载**有意偏离**计划（不放进通用守卫）；主包 231.5 KB（11.3%）                                                                                                                                            |
 | v1.11 | 2026-09-17 | 1.5 联调完成（协议层 35/35，状态 🟡 待 UI 目视）；新增 `scripts/verify-auth-flow.mjs` 协议镜像验证脚本；**联调发现 3 处真实缺陷并修复**：① `client.ts` 把非 Envelope 响应（Gin 404 纯文本）**静默当成功**；② 后端 `AuthResult.User` 直传原始 model → 字段名 PascalCase（两端 `res.user.id` 均为 undefined）且**下发密码哈希**，改为显式 `AuthUser` DTO（同时修好 Web 端）；③ **§11 #7 解除** —— 新增 `middleware/method_override.go`，必须包在 gin engine 外层，且只放行 PATCH；新增 §11 #8（其余接口是否有同类直传 model 问题待审计） |
-| v1.12 | 2026-09-17 | 补充 §2「本地运行方式」；新增 `miniprogram/README.md`；**记录高频踩坑**——微信开发者工具须导入 `miniprogram\dist\build\mp-weixin`，导入源码工程 `miniprogram\` 会报「app.json 文件在项目根目录未找到」（`app.json` 等由编译生成，源码目录本就没有）；同时更正此前「需手动勾选不校验合法域名」的说法，`project.config.json` 已设 `urlCheck: false` |
+| v1.12 | 2026-09-17 | 补充 §2「本地运行方式」；新增 `miniprogram/README.md`；**记录高频踩坑**——微信开发者工具须导入 `miniprogram\dist\build\mp-weixin`，导入源码工程 `miniprogram\` 会报「app.json 文件在项目根目录未找到」（`app.json` 等由编译生成，源码目录本就没有）；同时更正此前「需手动勾选不校验合法域名」的说法，`project.config.json` 已设 `urlCheck: false`                                                                                                                                                                                       |
+| v1.13 | 2026-09-19 | 阶段 2 的 5 个主 tab 页实现完成并补开发记录；新增统一导航/受保护页面生命周期与真实记录列表；移除主页面 mock、Web Speech/DOM toast；后端成员接口补 `user_name`；完成剩余响应 DTO 审计并解除 §11 #3/#8；自动类型检查与微信构建通过，视觉/真机项保持 🟡                                                                                                                                                                                                                                                                                   |
+| v1.14 | 2026-09-19 | 阶段 3 全部正式页面及 4.1–4.4 完成代码迁移；补齐猫咪生日/绝育/健康档案后端契约；新增下拉刷新、分享、离线 UI、安全区/键盘适配、迁移静态检查、Node 测试、ESLint/Prettier 与上线门禁；最终主包 346.8 KB。4.5 与阶段 5 因需 DevTools、真机、备案域名和微信后台权限保持待办                                                                                                                                                                                                                                                                 |

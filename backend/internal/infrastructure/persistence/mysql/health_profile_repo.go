@@ -3,6 +3,7 @@ package mysql
 
 import (
 	"context"
+	stderrors "errors"
 
 	"gorm.io/gorm"
 
@@ -28,6 +29,9 @@ func (r *HealthProfileRepo) Create(ctx context.Context, p *model.CatHealthProfil
 func (r *HealthProfileRepo) FindByCatID(ctx context.Context, catID string) (*model.CatHealthProfile, error) {
 	var p model.CatHealthProfile
 	if err := r.db.WithContext(ctx).Unscoped().Where("cat_id = ?", catID).First(&p).Error; err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &p, nil

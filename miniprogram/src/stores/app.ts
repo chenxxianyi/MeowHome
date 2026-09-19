@@ -15,7 +15,7 @@ export const useAppStore = defineStore('app', {
   state: (): AppState => ({
     currentCat: 'cat-whit',
     currentPage: 'today',
-    // 小程序无 navigator.onLine，且 uni.getNetworkType 是异步的，
+    // 小程序无浏览器在线状态 API，且 uni.getNetworkType 是异步的，
     // 因此乐观初值设为在线，由 App.vue onLaunch 调 syncNetworkStatus() 校准。
     isOnline: true,
     isOffline: false,
@@ -25,8 +25,12 @@ export const useAppStore = defineStore('app', {
     aiLoading: false
   }),
   actions: {
-    setCurrentCat(catId: string) { this.currentCat = catId },
-    setCurrentPage(page: string) { this.currentPage = page },
+    setCurrentCat(catId: string) {
+      this.currentCat = catId
+    },
+    setCurrentPage(page: string) {
+      this.currentPage = page
+    },
     setOnline(online: boolean) {
       this.isOnline = online
       this.isOffline = !online

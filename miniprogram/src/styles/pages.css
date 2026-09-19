@@ -3,7 +3,7 @@
 /* === Layout === */
 .page {
   min-height: 100vh;
-  padding-bottom: calc(64px + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   display: flex;
   flex-direction: column;
 }
@@ -4100,9 +4100,8 @@
 }
 
 /* === Touch target minimum === */
-@media (hover: none) and (pointer: coarse) {
-  button, navigator, input, picker, textarea, .record-type-btn, .quick-record-btn, .nav-item {
-    min-height: 44px;
-    min-width: 44px;
-  }
+/* 小程序是触摸端，直接保证最小点击面积；无需依赖 WXSS 不稳定的 hover/pointer 媒体特性。 */
+button, navigator, input, picker, textarea, .record-type-btn, .quick-record-btn, .nav-item {
+  min-height: 44px;
+  min-width: 44px;
 }

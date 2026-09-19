@@ -545,6 +545,21 @@ components:
           type: string
           format: date
           nullable: true
+        birthday:
+          type: string
+          format: date
+          nullable: true
+          description: Legacy client compatibility alias of birth_date.
+        neutered:
+          type: boolean
+        diseases:
+          type: array
+          items:
+            type: string
+        allergies:
+          type: array
+          items:
+            type: string
         color:
           type: string
           nullable: true
@@ -565,6 +580,16 @@ components:
         birth_date:
           type: string
           format: date
+        neutered:
+          type: boolean
+        diseases:
+          type: array
+          items:
+            type: string
+        allergies:
+          type: array
+          items:
+            type: string
         color:
           type: string
     CatUpdateRequest:
@@ -580,6 +605,8 @@ components:
         birth_date:
           type: string
           format: date
+        neutered:
+          type: boolean
         color:
           type: string
         avatar_key:

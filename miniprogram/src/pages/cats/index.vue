@@ -14,7 +14,7 @@
  * | `<input type="date">` | `<picker mode="date">` | 小程序 input 无 date 类型 |
  * | `<span>` (112 处同款) | `<text>` | `<span>` 会被静默映射为 `<label>`（表单标签），语义错误 |
  * | `<p>` `<h2>` | `<view>` | 块级语义，映射正确，但显式写原生标签更清晰 |
- * | `window.addEventListener('keydown')` | 删除 | 小程序无键盘事件，Esc 关闭不适用 |
+ * | 浏览器全局键盘监听 | 删除 | 小程序无对应键盘事件，Esc 关闭不适用 |
  * | `services.getCats()` | `catApi.list()` 直调 | **本页刻意绕过 services 层**：services 依赖 pinia 与 mocks，属步骤 1.2 范围，本步只验证标签/网络/UI/图标四条链路 |
  * | `useCatStore()` | 移除 | 同上，pinia 未安装 |
  * | `onMounted` | `onShow` | 小程序页面生命周期；用 onShow 保证每次进入都刷新 |
@@ -26,10 +26,16 @@ import { toApiError } from '../../api/adapter'
 import { catApi, toCat } from '../../api/endpoints'
 import { getStoredFamilyId } from '../../api/client'
 import AppIcon from '../../components/app/AppIcon.vue'
+import OfflineBanner from '../../components/app/OfflineBanner.vue'
 import { guardOnShow } from '../../utils/guard'
+import { useRouter } from '../../utils/navigation'
+import { useCatStore } from '../../stores/cat'
 import type { Cat } from '../../types'
+import { usePageCapabilities } from '../../utils/page'
 
 const cats = ref<Cat[]>([])
+const router = useRouter()
+const catStore = useCatStore()
 const loading = ref(true)
 const loadError = ref('')
 
@@ -54,9 +60,9 @@ const GENDERS = [
 
 const canSubmit = computed(() => form.value.name.trim().length > 0 && !submitting.value)
 
-/** 详情页尚未迁移（步骤 3.4），先给出明确反馈而不是静默无响应。 */
 function openDetail(cat: Cat) {
-  uni.showToast({ title: `${cat.name} 详情页待迁移`, icon: 'none' })
+  catStore.setCat(cat.id)
+  router.push(`/cats/${cat.id}`)
 }
 
 async function load() {
@@ -69,6 +75,7 @@ async function load() {
   try {
     const list = await catApi.list(familyId)
     cats.value = list.map(toCat)
+    catStore.setCats(cats.value)
     loadError.value = ''
   } catch (e) {
     loadError.value = toApiError(e).message
@@ -83,6 +90,7 @@ onShow(async () => {
   if (!(await guardOnShow())) return
   await load()
 })
+usePageCapabilities(load, '猫宅 · 猫咪档案')
 
 async function openSheet() {
   form.value = { name: '', gender: 'unknown', breed: '', birthday: '' }
@@ -131,40 +139,23 @@ async function submit() {
 </script>
 
 <template>
+  <OfflineBanner />
   <view class="page">
     <view class="page-header">
-      <view class="page-title">
-        猫咪
-      </view>
+      <view class="page-title"> 猫咪 </view>
     </view>
 
     <view class="page-content">
-      <view
-        v-if="loading"
-        aria-busy="true"
-      >
-        <view
-          v-for="i in 3"
-          :key="i"
-          class="skeleton"
-          style="height:72px;margin-bottom:12px;"
-        />
+      <view v-if="loading" aria-busy="true">
+        <view v-for="i in 3" :key="i" class="skeleton" style="height: 72px; margin-bottom: 12px" />
       </view>
 
       <template v-else>
-        <view
-          v-if="loadError"
-          class="load-error"
-        >
+        <view v-if="loadError" class="load-error">
           {{ loadError }}
         </view>
 
-        <text
-          v-else-if="cats.length === 0"
-          class="empty-hint"
-        >
-          还没有猫咪档案，先添加一只吧
-        </text>
+        <text v-else-if="cats.length === 0" class="empty-hint"> 还没有猫咪档案，先添加一只吧 </text>
 
         <view
           v-for="cat in cats"
@@ -173,20 +164,9 @@ async function submit() {
           :aria-label="'查看 ' + cat.name + ' 详情'"
           @click="openDetail(cat)"
         >
-          <image
-            v-if="cat.avatar"
-            class="cat-avatar"
-            :src="cat.avatar"
-            mode="aspectFit"
-          />
-          <view
-            v-else
-            class="cat-avatar cat-avatar-empty"
-          >
-            <AppIcon
-              name="pawPrint"
-              :size="22"
-            />
+          <image v-if="cat.avatar" class="cat-avatar" :src="cat.avatar" mode="aspectFit" />
+          <view v-else class="cat-avatar cat-avatar-empty">
+            <AppIcon name="pawPrint" :size="22" />
           </view>
 
           <view class="cat-info">
@@ -194,48 +174,26 @@ async function submit() {
               {{ cat.name }}
             </view>
             <view class="cat-meta">
-              {{ cat.age }}岁 · {{ cat.gender === 'female' ? '母' : cat.gender === 'male' ? '公' : '未知' }} · {{ cat.breed }}
+              {{ cat.age }}岁 · {{ cat.gender === 'female' ? '母' : cat.gender === 'male' ? '公' : '未知' }} ·
+              {{ cat.breed }}
               <text v-if="cat.neutered"> · 已绝育</text>
             </view>
             <text class="cat-status normal">健康</text>
           </view>
           <view class="family-item-arrow">
-            <AppIcon
-              name="chevronRight"
-              :size="20"
-            />
+            <AppIcon name="chevronRight" :size="20" />
           </view>
         </view>
 
-        <button
-          class="btn-primary"
-          style="margin-top:16px;"
-          @click="openSheet"
-        >
-          添加猫咪
-        </button>
+        <button class="btn-primary" style="margin-top: 16px" @click="openSheet">添加猫咪</button>
       </template>
     </view>
 
     <!-- 添加猫咪：底部抽屉（复用全局 .sheet-overlay / .sheet-content，层级 200/201） -->
-    <view
-      class="sheet-overlay"
-      :class="{ show: sheetOpen }"
-      @click.self="closeSheet"
-    >
-      <view
-        class="sheet-content"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-cat-title"
-      >
+    <view class="sheet-overlay" :class="{ show: sheetOpen }" @click.self="closeSheet">
+      <view class="sheet-content" role="dialog" aria-modal="true" aria-labelledby="add-cat-title">
         <view class="sheet-handle" />
-        <view
-          id="add-cat-title"
-          class="sheet-title"
-        >
-          添加猫咪
-        </view>
+        <view id="add-cat-title" class="sheet-title"> 添加猫咪 </view>
 
         <view class="sheet-body">
           <label class="field">
@@ -280,44 +238,22 @@ async function submit() {
 
           <label class="field">
             <text class="field-label">生日</text>
-            <picker
-              mode="date"
-              :value="form.birthday"
-              @change="onBirthdayChange"
-            >
-              <view
-                class="field-input picker-value"
-                :class="{ placeholder: !form.birthday }"
-              >
+            <picker mode="date" :value="form.birthday" @change="onBirthdayChange">
+              <view class="field-input picker-value" :class="{ placeholder: !form.birthday }">
                 {{ form.birthday || '请选择生日' }}
               </view>
             </picker>
           </label>
 
-          <text
-            v-if="error"
-            class="form-error"
-          >
+          <text v-if="error" class="form-error">
             {{ error }}
           </text>
         </view>
 
         <!-- 操作区固定在抽屉底部，不随表单滚动 -->
         <view class="sheet-actions">
-          <button
-            type="button"
-            class="btn-secondary"
-            :disabled="submitting"
-            @click="closeSheet"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="btn-primary"
-            :disabled="!canSubmit"
-            @click="submit"
-          >
+          <button type="button" class="btn-secondary" :disabled="submitting" @click="closeSheet">取消</button>
+          <button type="button" class="btn-primary" :disabled="!canSubmit" @click="submit">
             {{ submitting ? '保存中…' : '保存' }}
           </button>
         </view>
@@ -438,6 +374,7 @@ async function submit() {
   flex-direction: row;
   gap: 10px;
   margin-top: 12px;
+  padding-bottom: calc(56px + var(--safe-bottom));
 }
 
 .sheet-actions .btn-primary {

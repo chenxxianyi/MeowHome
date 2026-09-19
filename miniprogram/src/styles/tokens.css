@@ -1,31 +1,31 @@
 /* Design Tokens — 猫宅 MeowHome Vue 3 (高保真还原 H5 demo) */
 page {
-  --color-bg-page: #F7F4EE;
-  --color-bg-surface: #FFFCF7;
-  --color-bg-subtle: #F1ECE5;
+  --color-bg-page: #f7f4ee;
+  --color-bg-surface: #fffcf7;
+  --color-bg-subtle: #f1ece5;
 
-  --color-brand: #C87345;
-  --color-brand-hover: #B7653B;
-  --color-brand-soft: #F4E2D4;
+  --color-brand: #c87345;
+  --color-brand-hover: #b7653b;
+  --color-brand-soft: #f4e2d4;
 
-  --color-success: #5D846D;
-  --color-success-soft: #E4EEE7;
-  --color-warning: #C58A32;
-  --color-warning-soft: #F7ECD8;
-  --color-danger: #B5534B;
-  --color-danger-soft: #F4E1DF;
+  --color-success: #5d846d;
+  --color-success-soft: #e4eee7;
+  --color-warning: #c58a32;
+  --color-warning-soft: #f7ecd8;
+  --color-danger: #b5534b;
+  --color-danger-soft: #f4e1df;
 
-  --color-text-primary: #2D2925;
-  --color-text-secondary: #706A64;
-  --color-text-tertiary: #9B948C;
+  --color-text-primary: #2d2925;
+  --color-text-secondary: #706a64;
+  --color-text-tertiary: #9b948c;
 
-  --color-border: #E7E1D9;
-  --color-divider: #EEE8E1;
+  --color-border: #e7e1d9;
+  --color-divider: #eee8e1;
 
-  --color-ai-bg: #EDE8F5;
-  --color-ai-text: #5A4E82;
-  --color-ai-border: #D4C8E8;
-  --color-ai-accent: #7B68AE;
+  --color-ai-bg: #ede8f5;
+  --color-ai-text: #5a4e82;
+  --color-ai-border: #d4c8e8;
+  --color-ai-accent: #7b68ae;
 
   --font-size-caption: 12px;
   --font-size-assist: 13px;
@@ -52,16 +52,17 @@ page {
   --space-40: 40px;
 
   /* ---- 杂志排版（Editorial） ---- */
-  --font-display: "Noto Serif SC", "Songti SC", "STSong", "SimSun", "Times New Roman", serif;
-  --font-masthead: "Georgia", "Noto Serif SC", "Songti SC", serif;
+  --font-display: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', 'Times New Roman', serif;
+  --font-masthead: 'Georgia', 'Noto Serif SC', 'Songti SC', serif;
   --hairline: 1px solid var(--color-divider);
   --rule-thin: 1px solid var(--color-text-primary);
   --rule-thick: 3px solid var(--color-text-primary);
 
-  --shadow-nav: 0 -2px 12px rgba(45,41,37,0.06);
-  --shadow-elevated: 0 4px 20px rgba(45,41,37,0.08);
-  --shadow-modal: 0 -8px 32px rgba(45,41,37,0.12);
+  --shadow-nav: 0 -2px 12px rgba(45, 41, 37, 0.06);
+  --shadow-elevated: 0 4px 20px rgba(45, 41, 37, 0.08);
+  --shadow-modal: 0 -8px 32px rgba(45, 41, 37, 0.12);
 
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-top: env(safe-area-inset-top, 0px);
+  /* 默认原生导航栏已处理刘海安全区，页面内容不再重复叠加顶部 inset。 */
+  --safe-top: 0px;
 }

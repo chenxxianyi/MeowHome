@@ -245,6 +245,7 @@ func (h *Handler) ListMembers(c *gin.Context) {
 			"id":        m.ID,
 			"family_id": m.FamilyID,
 			"user_id":   m.UserID,
+			"user_name": m.UserName,
 			"role":      m.Role,
 		}
 	}
@@ -255,9 +256,13 @@ func (h *Handler) ListMembers(c *gin.Context) {
 
 // CatCreateRequest 创建猫咪请求体。
 type CatCreateRequest struct {
-	Name   string `json:"name" binding:"required,min=1,max=64"`
-	Breed  string `json:"breed,omitempty"`
-	Gender string `json:"gender,omitempty"`
+	Name      string   `json:"name" binding:"required,min=1,max=64"`
+	Breed     string   `json:"breed,omitempty"`
+	Gender    string   `json:"gender,omitempty"`
+	BirthDate string   `json:"birth_date,omitempty"`
+	Neutered  bool     `json:"neutered"`
+	Diseases  []string `json:"diseases,omitempty"`
+	Allergies []string `json:"allergies,omitempty"`
 }
 
 // CreateCat 创建猫咪。
@@ -269,7 +274,7 @@ func (h *Handler) CreateCat(c *gin.Context) {
 	}
 	familyID := c.Param("familyId")
 	userID := mustUserID(c)
-	cat, err := h.cat.CreateCat(c.Request.Context(), familyID, req.Name, req.Breed, req.Gender, userID)
+	cat, err := h.cat.CreateCat(c.Request.Context(), familyID, req.Name, req.Breed, req.Gender, req.BirthDate, req.Neutered, req.Diseases, req.Allergies, userID)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -298,7 +303,7 @@ func (h *Handler) UpdateCat(c *gin.Context) {
 	}
 	catID := c.Param("catId")
 	userID := mustUserID(c)
-	cat, err := h.cat.UpdateCat(c.Request.Context(), catID, userID, req.Name, req.Breed, req.Gender)
+	cat, err := h.cat.UpdateCat(c.Request.Context(), catID, userID, req.Name, req.Breed, req.Gender, req.BirthDate, req.Neutered)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -308,9 +313,11 @@ func (h *Handler) UpdateCat(c *gin.Context) {
 
 // CatUpdateRequest 更新猫咪请求体。
 type CatUpdateRequest struct {
-	Name   string `json:"name,omitempty"`
-	Breed  string `json:"breed,omitempty"`
-	Gender string `json:"gender,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Breed     string `json:"breed,omitempty"`
+	Gender    string `json:"gender,omitempty"`
+	BirthDate string `json:"birth_date,omitempty"`
+	Neutered  *bool  `json:"neutered,omitempty"`
 }
 
 // DeleteCat 删除猫咪。
@@ -343,12 +350,16 @@ func (h *Handler) ListCats(c *gin.Context) {
 // catToEnvelope 转换为 JSON 响应格式。
 func catToEnvelope(c *model.Cat) map[string]any {
 	envelope := map[string]any{
-		"id":        c.ID,
-		"family_id": c.FamilyID,
-		"name":      c.Name,
-		"breed":     c.Breed,
-		"gender":    c.Gender,
-		"neutered":  c.Neutered,
+		"id":         c.ID,
+		"family_id":  c.FamilyID,
+		"name":       c.Name,
+		"breed":      c.Breed,
+		"gender":     c.Gender,
+		"birthday":   c.Birthday,
+		"birth_date": c.Birthday,
+		"neutered":   c.Neutered,
+		"diseases":   c.Diseases,
+		"allergies":  c.Allergies,
 	}
 	if c.AvatarKey != "" {
 		envelope["avatar_key"] = c.AvatarKey

@@ -1,162 +1,167 @@
 {
-	"pages": [
-		{
-			"path": "pages/cats/index",
-			"style": {
-				"navigationBarTitleText": "猫咪"
-			}
-		},
-		{
-			"path": "pages/today/index",
-			"style": {
-				"navigationBarTitleText": "今日"
-			}
-		},
-		{
-			"path": "pages/records/index",
-			"style": {
-				"navigationBarTitleText": "记录"
-			}
-		},
-		{
-			"path": "pages/moments/index",
-			"style": {
-				"navigationBarTitleText": "时光"
-			}
-		},
-		{
-			"path": "pages/family/index",
-			"style": {
-				"navigationBarTitleText": "家庭"
-			}
-		},
-		{
-			"path": "pages/auth/index",
-			"style": {
-				"navigationBarTitleText": "登录"
-			}
-		},
-		{
-			"path": "pages/onboarding/index",
-			"style": {
-				"navigationBarTitleText": "开始使用"
-			}
-		},
-		{
-			"path": "pages/cat-detail/index",
-			"style": {
-				"navigationBarTitleText": "猫咪详情"
-			}
-		},
-		{
-			"path": "pages/trends/index",
-			"style": {
-				"navigationBarTitleText": "趋势"
-			}
-		},
-		{
-			"path": "pages/quick-record/index",
-			"style": {
-				"navigationBarTitleText": "快速记录"
-			}
-		},
-		{
-			"path": "pages/ai-input/index",
-			"style": {
-				"navigationBarTitleText": "AI 记录"
-			}
-		},
-		{
-			"path": "pages/ai-confirm/index",
-			"style": {
-				"navigationBarTitleText": "确认记录"
-			}
-		},
-		{
-			"path": "pages/medical-upload/index",
-			"style": {
-				"navigationBarTitleText": "病历上传"
-			}
-		},
-		{
-			"path": "pages/reminders/index",
-			"style": {
-				"navigationBarTitleText": "提醒"
-			}
-		},
-		{
-			"path": "pages/inventory/index",
-			"style": {
-				"navigationBarTitleText": "库存"
-			}
-		},
-		{
-			"path": "pages/expenses/index",
-			"style": {
-				"navigationBarTitleText": "账目"
-			}
-		},
-		{
-			"path": "pages/settings/index",
-			"style": {
-				"navigationBarTitleText": "设置"
-			}
-		},
-		{
-			"path": "pages/tag-test/index",
-			"style": {
-				"navigationBarTitleText": "标签容错实测"
-			}
-		},
-		{
-			"path": "pages/icon-test/index",
-			"style": {
-				"navigationBarTitleText": "图标方案验证"
-			}
-		}
-	],
-	"tabBar": {
-		"color": "#9B948C",
-		"selectedColor": "#C87345",
-		"backgroundColor": "#FFFCF7",
-		"borderStyle": "white",
-		"list": [
-			{
-				"pagePath": "pages/today/index",
-				"text": "今日",
-				"iconPath": "static/tabbar/today.png",
-				"selectedIconPath": "static/tabbar/today-active.png"
-			},
-			{
-				"pagePath": "pages/records/index",
-				"text": "记录",
-				"iconPath": "static/tabbar/records.png",
-				"selectedIconPath": "static/tabbar/records-active.png"
-			},
-			{
-				"pagePath": "pages/cats/index",
-				"text": "猫咪",
-				"iconPath": "static/tabbar/cats.png",
-				"selectedIconPath": "static/tabbar/cats-active.png"
-			},
-			{
-				"pagePath": "pages/moments/index",
-				"text": "时光",
-				"iconPath": "static/tabbar/moments.png",
-				"selectedIconPath": "static/tabbar/moments-active.png"
-			},
-			{
-				"pagePath": "pages/family/index",
-				"text": "家庭",
-				"iconPath": "static/tabbar/family.png",
-				"selectedIconPath": "static/tabbar/family-active.png"
-			}
-		]
-	},
-	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "猫宅 MeowHome",
-		"navigationBarBackgroundColor": "#FFFCF7",
-		"backgroundColor": "#F7F4EE"
-	}
+  "pages": [
+    {
+      "path": "pages/cats/index",
+      "style": {
+        "navigationBarTitleText": "猫咪",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/today/index",
+      "style": {
+        "navigationBarTitleText": "今日",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/records/index",
+      "style": {
+        "navigationBarTitleText": "记录",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/moments/index",
+      "style": {
+        "navigationBarTitleText": "时光",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/family/index",
+      "style": {
+        "navigationBarTitleText": "家庭",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/auth/index",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "pages/onboarding/index",
+      "style": {
+        "navigationBarTitleText": "开始使用"
+      }
+    },
+    {
+      "path": "pages/cat-detail/index",
+      "style": {
+        "navigationBarTitleText": "猫咪详情"
+      }
+    },
+    {
+      "path": "pages/trends/index",
+      "style": {
+        "navigationBarTitleText": "趋势"
+      }
+    },
+    {
+      "path": "pages/quick-record/index",
+      "style": {
+        "navigationBarTitleText": "快速记录"
+      }
+    },
+    {
+      "path": "pages/ai-input/index",
+      "style": {
+        "navigationBarTitleText": "AI 记录"
+      }
+    },
+    {
+      "path": "pages/ai-confirm/index",
+      "style": {
+        "navigationBarTitleText": "确认记录"
+      }
+    },
+    {
+      "path": "pages/medical-upload/index",
+      "style": {
+        "navigationBarTitleText": "病历上传"
+      }
+    },
+    {
+      "path": "pages/reminders/index",
+      "style": {
+        "navigationBarTitleText": "提醒"
+      }
+    },
+    {
+      "path": "pages/inventory/index",
+      "style": {
+        "navigationBarTitleText": "库存"
+      }
+    },
+    {
+      "path": "pages/expenses/index",
+      "style": {
+        "navigationBarTitleText": "账目"
+      }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置"
+      }
+    },
+    {
+      "path": "pages/tag-test/index",
+      "style": {
+        "navigationBarTitleText": "标签容错实测"
+      }
+    },
+    {
+      "path": "pages/icon-test/index",
+      "style": {
+        "navigationBarTitleText": "图标方案验证"
+      }
+    }
+  ],
+  "tabBar": {
+    "color": "#9B948C",
+    "selectedColor": "#C87345",
+    "backgroundColor": "#FFFCF7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/today/index",
+        "text": "今日",
+        "iconPath": "static/tabbar/today.png",
+        "selectedIconPath": "static/tabbar/today-active.png"
+      },
+      {
+        "pagePath": "pages/records/index",
+        "text": "记录",
+        "iconPath": "static/tabbar/records.png",
+        "selectedIconPath": "static/tabbar/records-active.png"
+      },
+      {
+        "pagePath": "pages/cats/index",
+        "text": "猫咪",
+        "iconPath": "static/tabbar/cats.png",
+        "selectedIconPath": "static/tabbar/cats-active.png"
+      },
+      {
+        "pagePath": "pages/moments/index",
+        "text": "时光",
+        "iconPath": "static/tabbar/moments.png",
+        "selectedIconPath": "static/tabbar/moments-active.png"
+      },
+      {
+        "pagePath": "pages/family/index",
+        "text": "家庭",
+        "iconPath": "static/tabbar/family.png",
+        "selectedIconPath": "static/tabbar/family-active.png"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "猫宅 MeowHome",
+    "navigationBarBackgroundColor": "#FFFCF7",
+    "backgroundColor": "#F7F4EE"
+  }
 }

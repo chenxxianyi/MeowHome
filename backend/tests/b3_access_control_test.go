@@ -20,18 +20,18 @@ import (
 // seedUsers 创建两个独立用户并各自建立家庭。
 // 返回 alice/bob 的用户 ID 及各自家庭 ID，以及组装好的服务引用。
 type b3Fixture struct {
-	db         *gorm.DB
-	aliceID    string
-	bobID      string
-	familyAID  string
-	familyBID  string
-	catAID     string
-	catBID     string
-	authSvc    *app.AuthService
-	familySvc  *app.FamilyService
-	catSvc     *app.CatService
-	memberSvc  *app.MemberService
-	auditRepo  repository.AuditRepo
+	db        *gorm.DB
+	aliceID   string
+	bobID     string
+	familyAID string
+	familyBID string
+	catAID    string
+	catBID    string
+	authSvc   *app.AuthService
+	familySvc *app.FamilyService
+	catSvc    *app.CatService
+	memberSvc *app.MemberService
+	auditRepo repository.AuditRepo
 }
 
 func seedB3Fixture(t *testing.T, db *gorm.DB) *b3Fixture {
@@ -66,24 +66,24 @@ func seedB3Fixture(t *testing.T, db *gorm.DB) *b3Fixture {
 	require.NoError(t, err)
 
 	// 各自添加猫咪
-	catA, err := catSvc.CreateCat(ctx, famA.ID, "catA", "", "male", alice.User.ID)
+	catA, err := catSvc.CreateCat(ctx, famA.ID, "catA", "", "male", "2020-05-01", true, []string{"慢性肾病"}, []string{"鸡肉"}, alice.User.ID)
 	require.NoError(t, err)
-	catB, err := catSvc.CreateCat(ctx, famB.ID, "catB", "", "female", bob.User.ID)
+	catB, err := catSvc.CreateCat(ctx, famB.ID, "catB", "", "female", "", false, nil, nil, bob.User.ID)
 	require.NoError(t, err)
 
 	return &b3Fixture{
-		db:         db,
-		aliceID:    alice.User.ID,
-		bobID:      bob.User.ID,
-		familyAID:  famA.ID,
-		familyBID:  famB.ID,
-		catAID:     catA.ID,
-		catBID:     catB.ID,
-		authSvc:    authSvc,
-		familySvc:  familySvc,
-		catSvc:     catSvc,
-		memberSvc:  memberSvc,
-		auditRepo:  auditRepo,
+		db:        db,
+		aliceID:   alice.User.ID,
+		bobID:     bob.User.ID,
+		familyAID: famA.ID,
+		familyBID: famB.ID,
+		catAID:    catA.ID,
+		catBID:    catB.ID,
+		authSvc:   authSvc,
+		familySvc: familySvc,
+		catSvc:    catSvc,
+		memberSvc: memberSvc,
+		auditRepo: auditRepo,
 	}
 }
 
@@ -103,8 +103,12 @@ func TestAccessControl_FamilyA_B_CatAccess(t *testing.T) {
 	t.Run("alice can access her own family and cat", func(t *testing.T) {
 		_, err := fx.familySvc.GetFamily(ctx, fx.familyAID, fx.aliceID)
 		assert.NoError(t, err)
-		_, err = fx.catSvc.GetCat(ctx, fx.catAID, fx.aliceID)
+		cat, err := fx.catSvc.GetCat(ctx, fx.catAID, fx.aliceID)
 		assert.NoError(t, err)
+		assert.Equal(t, "2020-05-01", cat.Birthday)
+		assert.True(t, cat.Neutered)
+		assert.Equal(t, []string{"慢性肾病"}, cat.Diseases)
+		assert.Equal(t, []string{"鸡肉"}, cat.Allergies)
 	})
 
 	t.Run("bob can access his own family and cat", func(t *testing.T) {
@@ -140,12 +144,12 @@ func TestAccessControl_FamilyA_B_CatAccess(t *testing.T) {
 	})
 
 	t.Run("alice cannot create cat in family B", func(t *testing.T) {
-		_, err := fx.catSvc.CreateCat(ctx, fx.familyBID, "intruder", "", "male", fx.aliceID)
+		_, err := fx.catSvc.CreateCat(ctx, fx.familyBID, "intruder", "", "male", "", false, nil, nil, fx.aliceID)
 		assertErrorFamilyForbidden(t, err)
 	})
 
 	t.Run("alice cannot update bob's cat", func(t *testing.T) {
-		_, err := fx.catSvc.UpdateCat(ctx, fx.catBID, fx.aliceID, "renamed", "", "")
+		_, err := fx.catSvc.UpdateCat(ctx, fx.catBID, fx.aliceID, "renamed", "", "", "", nil)
 		assertErrorFamilyForbidden(t, err)
 	})
 

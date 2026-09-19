@@ -54,9 +54,7 @@ const passwordMismatch = computed(
 )
 
 /** 密码是否达到后端要求的最短长度（后端 `app/auth.go` 校验 >= 8）。 */
-const passwordTooShort = computed(
-  () => isRegister.value && password.value.length > 0 && password.value.length < 8
-)
+const passwordTooShort = computed(() => isRegister.value && password.value.length > 0 && password.value.length < 8)
 
 /**
  * 提交按钮可用性。
@@ -147,12 +145,8 @@ async function onSubmit() {
   <view class="auth-page">
     <view class="auth-card">
       <view class="brand">
-        <view class="logo">
-          🐾
-        </view>
-        <view class="brand-name">
-          猫宅
-        </view>
+        <view class="logo"> 🐾 </view>
+        <view class="brand-name"> 猫宅 </view>
         <text class="subtitle">多猫家庭的生活与健康管理</text>
       </view>
 
@@ -172,10 +166,7 @@ async function onSubmit() {
           />
         </label>
 
-        <label
-          v-if="isRegister"
-          class="field"
-        >
+        <label v-if="isRegister" class="field">
           <text class="field-label">昵称</text>
           <input
             v-model="userName"
@@ -203,24 +194,13 @@ async function onSubmit() {
               :aria-label="showPassword ? '隐藏密码' : '显示密码'"
               @click="showPassword = !showPassword"
             >
-              <AppIcon
-                :name="showPassword ? 'eyeOff' : 'eye'"
-                :size="18"
-              />
+              <AppIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="18" />
             </button>
           </view>
         </label>
-        <text
-          v-if="passwordTooShort"
-          class="hint hint-error"
-        >
-          密码至少 8 位
-        </text>
+        <text v-if="passwordTooShort" class="hint hint-error"> 密码至少 8 位 </text>
 
-        <label
-          v-if="isRegister"
-          class="field"
-        >
+        <label v-if="isRegister" class="field">
           <text class="field-label">确认密码</text>
           <input
             v-model="confirmPassword"
@@ -231,17 +211,9 @@ async function onSubmit() {
             placeholder-class="input-placeholder"
           />
         </label>
-        <text
-          v-if="passwordMismatch"
-          class="hint hint-error"
-        >
-          两次输入的密码不一致
-        </text>
+        <text v-if="passwordMismatch" class="hint hint-error"> 两次输入的密码不一致 </text>
 
-        <label
-          v-if="isRegister"
-          class="field"
-        >
+        <label v-if="isRegister" class="field">
           <text class="field-label">家庭名称</text>
           <input
             v-model="familyName"
@@ -252,18 +224,11 @@ async function onSubmit() {
           />
         </label>
 
-        <text
-          v-if="error"
-          class="error"
-        >
+        <text v-if="error" class="error">
           {{ error }}
         </text>
 
-        <button
-          class="primary"
-          :disabled="submitting || !canSubmit"
-          @click="onSubmit"
-        >
+        <button class="primary" :disabled="submitting || !canSubmit" @click="onSubmit">
           {{ submitting ? '处理中…' : submitLabel }}
         </button>
       </view>
@@ -271,17 +236,11 @@ async function onSubmit() {
       <view class="switch">
         <template v-if="isRegister">
           <text class="switch-text">已有账号？</text>
-          <text
-            class="link"
-            @click="switchMode('login')"
-          >去登录</text>
+          <text class="link" @click="switchMode('login')">去登录</text>
         </template>
         <template v-else>
           <text class="switch-text">还没有账号？</text>
-          <text
-            class="link"
-            @click="switchMode('register')"
-          >注册一个</text>
+          <text class="link" @click="switchMode('register')">注册一个</text>
         </template>
       </view>
     </view>

@@ -19,7 +19,11 @@ export const useMomentStore = defineStore('moment', {
     month: null
   }),
   actions: {
-    setMonth(m: string) { this.month = m },
-    set(events: TimelineEvent[]) { this.events = events }
+    setMonth(m: string) {
+      this.month = m
+    },
+    set(events: TimelineEvent[]) {
+      this.events = events
+    }
   }
 })

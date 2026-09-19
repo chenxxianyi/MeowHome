@@ -54,8 +54,11 @@ export interface CatDTO {
   breed?: string
   gender?: string
   birthday?: string
+  birth_date?: string
   neutered?: boolean
   avatar_key?: string
+  diseases?: string[]
+  allergies?: string[]
 }
 
 export interface MemberDTO {
@@ -125,7 +128,12 @@ export interface ParseSessionDTO {
   originalInput: string
   parsedAt: string
   model: string
-  records: { id: string; type: string; catId?: string; fields: { key: string; value: unknown; confidence: string; note?: string }[] }[]
+  records: {
+    id: string
+    type: string
+    catId?: string
+    fields: { key: string; value: unknown; confidence: string; note?: string }[]
+  }[]
 }
 
 export interface SummaryDTO {
@@ -169,17 +177,18 @@ export function toMember(dto: MemberDTO): FamilyMember {
 
 export function toCat(dto: CatDTO): Cat {
   const gender = dto.gender === 'male' || dto.gender === 'female' ? dto.gender : 'unknown'
+  const birthday = dto.birthday ?? dto.birth_date ?? ''
   return {
     id: dto.id,
     name: dto.name,
     gender,
     breed: dto.breed ?? '',
-    birthday: dto.birthday ?? '',
-    age: ageFrom(dto.birthday),
+    birthday,
+    age: ageFrom(birthday),
     neutered: Boolean(dto.neutered),
     avatar: dto.avatar_key ?? '',
-    diseases: [],
-    allergies: [],
+    diseases: dto.diseases ?? [],
+    allergies: dto.allergies ?? [],
     currentMedication: null,
     nextVaccine: null,
     nextDeworm: null
@@ -328,13 +337,24 @@ export const catApi = {
   get(familyId: string, catId: string) {
     return request<CatDTO>(http, { method: 'GET', url: `/families/${familyId}/cats/${catId}` })
   },
-  create(familyId: string, data: { name: string; breed?: string; gender?: string; birth_date?: string }) {
+  create(
+    familyId: string,
+    data: {
+      name: string
+      breed?: string
+      gender?: string
+      birth_date?: string
+      neutered?: boolean
+      diseases?: string[]
+      allergies?: string[]
+    }
+  ) {
     return request<CatDTO>(http, { method: 'POST', url: `/families/${familyId}/cats`, data })
   },
   update(
     familyId: string,
     catId: string,
-    data: { name?: string; breed?: string; gender?: string; birth_date?: string }
+    data: { name?: string; breed?: string; gender?: string; birth_date?: string; neutered?: boolean }
   ) {
     return request<CatDTO>(http, { method: 'PATCH', url: `/families/${familyId}/cats/${catId}`, data })
   },
@@ -407,7 +427,10 @@ export const momentApi = {
   list(familyId: string) {
     return request<MomentDTO[]>(http, { method: 'GET', url: `/families/${familyId}/moments` })
   },
-  create(familyId: string, data: { type?: string; title: string; body?: string; date?: string; cat_ids?: string[]; images?: number }) {
+  create(
+    familyId: string,
+    data: { type?: string; title: string; body?: string; date?: string; cat_ids?: string[]; images?: number }
+  ) {
     return request<MomentDTO>(http, { method: 'POST', url: `/families/${familyId}/moments`, data })
   }
 }
@@ -418,7 +441,14 @@ export const inventoryApi = {
   },
   create(
     familyId: string,
-    data: { name: string; category?: string; quantity?: number; unit?: string; low_stock_threshold?: number; expiry?: string }
+    data: {
+      name: string
+      category?: string
+      quantity?: number
+      unit?: string
+      low_stock_threshold?: number
+      expiry?: string
+    }
   ) {
     return request<InventoryDTO>(http, { method: 'POST', url: `/families/${familyId}/inventory`, data })
   }
@@ -428,7 +458,10 @@ export const expenseApi = {
   list(familyId: string, month?: string) {
     return request<ExpenseDTO[]>(http, { method: 'GET', url: `/families/${familyId}/expenses`, params: { month } })
   },
-  create(familyId: string, data: { date?: string; amount: number; category?: string; label?: string; cat_ids?: string[] }) {
+  create(
+    familyId: string,
+    data: { date?: string; amount: number; category?: string; label?: string; cat_ids?: string[] }
+  ) {
     return request<ExpenseDTO>(http, { method: 'POST', url: `/families/${familyId}/expenses`, data })
   }
 }

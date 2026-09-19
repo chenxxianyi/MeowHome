@@ -1,47 +1,78 @@
 <script setup lang="ts">
-/**
- * 占位页 —— 步骤 1.1 注册路由用，**尚未迁移**。
- *
- * 迁移时用 Web 端对应视图替换本文件全部内容：
- *   frontend/src/views/family/ExpensesView.vue
- *
- * 迁移步骤：3.8
- *
- * 注意迁移时的标签映射（实测结论，见《MeowHome-小程序迁移步骤.md》§记录 0.6）：
- *   <span> <strong> <i> <em> <b> <small>  →  <text>
- *   <div> <p> <h1>-<h3> <section> ...      →  <view>
- *   <img>                                  →  <image mode="aspectFit">
- *   <a href="#/...">                       →  <navigator> 或 @click + uni.navigateTo
- *   <input type="date">                    →  <picker mode="date">
- */
+import { ref, computed } from 'vue'
+import AppIcon from '../../components/app/AppIcon.vue'
+import { useExpenseStore } from '../../stores/expense'
+import { services } from '../../services'
+import { useProtectedPage } from '../../utils/page'
+import type { Expense } from '../../types'
+
+const store = useExpenseStore()
+const expenses = ref<Expense[]>([])
+const total = ref(0)
+const loading = ref(true)
+const foodTotal = computed(() =>
+  expenses.value.filter((e) => e.category === 'food').reduce((sum, e) => sum + e.amount, 0)
+)
+const medicalTotal = computed(() =>
+  expenses.value.filter((e) => e.category === 'medical').reduce((sum, e) => sum + e.amount, 0)
+)
+
+async function load() {
+  const res = await services.getExpenses()
+  expenses.value = res.data
+  store.set(res.data)
+  total.value = res.data.reduce((sum: number, e: any) => sum + e.amount, 0)
+  loading.value = false
+}
+
+useProtectedPage(load)
 </script>
 
 <template>
-  <view class="page">
-    <view class="placeholder">
-      <text class="placeholder-title">账目</text>
-      <text class="placeholder-hint">页面待迁移（步骤 3.8）</text>
+  <view class="page-header">
+    <view class="page-title"> 养猫支出 </view>
+  </view>
+
+  <view class="page-content">
+    <view v-if="loading" aria-busy="true">
+      <view class="skeleton" style="height: 120px; margin-bottom: 16px" />
+      <view class="skeleton" style="height: 60px; margin-bottom: 12px" />
     </view>
+    <template v-else>
+      <view class="status-panel">
+        <view class="status-panel-title"> 本月支出 </view>
+        <view class="status-row">
+          <view class="status-label"><AppIcon name="wallet" :size="18" /> 总计</view>
+          <text class="status-value">¥{{ total.toFixed(2) }}</text>
+        </view>
+        <view class="status-row">
+          <view class="status-label"><AppIcon name="food" :size="18" /> 食物</view>
+          <text class="status-value">¥{{ foodTotal.toFixed(2) }}</text>
+        </view>
+        <view class="status-row">
+          <view class="status-label"><AppIcon name="medical" :size="18" /> 医疗</view>
+          <text class="status-value">¥{{ medicalTotal.toFixed(2) }}</text>
+        </view>
+      </view>
+
+      <view class="section-title"> 支出明细 </view>
+      <view v-if="!expenses.length" class="empty-state">暂无支出记录</view>
+      <view class="reminder-list">
+        <view v-for="e in expenses" :key="e.id" class="reminder-item">
+          <view class="reminder-left">
+            <view class="reminder-icon wallet">
+              <AppIcon name="wallet" :size="18" />
+            </view>
+            <view class="reminder-text">
+              <view class="reminder-title">
+                {{ e.label }}
+              </view>
+              <view class="reminder-subtitle"> {{ e.date }} · {{ e.category }} · 全部 </view>
+            </view>
+          </view>
+          <view class="reminder-time"> ¥{{ e.amount.toFixed(2) }} </view>
+        </view>
+      </view>
+    </template>
   </view>
 </template>
-
-<style scoped>
-.placeholder {
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.placeholder-title {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary, #2d2925);
-}
-
-.placeholder-hint {
-  display: block;
-  font-size: 13px;
-  color: var(--color-text-tertiary, #9b948c);
-}
-</style>

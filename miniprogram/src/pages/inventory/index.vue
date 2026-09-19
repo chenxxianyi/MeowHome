@@ -1,47 +1,82 @@
 <script setup lang="ts">
-/**
- * 占位页 —— 步骤 1.1 注册路由用，**尚未迁移**。
- *
- * 迁移时用 Web 端对应视图替换本文件全部内容：
- *   frontend/src/views/family/InventoryView.vue
- *
- * 迁移步骤：3.8
- *
- * 注意迁移时的标签映射（实测结论，见《MeowHome-小程序迁移步骤.md》§记录 0.6）：
- *   <span> <strong> <i> <em> <b> <small>  →  <text>
- *   <div> <p> <h1>-<h3> <section> ...      →  <view>
- *   <img>                                  →  <image mode="aspectFit">
- *   <a href="#/...">                       →  <navigator> 或 @click + uni.navigateTo
- *   <input type="date">                    →  <picker mode="date">
- */
+import { ref } from 'vue'
+import AppIcon from '../../components/app/AppIcon.vue'
+import { services } from '../../services'
+import { useInventoryStore } from '../../stores/inventory'
+import { useProtectedPage } from '../../utils/page'
+import type { InventoryItem } from '../../types'
+
+const store = useInventoryStore()
+const items = ref<InventoryItem[]>([])
+const loading = ref(true)
+
+async function load() {
+  const res = await services.getInventory()
+  items.value = res.data
+  store.set(res.data)
+  loading.value = false
+}
+
+const lowItems = () => items.value.filter((item) => item.status === 'low' || item.status === 'expired')
+
+useProtectedPage(load)
 </script>
 
 <template>
-  <view class="page">
-    <view class="placeholder">
-      <text class="placeholder-title">库存</text>
-      <text class="placeholder-hint">页面待迁移（步骤 3.8）</text>
+  <view class="page-header">
+    <view class="page-title"> 库存管理 </view>
+  </view>
+
+  <view class="page-content">
+    <!-- 需关注 -->
+    <view v-if="lowItems().length" class="family-section">
+      <view class="section-title"> 需关注 </view>
+      <view class="reminder-list">
+        <view v-for="item in lowItems()" :key="item.id" class="reminder-item">
+          <view class="reminder-left">
+            <view class="reminder-icon inventory">
+              <AppIcon name="alertTriangle" :size="18" />
+            </view>
+            <view class="reminder-text">
+              <view class="reminder-title">
+                {{ item.name }}
+              </view>
+              <view class="reminder-subtitle">
+                {{ item.quantity }} {{ item.unit }} · {{ item.category }} ·
+                {{ item.status === 'expired' ? '已过期' : '剩余不足' }}
+              </view>
+            </view>
+          </view>
+          <text class="inventory-badge" :class="item.status">{{ item.status === 'low' ? '库存不足' : '已过期' }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 全部库存 -->
+    <view class="family-section">
+      <view class="section-title"> 全部库存 </view>
+      <view class="reminder-list">
+        <view v-for="item in items" :key="item.id" class="reminder-item">
+          <view class="reminder-left">
+            <view class="reminder-icon inventory">
+              <AppIcon name="inbox" :size="18" />
+            </view>
+            <view class="reminder-text">
+              <view class="reminder-title">
+                {{ item.name }}
+              </view>
+              <view class="reminder-subtitle">
+                {{ item.quantity }} {{ item.unit }} · {{ item.category
+                }}{{ item.expiry ? ' · 到期 ' + item.expiry : '' }}
+              </view>
+            </view>
+          </view>
+          <text class="inventory-badge" :class="item.status">{{
+            item.status === 'ok' ? '正常' : item.status === 'low' ? '不足' : '过期'
+          }}</text>
+        </view>
+      </view>
+      <view v-if="!loading && !items.length" class="empty-state">暂无库存记录</view>
     </view>
   </view>
 </template>
-
-<style scoped>
-.placeholder {
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.placeholder-title {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary, #2d2925);
-}
-
-.placeholder-hint {
-  display: block;
-  font-size: 13px;
-  color: var(--color-text-tertiary, #9b948c);
-}
-</style>

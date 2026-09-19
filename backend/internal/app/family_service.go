@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/meowhome/backend/internal/domain/model"
@@ -167,11 +168,29 @@ func (s *FamilyService) UpdateFamily(ctx context.Context, familyID, userID strin
 }
 
 // ListMembers 列出家庭所有成员。
-func (s *FamilyService) ListMembers(ctx context.Context, familyID, userID string) ([]*model.Member, error) {
+func (s *FamilyService) ListMembers(ctx context.Context, familyID, userID string) ([]*MemberEnvelope, error) {
 	if err := s.enforceAccess(ctx, familyID, userID); err != nil {
 		return nil, err
 	}
-	return s.memberRepo.FindByFamily(ctx, familyID)
+	members, err := s.memberRepo.FindByFamily(ctx, familyID)
+	if err != nil {
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to load members", err)
+	}
+	result := make([]*MemberEnvelope, 0, len(members))
+	for _, member := range members {
+		name := member.UserID
+		if user, findErr := s.userRepo.FindByID(ctx, member.UserID); findErr == nil && user != nil && user.Name != "" {
+			name = user.Name
+		}
+		result = append(result, &MemberEnvelope{
+			ID:       member.ID,
+			FamilyID: member.FamilyID,
+			UserID:   member.UserID,
+			UserName: name,
+			Role:     member.Role,
+		})
+	}
+	return result, nil
 }
 
 // CatService 猫咪服务。
@@ -221,7 +240,7 @@ func (s *CatService) enforceCatAccess(ctx context.Context, familyID, userID stri
 }
 
 // CreateCat 创建猫咪。
-func (s *CatService) CreateCat(ctx context.Context, familyID, name, breed, gender string, creatorUserID string) (*model.Cat, error) {
+func (s *CatService) CreateCat(ctx context.Context, familyID, name, breed, gender, birthday string, neutered bool, diseases, allergies []string, creatorUserID string) (*model.Cat, error) {
 	if err := s.enforceCatAccess(ctx, familyID, creatorUserID); err != nil {
 		return nil, err
 	}
@@ -242,13 +261,29 @@ func (s *CatService) CreateCat(ctx context.Context, familyID, name, breed, gende
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
-		FamilyID: familyID,
-		Name:     name,
-		Breed:    breed,
-		Gender:   gender,
+		FamilyID:  familyID,
+		Name:      name,
+		Breed:     breed,
+		Gender:    gender,
+		Birthday:  birthday,
+		Neutered:  neutered,
+		Diseases:  diseases,
+		Allergies: allergies,
 	}
 	if err := s.catRepo.Create(ctx, c); err != nil {
 		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to create cat", err)
+	}
+	diseasesJSON, _ := json.Marshal(diseases)
+	allergiesJSON, _ := json.Marshal(allergies)
+	if err := s.healthRepo.Create(ctx, &model.CatHealthProfile{
+		Base:              model.NewBase("", creatorUserID),
+		CatID:             c.ID,
+		Diseases:          string(diseasesJSON),
+		Allergies:         string(allergiesJSON),
+		Contraindications: "[]",
+	}); err != nil {
+		_ = s.catRepo.Delete(ctx, c.ID)
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to create cat health profile", err)
 	}
 
 	// 审计日志
@@ -278,11 +313,14 @@ func (s *CatService) GetCat(ctx context.Context, catID, userID string) (*model.C
 	if err := s.enforceCatAccess(ctx, c.FamilyID, userID); err != nil {
 		return nil, err
 	}
+	if err := s.loadCatHealth(ctx, c); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
 // UpdateCat 更新猫咪。
-func (s *CatService) UpdateCat(ctx context.Context, catID, userID string, name, breed, gender string) (*model.Cat, error) {
+func (s *CatService) UpdateCat(ctx context.Context, catID, userID string, name, breed, gender, birthday string, neutered *bool) (*model.Cat, error) {
 	c, err := s.catRepo.FindByID(ctx, catID)
 	if err != nil {
 		return nil, errors.NotFound(errors.CodeNotFound, "cat not found")
@@ -299,9 +337,18 @@ func (s *CatService) UpdateCat(ctx context.Context, catID, userID string, name, 
 	if gender != "" {
 		c.Gender = gender
 	}
+	if birthday != "" {
+		c.Birthday = birthday
+	}
+	if neutered != nil {
+		c.Neutered = *neutered
+	}
 	c.UpdatedAt = time.Now().UTC()
 	if err := s.catRepo.Update(ctx, c); err != nil {
 		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to update cat", err)
+	}
+	if err := s.loadCatHealth(ctx, c); err != nil {
+		return nil, err
 	}
 	return c, nil
 }
@@ -311,7 +358,39 @@ func (s *CatService) ListCats(ctx context.Context, familyID, userID string) ([]*
 	if err := s.enforceCatAccess(ctx, familyID, userID); err != nil {
 		return nil, err
 	}
-	return s.catRepo.ListByFamily(ctx, familyID)
+	cats, err := s.catRepo.ListByFamily(ctx, familyID)
+	if err != nil {
+		return nil, err
+	}
+	for _, cat := range cats {
+		if err := s.loadCatHealth(ctx, cat); err != nil {
+			return nil, err
+		}
+	}
+	return cats, nil
+}
+
+func (s *CatService) loadCatHealth(ctx context.Context, cat *model.Cat) error {
+	profile, err := s.healthRepo.FindByCatID(ctx, cat.ID)
+	if err != nil {
+		return errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to load cat health profile", err)
+	}
+	if profile == nil {
+		cat.Diseases = []string{}
+		cat.Allergies = []string{}
+		return nil
+	}
+	cat.Diseases = decodeStringList(profile.Diseases)
+	cat.Allergies = decodeStringList(profile.Allergies)
+	return nil
+}
+
+func decodeStringList(raw string) []string {
+	items := []string{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &items)
+	}
+	return items
 }
 
 // DeleteCat 软删除猫咪。

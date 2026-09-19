@@ -18,14 +18,16 @@
  * 保留：`*` 归零、`button`/`input`/`textarea` 字体继承、`button` 默认样式归零。
  */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
 page {
-  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-family: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   font-size: var(--font-size-body);
   color: var(--color-text-primary);
   background-color: var(--color-bg-page);
@@ -38,7 +40,9 @@ image {
   max-width: 100%;
 }
 
-button, input, textarea {
+button,
+input,
+textarea {
   font: inherit;
   color: inherit;
 }

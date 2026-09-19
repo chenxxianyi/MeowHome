@@ -1,0 +1,5 @@
+dist
+node_modules
+src/components/app/iconData.ts
+src/manifest.json
+src/styles/pages.css

@@ -35,13 +35,15 @@ func (Member) TableName() string { return "family_members" }
 // Cat 猫咪。
 type Cat struct {
 	Base
-	FamilyID  string `gorm:"index;type:varchar(26);not null"`
-	Name      string `gorm:"type:varchar(120);not null"`
-	Gender    string `gorm:"type:varchar(10);not null"`
-	Breed     string `gorm:"type:varchar(120)"`
-	Birthday  string `gorm:"type:date"`
-	Neutered  bool   `gorm:"default:false"`
-	AvatarKey string `gorm:"type:varchar(255)"`
+	FamilyID  string   `gorm:"index;type:varchar(26);not null"`
+	Name      string   `gorm:"type:varchar(120);not null"`
+	Gender    string   `gorm:"type:varchar(10);not null"`
+	Breed     string   `gorm:"type:varchar(120)"`
+	Birthday  string   `gorm:"type:varchar(10)"`
+	Neutered  bool     `gorm:"default:false"`
+	AvatarKey string   `gorm:"type:varchar(255)"`
+	Diseases  []string `gorm:"-"`
+	Allergies []string `gorm:"-"`
 }
 
 func (Cat) TableName() string { return "cats" }
