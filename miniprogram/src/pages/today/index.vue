@@ -455,8 +455,8 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
           <AIResultBadge>AI 每日整理</AIResultBadge>
           <text>基于 {{ aiSummary.evidenceCount }} 条记录</text>
         </view>
-        <view>管家的今日小结</view>
-        <view>{{ aiSummary.body }}</view>
+        <view class="today-ai-subtitle">今日小结</view>
+        <view class="today-ai-body">{{ aiSummary.body }}</view>
         <view class="today-ai-footer">
           <view>生成于 {{ aiSummary.generatedAt.slice(11, 16) }} · 不构成医疗诊断</view>
           <button type="button" @click="showEvidence = !showEvidence">

@@ -62,7 +62,7 @@ useProtectedPage()
           v-model="input"
           class="form-input"
           rows="4"
-          placeholder="例如：小白今天早上没怎么吃，下午吐了一次黄色的水，小橘晚上要记得喂药…"
+          placeholder="例如：今天早上没怎么吃，下午吐了一次黄色的水…"
         />
       </view>
 

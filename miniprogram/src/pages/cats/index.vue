@@ -204,7 +204,7 @@ async function submit() {
               type="text"
               :focus="nameFocus"
               maxlength="64"
-              placeholder="例如：小白"
+              placeholder="例如：请输入猫咪名字"
               @blur="nameFocus = false"
             />
           </label>

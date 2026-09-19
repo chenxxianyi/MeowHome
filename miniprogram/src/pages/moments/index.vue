@@ -77,7 +77,10 @@ function formatDay(date: string) {
 }
 
 function catName(catId?: string) {
-  if (catId === 'both') return '小白与小橘'
+  if (catId === 'both') {
+    const names = catStore.cats.map((c) => c.name).filter(Boolean)
+    return names.length ? names.join(' 与 ') : '猫宅'
+  }
   return catStore.cats.find((cat) => cat.id === catId)?.name || '猫宅'
 }
 

@@ -15,23 +15,23 @@ const catStore = useCatStore()
 const step = ref(1)
 const totalSteps = 5
 
-const family = reactive({ name: '小家的猫宅' })
+const family = reactive({ name: '' })
 type CatGender = 'female' | 'male' | 'unknown'
 const cat1 = reactive({
-  name: '小白',
-  gender: 'female' as CatGender,
-  breed: '中华田园猫',
+  name: '',
+  gender: 'unknown' as CatGender,
+  breed: '',
   birthday: '',
-  neutered: true,
+  neutered: false,
   diseases: '',
   allergies: ''
 })
 const cat2 = reactive({
-  name: '小橘',
-  gender: 'male' as CatGender,
-  breed: '中华田园猫',
+  name: '',
+  gender: 'unknown' as CatGender,
+  breed: '',
   birthday: '',
-  neutered: true,
+  neutered: false,
   diseases: '',
   allergies: ''
 })
@@ -178,7 +178,7 @@ useProtectedPage()
       <view>添加第一只猫</view>
       <view class="form-group">
         <label class="form-label" for="c1-name">猫咪名称 *</label>
-        <input id="c1-name" v-model="cat1.name" class="form-input" placeholder="如：小白" required />
+        <input id="c1-name" v-model="cat1.name" class="form-input" placeholder="如：猫咪名字" required />
       </view>
       <view class="form-row">
         <view class="form-group">
@@ -241,7 +241,7 @@ useProtectedPage()
         <view style="margin-top: 16px"> 第二只猫 </view>
         <view class="form-group">
           <label class="form-label" for="c2-name">猫咪名称 *</label>
-          <input id="c2-name" v-model="cat2.name" class="form-input" placeholder="如：小橘" />
+          <input id="c2-name" v-model="cat2.name" class="form-input" placeholder="如：第二只猫咪" />
         </view>
         <view class="form-row">
           <view class="form-group">

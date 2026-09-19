@@ -51,7 +51,7 @@ function onCatSelect() {
   loadRecords()
 }
 
-const aiExamples = ['小白早上吐了一次黄色的水', '小橘晚饭吃了半罐，喝水正常']
+const aiExamples = ['今天没怎么吃饭', '晚上吐了一次黄色的水', '精神状态很好，玩了一整天']
 
 function useAIExample(example: string) {
   aiInput.value = example
@@ -159,7 +159,7 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
           class="ai-composer-input"
           rows="3"
           maxlength="300"
-          :placeholder="recording ? '正在聆听，请说话…' : '例如：小白今天早上没怎么吃，下午吐了一次黄色的水…'"
+          :placeholder="recording ? '正在聆听，请说话…' : '例如：今天早上没怎么吃，下午吐了一次黄色的水…'"
           aria-label="AI 自然语言输入"
           @keydown.ctrl.enter.prevent="parseAI"
           @keydown.meta.enter.prevent="parseAI"
