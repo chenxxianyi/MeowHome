@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { toApiError } from '../../api/adapter'
+import AppIcon from '../../components/app/AppIcon.vue'
 import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()
@@ -13,6 +14,8 @@ const auth = useAuthStore()
 const mode = ref<'login' | 'register'>('login')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
+const showPassword = ref(false)
 const userName = ref('')
 const familyName = ref('')
 const error = ref('')
@@ -22,9 +25,36 @@ const isRegister = computed(() => mode.value === 'register')
 const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'))
 const submitLabel = computed(() => (isRegister.value ? '注册并进入' : '登录'))
 
+/** 仅当用户已开始输入确认密码、且两次不一致时才提示，避免刚进页面就报错。 */
+const passwordMismatch = computed(
+  () => isRegister.value && confirmPassword.value.length > 0 && confirmPassword.value !== password.value
+)
+
+/** 密码是否达到后端要求的最短长度（后端 Register 校验 >= 8）。 */
+const passwordTooShort = computed(
+  () => isRegister.value && password.value.length > 0 && password.value.length < 8
+)
+
+/**
+ * 提交按钮可用性。
+ * 登录模式只要求邮箱与密码非空；注册模式额外要求昵称、密码长度与两次一致。
+ */
+const canSubmit = computed(() => {
+  if (!email.value || !password.value) return false
+  if (!isRegister.value) return true
+  if (!userName.value) return false
+  if (password.value.length < 8) return false
+  return confirmPassword.value.length > 0 && confirmPassword.value === password.value
+})
+
 function switchMode(next: 'login' | 'register') {
   mode.value = next
   error.value = ''
+  // 切到登录时清掉仅注册相关的输入，避免把上一轮的密码带过去
+  if (next === 'login') {
+    confirmPassword.value = ''
+    showPassword.value = false
+  }
 }
 
 async function onSubmit() {
@@ -33,13 +63,24 @@ async function onSubmit() {
     error.value = '请填写邮箱与密码'
     return
   }
-  if (isRegister.value && !userName.value) {
-    error.value = '请填写昵称'
-    return
-  }
-  if (isRegister.value && password.value.length < 8) {
-    error.value = '密码至少 8 位'
-    return
+  if (isRegister.value) {
+    if (!userName.value) {
+      error.value = '请填写昵称'
+      return
+    }
+    if (password.value.length < 8) {
+      error.value = '密码至少 8 位'
+      return
+    }
+    if (!confirmPassword.value) {
+      error.value = '请再次输入密码'
+      return
+    }
+    if (confirmPassword.value !== password.value) {
+      error.value = '两次输入的密码不一致'
+      confirmPassword.value = ''
+      return
+    }
   }
 
   submitting.value = true
@@ -90,13 +131,58 @@ async function onSubmit() {
 
         <label class="field">
           <span>密码</span>
+          <span class="input-wrap">
+            <input
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              :autocomplete="isRegister ? 'new-password' : 'current-password'"
+              :placeholder="isRegister ? '至少 8 位' : '请输入密码'"
+              :aria-invalid="passwordTooShort"
+              :aria-describedby="passwordTooShort ? 'password-hint' : undefined"
+            />
+            <button
+              type="button"
+              class="toggle"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
+            >
+              <AppIcon
+                :name="showPassword ? 'eyeOff' : 'eye'"
+                :size="18"
+              />
+            </button>
+          </span>
+        </label>
+        <p
+          v-if="passwordTooShort"
+          id="password-hint"
+          class="hint hint-error"
+        >
+          密码至少 8 位
+        </p>
+
+        <label
+          v-if="isRegister"
+          class="field"
+        >
+          <span>确认密码</span>
           <input
-            v-model="password"
-            type="password"
-            :autocomplete="isRegister ? 'new-password' : 'current-password'"
-            :placeholder="isRegister ? '至少 8 位' : '请输入密码'"
+            v-model="confirmPassword"
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="new-password"
+            placeholder="请再次输入密码"
+            :aria-invalid="passwordMismatch"
+            :aria-describedby="passwordMismatch ? 'confirm-hint' : undefined"
           />
         </label>
+        <p
+          v-if="passwordMismatch"
+          id="confirm-hint"
+          class="hint hint-error"
+        >
+          两次输入的密码不一致
+        </p>
 
         <label v-if="isRegister" class="field">
           <span>家庭名称</span>
@@ -105,7 +191,11 @@ async function onSubmit() {
 
         <p v-if="error" class="error">{{ error }}</p>
 
-        <button type="submit" class="primary" :disabled="submitting">
+        <button
+          type="submit"
+          class="primary"
+          :disabled="submitting || !canSubmit"
+        >
           {{ submitting ? '处理中…' : submitLabel }}
         </button>
       </form>
@@ -175,11 +265,18 @@ h2 {
   margin-bottom: 14px;
 }
 
-.field span {
+.field span:not(.input-wrap) {
   display: block;
   font-size: 13px;
   color: #7a6f5d;
   margin-bottom: 6px;
+}
+
+/* 输入框容器：仅作为定位上下文，让图标叠在输入框「内部」而不占布局宽度。
+   此前用 flex 并排，密码框被按钮挤窄，比没有图标的「确认密码」框短一截。 */
+.input-wrap {
+  position: relative;
+  display: block;
 }
 
 .field input {
@@ -194,9 +291,57 @@ h2 {
   outline: none;
 }
 
+/* 右侧留出图标的位置，避免长密码被图标压住 */
+.input-wrap input {
+  padding-right: 46px;
+}
+
 .field input:focus {
   border-color: #d9a441;
   background: #fff;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: #d98a80;
+}
+
+/* 显示/隐藏密码：叠在输入框内右侧，点击行为与原来的文字按钮完全一致 */
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: #9a8f7d;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: #7a6f5d;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid #d9a441;
+  outline-offset: 1px;
+}
+
+/* 校验提示：上移抵消 .field 的下边距，避免字段间距被撑开 */
+.hint {
+  margin: -8px 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.hint-error {
+  color: #b4453a;
 }
 
 .error {

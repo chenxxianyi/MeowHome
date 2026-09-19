@@ -34,12 +34,36 @@ func NewAuthService(userRepo repository.UserRepo, refreshToken repository.Refres
 	}
 }
 
+// AuthUser 认证结果中的用户摘要。
+//
+// ⚠️ 这里**不能**直接用 *model.User。model.User 及其内嵌的 model.Base 都没有 json tag，
+// encoding/json 会退回按 Go 字段名序列化，后果有两条：
+//  1. 字段名变成 ID/Email/Name，与其余所有接口的 snake_case 约定不一致。
+//     Web 端与小程序端都按 `res.user.id` / `res.user.name` 读取，会双双拿到 undefined。
+//  2. **Password 字段没有 json:"-"，密码哈希会被一并下发到客户端。**
+//
+// 用显式 DTO 而不是给 model 补 tag：这样「不下发密码」是结构上保证的，
+// 不依赖以后有人记得加 tag。
+type AuthUser struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+// newAuthUser 把领域模型收敛为可下发的用户摘要。
+func newAuthUser(u *model.User) *AuthUser {
+	if u == nil {
+		return nil
+	}
+	return &AuthUser{ID: u.ID, Email: u.Email, Name: u.Name}
+}
+
 // AuthResult 认证结果。
 type AuthResult struct {
-	AccessToken  string      `json:"access_token"`
-	RefreshToken string      `json:"refresh_token"`
-	ExpiresIn    int64       `json:"expires_in"` // 秒
-	User         *model.User `json:"user"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	ExpiresIn    int64     `json:"expires_in"` // 秒
+	User         *AuthUser `json:"user"`
 }
 
 // Register 注册新用户（首次注册必须携带家庭名，B3 简化版先仅建用户）。
@@ -81,7 +105,7 @@ func (s *AuthService) Register(ctx context.Context, email, password, userName st
 	}
 
 	return &AuthResult{
-		User:         user,
+		User:         newAuthUser(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenRaw,
 		ExpiresIn:    int64(s.accessTTL.Seconds()),
@@ -108,7 +132,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 	}
 
 	return &AuthResult{
-		User:         user,
+		User:         newAuthUser(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenRaw,
 		ExpiresIn:    int64(s.accessTTL.Seconds()),
@@ -146,7 +170,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshTokenRaw string) (*Aut
 	}
 
 	return &AuthResult{
-		User:         user,
+		User:         newAuthUser(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenRaw,
 		ExpiresIn:    int64(s.accessTTL.Seconds()),

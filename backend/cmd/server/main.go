@@ -18,6 +18,7 @@ import (
 	"github.com/meowhome/backend/internal/infrastructure/persistence/mysql"
 	"github.com/meowhome/backend/internal/platform/config"
 	"github.com/meowhome/backend/internal/transport/http/handler"
+	my "github.com/meowhome/backend/internal/transport/http/middleware"
 	"github.com/meowhome/backend/internal/transport/http/router"
 )
 
@@ -76,7 +77,9 @@ func main() {
 	// 组装 HTTP 层
 	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc)
 	health := &appHealth{db: db}
-	srv.Handler = router.New(cfg, logger, nil, health, hdl)
+	// MethodOverride 必须包在 gin engine 外层：Gin 在进入中间件链前就按
+	// (method, path) 完成路由匹配，engine.Use() 里改 Method 已经太晚（详见该中间件注释）。
+	srv.Handler = my.MethodOverride(router.New(cfg, logger, nil, health, hdl))
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

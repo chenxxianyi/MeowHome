@@ -1,5 +1,7 @@
 // Unit tests for MeowHome Vue 3 frontend
 import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 // —— 日期工具 ——
 describe('date utils', () => {
@@ -262,5 +264,138 @@ describe('types', () => {
     const r = mockReminders[0]
     expect(['todo', 'done']).toContain(r.state)
     expect(typeof r.title).toBe('string')
+  })
+})
+
+// —— 注册页「确认密码」——
+describe('AuthView 确认密码', () => {
+  /** 挂载登录/注册页。Pinia 由 vitest.setup.ts 全局注入，这里只需补 router。 */
+  async function mountAuth() {
+    const { default: AuthView } = await import('@/views/auth/AuthView.vue')
+    const router = createRouter({
+      history: createWebHashHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    return mount(AuthView, { global: { plugins: [router] } })
+  }
+
+  /** 切到注册模式（页面上唯一的 .link 按钮就是模式切换）。 */
+  async function toRegister(wrapper: Awaited<ReturnType<typeof mountAuth>>) {
+    await wrapper.find('button.link').trigger('click')
+  }
+
+  const CONFIRM = 'input[placeholder="请再次输入密码"]'
+
+  it('登录模式不显示确认密码，切到注册才显示', async () => {
+    const w = await mountAuth()
+    expect(w.find(CONFIRM).exists()).toBe(false)
+
+    await toRegister(w)
+    expect(w.find(CONFIRM).exists()).toBe(true)
+  })
+
+  it('两次密码不一致时给出提示并禁止提交', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    await w.find('input[placeholder="家里怎么称呼你"]').setValue('小明')
+    await w.find('input[type="email"]').setValue('a@b.com')
+    const pwd = w.findAll('input[type="password"]')
+    expect(pwd.length).toBe(2)
+    await pwd[0].setValue('password123')
+    await pwd[1].setValue('password124')
+
+    expect(w.find('#confirm-hint').text()).toContain('不一致')
+    expect(w.find('button.primary').attributes('disabled')).toBeDefined()
+  })
+
+  it('两次一致且长度达标时解除禁用', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    await w.find('input[placeholder="家里怎么称呼你"]').setValue('小明')
+    await w.find('input[type="email"]').setValue('a@b.com')
+    const pwd = w.findAll('input[type="password"]')
+    await pwd[0].setValue('password123')
+    await pwd[1].setValue('password123')
+
+    expect(w.find('#confirm-hint').exists()).toBe(false)
+    expect(w.find('button.primary').attributes('disabled')).toBeUndefined()
+  })
+
+  it('密码不足 8 位时提示，且确认一致也无法提交', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    await w.find('input[placeholder="家里怎么称呼你"]').setValue('小明')
+    await w.find('input[type="email"]').setValue('a@b.com')
+    const pwd = w.findAll('input[type="password"]')
+    await pwd[0].setValue('short')
+    await pwd[1].setValue('short')
+
+    expect(w.find('#password-hint').text()).toContain('至少 8 位')
+    expect(w.find('button.primary').attributes('disabled')).toBeDefined()
+  })
+
+  it('切回登录模式会清空确认密码，避免残留', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+    await w.find(CONFIRM).setValue('password123')
+    await w.find('button.link').trigger('click') // 切回登录
+
+    await toRegister(w)
+    expect((w.find(CONFIRM).element as HTMLInputElement).value).toBe('')
+  })
+
+  it('显示/隐藏切换会同时作用于两个密码框', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    expect(w.findAll('input[type="password"]').length).toBe(2)
+    await w.find('button.toggle').trigger('click')
+    expect(w.findAll('input[type="password"]').length).toBe(0)
+    // 昵称 + 家庭名称 + 两个已明文显示的密码框
+    expect(w.findAll('input[type="text"]').length).toBe(4)
+  })
+
+  it('切换按钮是图标而非文字，且位于输入框容器内', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    const toggle = w.find('.input-wrap .toggle')
+    expect(toggle.exists()).toBe(true)
+    // 没有可见文字，语义全部由 aria-label 承担
+    expect(toggle.text()).toBe('')
+    expect(toggle.find('svg').exists()).toBe(true)
+    expect(toggle.attributes('aria-label')).toBe('显示密码')
+
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-label')).toBe('隐藏密码')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+  })
+
+  it('图标按钮与输入框同容器，两个密码框结构一致', async () => {
+    const w = await mountAuth()
+    await toRegister(w)
+
+    // 修复点：图标由「与输入框并排的 flex 项」改为「叠加在输入框内的定位元素」。
+    // 结构上体现为容器内恰好两个子节点，且输入框是第一个。
+    const wrap = w.find('.input-wrap')
+    expect(wrap.exists()).toBe(true)
+    expect(wrap.element.children.length).toBe(2)
+    expect(wrap.element.children[0].tagName).toBe('INPUT')
+    expect(wrap.element.children[1].tagName).toBe('BUTTON')
+
+    // 两个密码框都没有内联尺寸，宽度完全来自同一条 .field input{width:100%} 规则
+    const pwd = w.find('.input-wrap input').element as HTMLInputElement
+    const confirm = w.find(CONFIRM).element as HTMLInputElement
+    expect(pwd.getAttribute('style')).toBeNull()
+    expect(confirm.getAttribute('style')).toBeNull()
+    expect(pwd.className).toBe(confirm.className)
+
+    // 注册模式共 5 个输入框：邮箱、昵称、密码、确认密码、家庭名称
+    expect(w.findAll('.field input').length).toBe(5)
   })
 })

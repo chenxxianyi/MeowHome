@@ -1,0 +1,16 @@
+# 微信开发者工具
+# project.config.json 需要入库（定义小程序项目）；project.private.config.json
+# 是机器本地私有配置，WeChat 官方约定不入库。
+# 注意：仓库根目录不应存在这两个文件——DevTools 项目应指向 miniprogram/ 或
+# miniprogram/dist/dev/mp-weixin，详见《MeowHome-小程序迁移步骤.md》。
+project.private.config.json
+project.config.json.bak
+
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 本地环境
+.env
+*.local
+*.log

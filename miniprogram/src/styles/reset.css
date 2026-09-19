@@ -1,0 +1,64 @@
+/**
+ * 小程序版 reset —— 由 Web 端 `frontend/src/styles/reset.css` 改写。
+ *
+ * 改写原因（构建期实测）：Web 端 reset 里的元素选择器在小程序中**不存在**
+ * 或**不被 WXSS 支持**，直接引入会产生编译警告且规则静默失效。
+ *
+ * | Web 端 | 小程序 | 原因 |
+ * |---|---|---|
+ * | `html` / `body` | `page` | 小程序根节点是 `page`，没有 html/body |
+ * | `img` | `image` | WXSS 明确不支持 `img` 标签选择器（编译警告） |
+ * | `svg` | 删除 | 小程序无 `<svg>` 标签（图标已改用 CSS 遮罩，见 AppIcon.vue） |
+ * | `a` | `navigator` | `<a>` 会被 uni-app 映射为 `<navigator>` |
+ * | `ul` / `ol` | 删除 | 小程序无此标签（Web 端用 div 列表） |
+ * | `select` | 删除 | 小程序用 `<picker>` 替代 |
+ * | `:focus-visible` | 删除 | 不支持该伪类 |
+ * | `@media print` | 删除 | 无打印场景 |
+ *
+ * 保留：`*` 归零、`button`/`input`/`textarea` 字体继承、`button` 默认样式归零。
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+page {
+  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-page);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+image {
+  display: block;
+  max-width: 100%;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+ * 小程序 button 有平台默认样式（边框 / 背景 / 圆角 / 最小宽度），
+ * 必须归零，否则 72 处按钮会全部走形。
+ */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button::after {
+  border: none;
+}
+
+navigator {
+  color: inherit;
+  text-decoration: none;
+}

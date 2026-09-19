@@ -193,6 +193,32 @@ export const services = {
     })
   },
 
+  /**
+   * 创建猫咪。
+   *
+   * 这是 services 中唯一会向外抛异常的方法：表单需要把后端的具体校验
+   * 信息（如「name is required」）展示给用户，而 api() 兜底会吞掉消息。
+   * 调用方需自行 try/catch，例如 CatsView 的添加猫咪表单。
+   */
+  async createCat(input: {
+    name: string
+    gender?: string
+    breed?: string
+    birthday?: string
+  }): Promise<APIResponse<Cat>> {
+    const dto = await catApi.create(familyId(), {
+      name: input.name,
+      gender: input.gender,
+      breed: input.breed,
+      birth_date: input.birthday || undefined
+    })
+    const cat = toCat(dto)
+    // 立即并入 store，避免列表与切换器短暂不一致
+    const store = useCatStore()
+    store.setCats([...store.cats, cat])
+    return { success: true, data: cat }
+  },
+
   async getTodayStatus(catId: string): Promise<APIResponse<TodayStatusData>> {
     return api<TodayStatusData>(emptyToday(), () => careApi.today(familyId(), catId))
   },
