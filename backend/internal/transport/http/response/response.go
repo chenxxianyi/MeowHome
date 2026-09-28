@@ -110,7 +110,7 @@ func statusFor(e *errors.AppError) int {
 		switch e.Code {
 		case errors.CodeNotFound, errors.CodeCatNotFound:
 			return http.StatusNotFound
-		case errors.CodeConflict, errors.CodeInvalidRecordState:
+		case errors.CodeConflict, errors.CodeInvalidRecordState, errors.CodeAgentConflict, errors.CodeAgentDraftExpired:
 			return http.StatusConflict
 		default:
 			return http.StatusBadRequest

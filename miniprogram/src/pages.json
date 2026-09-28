@@ -90,6 +90,12 @@
       }
     },
     {
+      "path": "pages/agent/index",
+      "style": {
+        "navigationBarTitleText": "猫管家"
+      }
+    },
+    {
       "path": "pages/inventory/index",
       "style": {
         "navigationBarTitleText": "库存"

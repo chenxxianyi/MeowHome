@@ -17,6 +17,8 @@ tags:
     description: 家庭与成员
   - name: cats
     description: 猫咪档案
+  - name: agent
+    description: 猫管家 Agent（主动巡检 + 智能问答）
 paths:
   /health/live:
     get:
@@ -300,6 +302,235 @@ paths:
       responses:
         '204':
           description: 删除成功
+  # --- Agent（猫管家）---
+  /families/{familyId}/agent/messages:
+    get:
+      tags: [agent]
+      summary: 家庭 Agent 消息列表（仅 visibility=family，不含私有聊天）
+      description: |
+        过滤不可识别的 type/status 时返回 400，不默认为全部数据。
+        游标 before 为 `generated_at|id`，不允许跨家庭或绕过权限。
+      operationId: listAgentMessages
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [patrol_abnormal, patrol_weight, chat_answer, reminder_draft]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, dismissed, expired]
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: before
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 家庭消息列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentMessageListEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/agent/messages/{messageId}:
+    get:
+      tags: [agent]
+      summary: Agent 消息详情
+      operationId: getAgentMessage
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 消息详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentMessageEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/agent/messages/{messageId}/draft:
+    patch:
+      tags: [agent]
+      summary: 创建或编辑该消息的唯一提醒草稿
+      description: |
+        未创建时 expected_version=0，首次保存后版本为 1；
+        旧版本返回 AGENT_CONFLICT（409）。
+      operationId: editAgentReminderDraft
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentReminderEditRequest'
+      responses:
+        '200':
+          description: 草稿已保存
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentReminderDraftEnvelope'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /families/{familyId}/agent/messages/{messageId}/confirm:
+    post:
+      tags: [agent]
+      summary: 确认提醒草稿（幂等）
+      description: |
+        服务端从消息行内加载草稿，客户端只提交 expected_version；
+        再次校验身份、成员资格、可见性、猫咪归属、开关、草稿状态/有效期/计划时间。
+        重复确认返回同一提醒，不新建。
+      operationId: confirmAgentReminderDraft
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentConfirmRequest'
+      responses:
+        '200':
+          description: 确认成功（幂等）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConfirmEnvelope'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/agent/messages/{messageId}/dismiss:
+    post:
+      tags: [agent]
+      summary: 忽略 Agent 消息（幂等）
+      description: 忽略仅隐藏消息，不撤销已创建的正式提醒。
+      operationId: dismissAgentMessage
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: 忽略成功
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/agent/chat:
+    post:
+      tags: [agent]
+      summary: Agent 对话
+      description: |
+        首轮不携带 session_id 时按 family+user+client_message_id 恢复已创建会话。
+        模型不可用时 degraded=true，返回确定性兜底结果。
+      operationId: agentChat
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatRequest'
+      responses:
+        '200':
+          description: 聊天结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentChatEnvelope'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /families/{familyId}/agent/sessions:
+    get:
+      tags: [agent]
+      summary: 当前用户在本家庭的 Agent 会话列表
+      operationId: listAgentSessions
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: before
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 会话列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionListEnvelope'
+  /families/{familyId}/agent/sessions/{sessionId}/messages:
+    get:
+      tags: [agent]
+      summary: 本人私有会话消息（游标分页）
+      operationId: listAgentSessionMessages
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: before
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 会话消息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionMessagesEnvelope'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /internal/agent/patrol:
+    post:
+      tags: [agent]
+      summary: 手动触发指定家庭巡检（仅目标家庭真实 admin，限流与审计）
+      operationId: runAgentPatrol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentPatrolRequest'
+      responses:
+        '200':
+          description: 巡检执行结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPatrolEnvelope'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   parameters:
     FamilyId:
@@ -627,6 +858,244 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Cat'
+    # --- Agent（猫管家）schemas ---
+    AgentMessage:
+      type: object
+      required: [id, role, visibility, type, severity, title, body, generated_at, model]
+      properties:
+        id: { type: string }
+        session_id: { type: string, description: 对话消息所属会话；巡检消息可空 }
+        role:
+          type: string
+          enum: [user, assistant, tool]
+        visibility:
+          type: string
+          enum: [family, private]
+        family_id: { type: string }
+        user_id: { type: string, description: 系统消息可空 }
+        cat_id: { type: string, description: 单猫消息的明确归属 }
+        type:
+          type: string
+          enum: [patrol_abnormal, patrol_weight, chat_answer, reminder_draft]
+        severity:
+          type: string
+          enum: [info, warning, danger]
+        title: { type: string, maxLength: 200 }
+        body: { type: string }
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentEvidence'
+        action_suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentAction'
+        draft_version: { type: integer, minimum: 0 }
+        action_status:
+          type: string
+          enum: [pending, confirmed, dismissed, expired]
+        generated_at: { type: string, format: date-time }
+        model:
+          type: string
+          enum: [rule-engine-v1, llm-enhance-v1, chat-llm-v1]
+        disclaimer: { type: string }
+    AgentEvidence:
+      type: object
+      required: [source_type, source_id]
+      properties:
+        source_type:
+          type: string
+          enum: [record, reminder, trend, weight, family_scope]
+        source_id: { type: string, description: 记录/提醒 ID；趋势类可空 }
+        cat_ids:
+          type: array
+          items: { type: string }
+        occurred_at: { type: string, format: date-time }
+        excerpt: { type: string, description: 原始文案节选，禁止改写诊断 }
+    AgentAction:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          type: string
+          enum: [view_records, view_trend, create_reminder]
+        title: { type: string }
+        cat_id: { type: string, description: 单猫导航/提醒必填；家庭级留空 }
+        days: { type: integer, minimum: 1, maximum: 90 }
+        payload:
+          type: object
+          description: 仅导航类允许携带限定键
+    AgentReminderInput:
+      type: object
+      required: [type, title]
+      properties:
+        cat_id: { type: string, description: 猫咪 ID 或 both；家庭级留空 }
+        type:
+          type: string
+          enum: [medication, vaccine, deworm, checkup, weight, inventory, water, custom]
+        title: { type: string, maxLength: 200 }
+        subtitle: { type: string }
+        time: { type: string, description: 展示用 time_label 兼容字段 }
+        scheduled_at: { type: string, format: date-time, description: 可计算的绝对时间（UTC 存储） }
+        timezone: { type: string, description: IANA 时区，展示用 }
+        icon: { type: string }
+        rule: { type: string }
+    AgentReminderDraft:
+      type: object
+      required: [message_id, version, expires_at]
+      properties:
+        message_id: { type: string }
+        version: { type: integer }
+        expires_at: { type: string, format: date-time }
+        reminder:
+          $ref: '#/components/schemas/AgentReminderInput'
+        confirmed_reminder_id: { type: string }
+    AgentReminderResult:
+      type: object
+      required: [id, family_id, cat_id, type, title, state]
+      properties:
+        id: { type: string }
+        family_id: { type: string }
+        cat_id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        time: { type: string }
+        state: { type: string }
+        icon: { type: string }
+        rule: { type: string }
+        scheduled_at: { type: string, format: date-time }
+        timezone: { type: string }
+        completed_at: { type: string, format: date-time }
+    AgentChatRequest:
+      type: object
+      required: [client_message_id, message]
+      properties:
+        session_id: { type: string, description: 首轮可缺省 }
+        client_message_id: { type: string, description: 幂等键，同会话内唯一 }
+        message: { type: string, maxLength: 2000 }
+    AgentSessionSummary:
+      type: object
+      required: [id, created_at, updated_at]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AgentReminderEditRequest:
+      type: object
+      required: [expected_version, reminder]
+      properties:
+        expected_version: { type: integer, minimum: 0 }
+        reminder:
+          $ref: '#/components/schemas/AgentReminderInput'
+    AgentConfirmRequest:
+      type: object
+      required: [expected_version]
+      properties:
+        expected_version: { type: integer, minimum: 0 }
+    AgentPatrolRequest:
+      type: object
+      required: [family_id]
+      properties:
+        family_id: { type: string }
+    AgentMessageListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgentMessage'
+                next_cursor: { type: string }
+    AgentMessageEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AgentMessage'
+    AgentReminderDraftEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AgentReminderDraft'
+    AgentChatEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [session_id, message, degraded]
+              properties:
+                session_id: { type: string }
+                message:
+                  $ref: '#/components/schemas/AgentMessage'
+                degraded: { type: boolean }
+    AgentConfirmEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [reminder, message_id, action_status]
+              properties:
+                reminder:
+                  $ref: '#/components/schemas/AgentReminderResult'
+                message_id: { type: string }
+                action_status:
+                  type: string
+                  enum: [confirmed]
+    AgentPatrolEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgentMessage'
+    AgentSessionListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [sessions]
+              properties:
+                sessions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgentSessionSummary'
+                next_cursor: { type: string }
+    AgentSessionMessagesEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgentMessage'
+                next_cursor: { type: string }
   securitySchemes:
     bearerAuth:
       type: http

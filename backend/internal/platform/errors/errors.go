@@ -37,9 +37,14 @@ const (
 	CodeOCRUnavailable     = "OCR_UNAVAILABLE"
 	CodeStorageUnavailable = "STORAGE_UNAVAILABLE"
 
-	CodeAIInvalidOutput  = "AI_INVALID_OUTPUT"
-	CodeAINeedsClar      = "AI_NEEDS_CLARIFICATION"
-	CodeAISessionExpired = "AI_SESSION_EXPIRED"
+	CodeAIInvalidOutput    = "AI_INVALID_OUTPUT"
+	CodeAINeedsClar        = "AI_NEEDS_CLARIFICATION"
+	CodeAISessionExpired   = "AI_SESSION_EXPIRED"
+	CodeAgentDisabled      = "AGENT_DISABLED"
+	CodeAgentUnavailable   = "AGENT_UNAVAILABLE"
+	CodeAgentInvalidOutput = "AGENT_INVALID_OUTPUT"
+	CodeAgentDraftExpired  = "AGENT_DRAFT_EXPIRED"
+	CodeAgentConflict      = "AGENT_CONFLICT"
 )
 
 // AppError 统一业务错误。

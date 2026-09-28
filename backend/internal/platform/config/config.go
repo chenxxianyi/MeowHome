@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type Config struct {
 	Auth    Auth    `mapstructure:"auth"`
 	Storage Storage `mapstructure:"storage"`
 	AI      AI      `mapstructure:"ai"`
+	Agent   Agent   `mapstructure:"agent"`
 	OCR     OCR     `mapstructure:"ocr"`
 	Redis   Redis   `mapstructure:"redis"`
 	Rate    Rate    `mapstructure:"rate"`
@@ -82,6 +84,13 @@ type AI struct {
 	Model      string        `mapstructure:"model"`
 	Timeout    time.Duration `mapstructure:"timeout"`
 	MaxRetries int           `mapstructure:"max_retries"`
+}
+
+// Agent 业务 Agent 开关。Agent 巡检与通用 AI 模型开关相互独立。
+type Agent struct {
+	Enabled     bool   `mapstructure:"enabled"`
+	LLMEnhance  bool   `mapstructure:"llm_enhance"`
+	PatrolTimes string `mapstructure:"patrol_times"`
 }
 
 // OCR Provider 配置。
@@ -203,6 +212,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("ai.enabled", false)
 	v.SetDefault("ai.timeout", "30s")
 	v.SetDefault("ai.max_retries", 2)
+	v.SetDefault("agent.enabled", false)
+	v.SetDefault("agent.llm_enhance", false)
+	v.SetDefault("agent.patrol_times", "08:00,20:00")
 
 	v.SetDefault("ocr.enabled", false)
 	v.SetDefault("ocr.timeout", "30s")
@@ -235,7 +247,10 @@ func bindEnvs(v *viper.Viper) {
 		"auth.refresh_ttl": "JWT_REFRESH_TTL",
 		"auth.bcrypt_cost": "BCRYPT_COST",
 
-		"rate.per_minute": "RATE_LIMIT_PER_MINUTE",
+		"rate.per_minute":    "RATE_LIMIT_PER_MINUTE",
+		"agent.enabled":      "AI_AGENT_ENABLED",
+		"agent.llm_enhance":  "AI_AGENT_LLM_ENHANCE",
+		"agent.patrol_times": "AI_AGENT_PATROL_TIMES",
 	}
 	for key, env := range pairs {
 		_ = v.BindEnv(key, env)
@@ -257,6 +272,27 @@ func (c *Config) Validate() error {
 	}
 	if c.Auth.JWTSecret == "" {
 		return fmt.Errorf("config: auth.jwt_secret is required")
+	}
+	if err := validatePatrolTimes(c.Agent.PatrolTimes); err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	return nil
+}
+
+func validatePatrolTimes(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return fmt.Errorf("agent.patrol_times cannot be empty")
+	}
+	for _, item := range strings.Split(raw, ",") {
+		parts := strings.Split(strings.TrimSpace(item), ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid agent.patrol_times value %q", item)
+		}
+		hour, hourErr := strconv.Atoi(parts[0])
+		minute, minuteErr := strconv.Atoi(parts[1])
+		if hourErr != nil || minuteErr != nil || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+			return fmt.Errorf("invalid agent.patrol_times value %q", item)
+		}
 	}
 	return nil
 }

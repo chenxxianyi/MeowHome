@@ -199,6 +199,10 @@ export interface Reminder {
   time: string
   state: 'todo' | 'done'
   icon?: string
+  rule?: string
+  scheduled_at?: string
+  timezone?: string
+  completed_at?: string
 }
 
 export interface CareTask {

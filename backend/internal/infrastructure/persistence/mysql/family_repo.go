@@ -46,6 +46,22 @@ func (r *FamilyRepo) FindByID(ctx context.Context, id string) (*model.Family, er
 	return &f, nil
 }
 
+// List 返回未删除家庭，使用 ULID 作为稳定游标，供后台调度分页扫描。
+func (r *FamilyRepo) List(ctx context.Context, beforeID string, limit int) ([]*model.Family, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	tx := r.db.WithContext(ctx).Where("deleted_at IS NULL")
+	if beforeID != "" {
+		tx = tx.Where("id > ?", beforeID)
+	}
+	var out []*model.Family
+	if err := tx.Order("id ASC").Limit(limit).Find(&out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Update 更新家庭。
 func (r *FamilyRepo) Update(ctx context.Context, f *model.Family) error {
 	err := r.db.WithContext(ctx).Save(f).Error

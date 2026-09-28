@@ -25,6 +25,7 @@ export function toMiniProgramUrl(path: string): string {
   if (path === '/family/expenses') return '/pages/expenses/index'
   if (path === '/medical/upload') return '/pages/medical-upload/index'
   if (path === '/reminders') return '/pages/reminders/index'
+  if (path === '/agent') return '/pages/agent/index'
   if (path === '/settings') return '/pages/settings/index'
 
   const quickRecord = path.match(/^\/records\/quick\/([^/?#]+)(?:\?(.+))?$/)

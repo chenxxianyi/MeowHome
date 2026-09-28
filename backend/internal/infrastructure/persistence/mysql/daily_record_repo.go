@@ -43,7 +43,7 @@ func (r *DailyRecordRepo) FindByID(ctx context.Context, id string) (*model.Daily
 // ListByFamily 按家庭查询记录。
 // CatID 过滤走 JSON_CONTAINS：cat_ids 是存 JSON 数组的 TEXT 列。
 func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRecordQuery) ([]*model.DailyRecord, error) {
-	tx := r.db.WithContext(ctx).Model(&model.DailyRecord{}).Where("family_id = ?", q.FamilyID)
+	tx := r.db.WithContext(ctx).Model(&model.DailyRecord{}).Where("family_id = ? AND deleted_at IS NULL", q.FamilyID)
 
 	if q.CatID != "" {
 		tx = tx.Where("cat_ids IS NOT NULL AND JSON_VALID(cat_ids) AND JSON_CONTAINS(cat_ids, JSON_QUOTE(?))", q.CatID)
@@ -61,6 +61,9 @@ func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRe
 			tx = tx.Where("occurred_at <= ?", t)
 		}
 	}
+	if q.BeforeOccurredAt != nil && q.BeforeID != "" {
+		tx = tx.Where("(occurred_at, id) < (?, ?)", *q.BeforeOccurredAt, q.BeforeID)
+	}
 
 	limit := q.Limit
 	if limit <= 0 || limit > 1000 {
@@ -68,7 +71,7 @@ func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRe
 	}
 
 	var out []*model.DailyRecord
-	if err := tx.Order("occurred_at DESC").Limit(limit).Find(&out).Error; err != nil {
+	if err := tx.Order("occurred_at DESC, id DESC").Limit(limit).Find(&out).Error; err != nil {
 		return nil, err
 	}
 	return out, nil

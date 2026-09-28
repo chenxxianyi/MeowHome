@@ -16,6 +16,7 @@ import (
 
 	"github.com/meowhome/backend/internal/app"
 	"github.com/meowhome/backend/internal/infrastructure/persistence/mysql"
+	"github.com/meowhome/backend/internal/infrastructure/scheduler"
 	"github.com/meowhome/backend/internal/platform/config"
 	"github.com/meowhome/backend/internal/transport/http/handler"
 	my "github.com/meowhome/backend/internal/transport/http/middleware"
@@ -70,12 +71,20 @@ func main() {
 	memberSvc := app.NewMemberService(memberRepo, userRepo, familyRepo)
 	recordSvc := app.NewRecordService(recordRepo, memberRepo, auditRepo)
 	careSvc := app.NewCareService(recordRepo, reminderRepo, catRepo, familyRepo, memberRepo)
-	reminderSvc := app.NewReminderService(reminderRepo, memberRepo)
+	reminderSvc := app.NewReminderServiceWithRepos(reminderRepo, memberRepo, catRepo, familyRepo)
 	assetSvc := app.NewAssetService(timelineRepo, inventoryRepo, expenseRepo, memberRepo)
 	aiSvc := app.NewAIService(recordRepo, reportRepo, aiRepo, catRepo, memberRepo)
+	agentRepo := mysql.NewAgentRepo(db)
+	agentSvc := app.NewAgentService(agentRepo, recordRepo, reminderRepo, catRepo, familyRepo, memberRepo, cfg.Agent.Enabled)
+	patrolScheduler, err := scheduler.NewAgentPatrolScheduler(agentSvc, familyRepo, cfg.Agent.Enabled, cfg.Agent.PatrolTimes)
+	if err != nil {
+		logger.Fatal("agent patrol scheduler", zap.Error(err))
+	}
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	patrolScheduler.Start(schedulerCtx)
 
 	// 组装 HTTP 层
-	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc)
+	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc, agentSvc)
 	health := &appHealth{db: db}
 	// MethodOverride 必须包在 gin engine 外层：Gin 在进入中间件链前就按
 	// (method, path) 完成路由匹配，engine.Use() 里改 Method 已经太晚（详见该中间件注释）。
@@ -90,6 +99,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	stopScheduler()
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()

@@ -134,6 +134,17 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
 	// AI
 	familyG.POST("/:familyId/ai/parse", h.ParseAI)
 	familyG.GET("/:familyId/ai/summary", h.AISummary)
+
+	// Agent：家庭巡检消息与提醒草稿。
+	familyG.GET("/:familyId/agent/messages", h.ListAgentMessages)
+	familyG.GET("/:familyId/agent/messages/:messageId", h.GetAgentMessage)
+	familyG.PATCH("/:familyId/agent/messages/:messageId/draft", h.EditAgentDraft)
+	familyG.POST("/:familyId/agent/messages/:messageId/confirm", h.ConfirmAgentDraft)
+	familyG.POST("/:familyId/agent/messages/:messageId/dismiss", h.DismissAgentMessage)
+	familyG.POST("/:familyId/agent/chat", h.ChatAgent)
+	familyG.GET("/:familyId/agent/sessions", h.ListAgentSessions)
+	familyG.GET("/:familyId/agent/sessions/:sessionId/messages", h.ListAgentSessionMessages)
+	protected.POST("/internal/agent/patrol", h.PatrolAgent)
 }
 
 func registerV1Placeholder(r *gin.Engine) {

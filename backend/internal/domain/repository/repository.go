@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/meowhome/backend/internal/domain/model"
 )
@@ -13,6 +14,9 @@ var ErrDuplicateKey = errors.New("duplicate key")
 
 // ErrNotFound 资源不存在。
 var ErrNotFound = errors.New("not found")
+
+// ErrConflict 表示乐观锁或状态机冲突。
+var ErrConflict = errors.New("conflict")
 
 // UserRepo 用户仓储。
 type UserRepo interface {
@@ -25,6 +29,7 @@ type UserRepo interface {
 type FamilyRepo interface {
 	Create(ctx context.Context, f *model.Family) error
 	FindByID(ctx context.Context, id string) (*model.Family, error)
+	List(ctx context.Context, beforeID string, limit int) ([]*model.Family, error)
 	Update(ctx context.Context, f *model.Family) error
 	Delete(ctx context.Context, id string) error
 }
@@ -74,12 +79,14 @@ type DailyRecordRepo interface {
 
 // DailyRecordQuery 记录查询条件。
 type DailyRecordQuery struct {
-	FamilyID string
-	CatID    string   // 命中 cat_ids JSON 数组中的任一元素
-	Types    []string // 空表示不限
-	From     string   // RFC3339 或 YYYY-MM-DD
-	To       string
-	Limit    int
+	FamilyID         string
+	CatID            string   // 命中 cat_ids JSON 数组中的任一元素
+	Types            []string // 空表示不限
+	From             string   // RFC3339 或 YYYY-MM-DD
+	To               string
+	BeforeOccurredAt *time.Time // 与 BeforeID 组成稳定倒序游标
+	BeforeID         string
+	Limit            int
 }
 
 // TimelineRepo 时光事件仓储。
@@ -121,6 +128,37 @@ type ReminderQuery struct {
 	FamilyID string
 	CatID    string
 	Status   string
+}
+
+// AgentMessageQuery Agent 消息查询条件。
+type AgentMessageQuery struct {
+	FamilyID         string
+	SessionID        string
+	Type             string
+	Status           string
+	Visibility       string
+	ExcludeDismissed bool
+	Before           string
+	Limit            int
+}
+
+// AgentRepo 持久化 Agent 会话、消息和提醒草稿。
+type AgentRepo interface {
+	CreateSession(ctx context.Context, s *model.AgentSession) error
+	UpdateSession(ctx context.Context, s *model.AgentSession) error
+	FindSession(ctx context.Context, id string) (*model.AgentSession, error)
+	ListSessions(ctx context.Context, familyID, userID, before string, limit int) ([]*model.AgentSession, error)
+	CreateMessage(ctx context.Context, m *model.AgentMessage) error
+	FindMessage(ctx context.Context, id string) (*model.AgentMessage, error)
+	FindMessageByDedup(ctx context.Context, familyID, dedupKey string) (*model.AgentMessage, error)
+	FindMessageByClientID(ctx context.Context, sessionID, clientMessageID string) (*model.AgentMessage, error)
+	FindAnyMessageByClientID(ctx context.Context, familyID, userID, clientMessageID string) (*model.AgentMessage, error)
+	ListMessages(ctx context.Context, q AgentMessageQuery) ([]*model.AgentMessage, error)
+	UpdateMessage(ctx context.Context, m *model.AgentMessage) error
+	UpdateMessageIfVersion(ctx context.Context, m *model.AgentMessage, expectedVersion int) error
+	// ConfirmMessageAndCreateReminder 在同一事务中锁定消息、创建提醒并确认草稿。
+	// created=false 表示并发请求已经完成确认，返回已有提醒。
+	ConfirmMessageAndCreateReminder(ctx context.Context, messageID string, expectedVersion int, now time.Time, reminder *model.Reminder) (created bool, err error)
 }
 
 // InventoryRepo 库存仓储。

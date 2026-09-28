@@ -31,7 +31,7 @@ func (r *ReminderRepo) Create(ctx context.Context, m *model.Reminder) error {
 // FindByID 按 ID 查找提醒。
 func (r *ReminderRepo) FindByID(ctx context.Context, id string) (*model.Reminder, error) {
 	var m model.Reminder
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&m).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, repository.ErrNotFound
 		}
@@ -42,7 +42,7 @@ func (r *ReminderRepo) FindByID(ctx context.Context, id string) (*model.Reminder
 
 // List 按家庭与状态查询提醒。
 func (r *ReminderRepo) List(ctx context.Context, q repository.ReminderQuery) ([]*model.Reminder, error) {
-	tx := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("family_id = ?", q.FamilyID)
+	tx := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("family_id = ? AND deleted_at IS NULL", q.FamilyID)
 	if q.CatID != "" {
 		tx = tx.Where("cat_id = ?", q.CatID)
 	}

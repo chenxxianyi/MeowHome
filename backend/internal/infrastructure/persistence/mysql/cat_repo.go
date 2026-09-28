@@ -31,7 +31,7 @@ func (r *CatRepo) Create(ctx context.Context, c *model.Cat) error {
 // FindByID 按 ID 查找猫咪（含软删除）。
 func (r *CatRepo) FindByID(ctx context.Context, id string) (*model.Cat, error) {
 	var c model.Cat
-	if err := r.db.WithContext(ctx).Unscoped().Where("id = ?", id).First(&c).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&c).Error; err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -40,7 +40,7 @@ func (r *CatRepo) FindByID(ctx context.Context, id string) (*model.Cat, error) {
 // ListByFamily 列出家庭所有猫咪（含软删除以保留历史）。
 func (r *CatRepo) ListByFamily(ctx context.Context, familyID string) ([]*model.Cat, error) {
 	var cats []*model.Cat
-	if err := r.db.WithContext(ctx).Unscoped().Where("family_id = ?", familyID).Find(&cats).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("family_id = ? AND deleted_at IS NULL", familyID).Find(&cats).Error; err != nil {
 		return nil, err
 	}
 	return cats, nil

@@ -18,6 +18,18 @@ import type {
   TrendDataPoint,
   User
 } from '../types'
+import type {
+  AgentChatRequest,
+  AgentChatResponse,
+  AgentConfirmResponse,
+  AgentMessage,
+  AgentMessageListParams,
+  AgentMessageListResponse,
+  AgentReminderEditRequest,
+  AgentReminderDraft,
+  AgentSessionListResponse,
+  AgentSessionMessagesResponse
+} from '../types/agent'
 
 // ---------------------------------------------------------------- DTO
 
@@ -91,6 +103,10 @@ export interface ReminderDTO {
   time: string
   state: string
   icon: string
+  rule?: string
+  scheduled_at?: string
+  timezone?: string
+  completed_at?: string
 }
 
 export interface MomentDTO {
@@ -472,6 +488,34 @@ export const aiApi = {
   },
   summary(familyId: string) {
     return request<SummaryDTO>(aiHttp, { method: 'GET', url: `/families/${familyId}/ai/summary` })
+  }
+}
+
+// ---------------------------------------------------------------- Agent
+export const agentApi = {
+  listMessages(familyId: string, params: AgentMessageListParams = {}) {
+    return request<AgentMessageListResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/messages`, params: params as Record<string, unknown> })
+  },
+  getMessage(familyId: string, messageId: string) {
+    return request<AgentMessage>(http, { method: 'GET', url: `/families/${familyId}/agent/messages/${messageId}` })
+  },
+  editDraft(familyId: string, messageId: string, data: AgentReminderEditRequest) {
+    return request<AgentReminderDraft>(http, { method: 'PATCH', url: `/families/${familyId}/agent/messages/${messageId}/draft`, data })
+  },
+  confirm(familyId: string, messageId: string, expected_version: number) {
+    return request<AgentConfirmResponse>(http, { method: 'POST', url: `/families/${familyId}/agent/messages/${messageId}/confirm`, data: { expected_version } })
+  },
+  dismiss(familyId: string, messageId: string) {
+    return request<void>(http, { method: 'POST', url: `/families/${familyId}/agent/messages/${messageId}/dismiss` })
+  },
+  chat(familyId: string, data: AgentChatRequest) {
+    return request<AgentChatResponse>(aiHttp, { method: 'POST', url: `/families/${familyId}/agent/chat`, data })
+  },
+  sessions(familyId: string) {
+    return request<AgentSessionListResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/sessions` })
+  },
+  sessionMessages(familyId: string, sessionId: string, params: { limit?: number; before?: string } = {}) {
+    return request<AgentSessionMessagesResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/sessions/${sessionId}/messages`, params })
   }
 }
 

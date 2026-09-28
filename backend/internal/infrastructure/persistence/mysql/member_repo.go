@@ -31,7 +31,7 @@ func (r *MemberRepo) Create(ctx context.Context, m *model.Member) error {
 // FindByFamily 查找家庭的所有成员（含软删除）。
 func (r *MemberRepo) FindByFamily(ctx context.Context, familyID string) ([]*model.Member, error) {
 	var members []*model.Member
-	if err := r.db.WithContext(ctx).Unscoped().Where("family_id = ?", familyID).Find(&members).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("family_id = ? AND deleted_at IS NULL", familyID).Find(&members).Error; err != nil {
 		return nil, err
 	}
 	return members, nil
@@ -40,7 +40,7 @@ func (r *MemberRepo) FindByFamily(ctx context.Context, familyID string) ([]*mode
 // FindByUser 查找用户的所有成员记录（含软删除）。
 func (r *MemberRepo) FindByUser(ctx context.Context, userID string) ([]*model.Member, error) {
 	var members []*model.Member
-	if err := r.db.WithContext(ctx).Unscoped().Where("user_id = ?", userID).Find(&members).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND deleted_at IS NULL", userID).Find(&members).Error; err != nil {
 		return nil, err
 	}
 	return members, nil

@@ -17,15 +17,18 @@ func (RefreshToken) TableName() string { return "refresh_tokens" }
 // Reminder 提醒规则。
 type Reminder struct {
 	Base
-	FamilyID  string `gorm:"index;type:varchar(26);not null"`
-	CatID     string `gorm:"type:varchar(64)"` // 猫咪 ID 或 "both"
-	Type      string `gorm:"type:varchar(32);not null"`
-	Title     string `gorm:"type:varchar(255)"`
-	Subtitle  string `gorm:"type:varchar(255)"`
-	TimeLabel string `gorm:"column:time_label;type:varchar(64)"`
-	State     string `gorm:"type:varchar(20);default:todo"`
-	Icon      string `gorm:"type:varchar(64)"`
-	Rule      string `gorm:"type:text"` // cron 或自定义规则 JSON
+	FamilyID    string     `gorm:"index;type:varchar(26);not null"`
+	CatID       string     `gorm:"type:varchar(64)"` // 猫咪 ID 或 "both"
+	Type        string     `gorm:"type:varchar(32);not null"`
+	Title       string     `gorm:"type:varchar(255)"`
+	Subtitle    string     `gorm:"type:varchar(255)"`
+	TimeLabel   string     `gorm:"column:time_label;type:varchar(64)"`
+	State       string     `gorm:"type:varchar(20);default:todo"`
+	Icon        string     `gorm:"type:varchar(64)"`
+	Rule        string     `gorm:"type:text"` // cron 或自定义规则 JSON
+	ScheduledAt *time.Time `gorm:"index"`
+	Timezone    string     `gorm:"type:varchar(64)"`
+	CompletedAt *time.Time `gorm:"index"`
 }
 
 func (Reminder) TableName() string { return "reminders" }

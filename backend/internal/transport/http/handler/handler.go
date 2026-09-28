@@ -20,6 +20,7 @@ type Handler struct {
 	reminder *app.ReminderService
 	asset    *app.AssetService
 	ai       *app.AIService
+	agent    *app.AgentService
 }
 
 // New 创建 handler 集合。
@@ -33,6 +34,7 @@ func New(
 	reminder *app.ReminderService,
 	asset *app.AssetService,
 	ai *app.AIService,
+	agent *app.AgentService,
 ) *Handler {
 	return &Handler{
 		auth:     auth,
@@ -44,6 +46,7 @@ func New(
 		reminder: reminder,
 		asset:    asset,
 		ai:       ai,
+		agent:    agent,
 	}
 }
 
