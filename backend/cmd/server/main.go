@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/meowhome/backend/internal/app"
+	"github.com/meowhome/backend/internal/infrastructure/ai"
 	"github.com/meowhome/backend/internal/infrastructure/persistence/mysql"
 	"github.com/meowhome/backend/internal/infrastructure/scheduler"
 	"github.com/meowhome/backend/internal/platform/config"
@@ -76,7 +77,10 @@ func main() {
 	aiSvc := app.NewAIService(recordRepo, reportRepo, aiRepo, catRepo, memberRepo)
 	agentRepo := mysql.NewAgentRepo(db)
 	agentSvc := app.NewAgentService(agentRepo, recordRepo, reminderRepo, catRepo, familyRepo, memberRepo, cfg.Agent.Enabled)
-	patrolScheduler, err := scheduler.NewAgentPatrolScheduler(agentSvc, familyRepo, cfg.Agent.Enabled, cfg.Agent.PatrolTimes)
+	agentSvc.SetAuditRepo(auditRepo)
+	agentSvc.SetLLMProvider(ai.NewChatCompletionsProvider(cfg.AI))
+	agentSvc.SetHealthProfileRepo(healthRepo)
+	patrolScheduler, err := scheduler.NewAgentPatrolScheduler(agentSvc, familyRepo, recordRepo, mysql.NewAgentTaskProgressRepo(db), cfg.Agent.Enabled && db != nil, cfg.Agent.PatrolTimes)
 	if err != nil {
 		logger.Fatal("agent patrol scheduler", zap.Error(err))
 	}
@@ -103,6 +107,9 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
+	if err := patrolScheduler.Wait(ctx); err != nil {
+		logger.Warn("agent scheduler did not stop before shutdown timeout", zap.Error(err))
+	}
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Fatal("shutdown", zap.Error(err))
 	}

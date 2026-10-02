@@ -393,6 +393,9 @@ export interface RecordInput {
 }
 
 export const recordApi = {
+  get(familyId: string, recordId: string) {
+    return request<RecordDTO>(http, { method: 'GET', url: `/families/${familyId}/records/${recordId}` })
+  },
   list(familyId: string, params: { cat_id?: string; type?: string; from?: string; to?: string; limit?: number } = {}) {
     return request<RecordDTO[]>(http, { method: 'GET', url: `/families/${familyId}/records`, params })
   },

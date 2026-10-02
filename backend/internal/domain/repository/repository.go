@@ -18,6 +18,12 @@ var ErrNotFound = errors.New("not found")
 // ErrConflict 表示乐观锁或状态机冲突。
 var ErrConflict = errors.New("conflict")
 
+// ErrInvalidQuery 表示仓储查询缺少必要作用域或分页限制。
+var ErrInvalidQuery = errors.New("invalid repository query")
+
+// ErrDailyLimit 表示该家庭本地日的非 danger 巡检消息额度已用完。
+var ErrDailyLimit = errors.New("agent daily message limit reached")
+
 // UserRepo 用户仓储。
 type UserRepo interface {
 	Create(ctx context.Context, u *model.User) error
@@ -89,6 +95,35 @@ type DailyRecordQuery struct {
 	Limit            int
 }
 
+// CreatedRecordQuery 以创建时间和 ID 正序扫描记录，不依赖业务发生时间。
+type CreatedRecordQuery struct {
+	FamilyID string
+	AfterAt  *time.Time
+	AfterID  string
+	Limit    int
+}
+
+// AgentEventRecordRepo 供后台事件扫描使用。
+type AgentEventRecordRepo interface {
+	ListCreatedAfter(ctx context.Context, q CreatedRecordQuery) ([]*model.DailyRecord, error)
+}
+
+// AgentTaskProgress 保存单家庭单任务窗口的执行结果及事件扫描游标。
+type AgentTaskProgress struct {
+	FamilyID        string
+	TaskKey         string
+	Status          string
+	LastSuccessAt   *time.Time
+	LastFailureAt   *time.Time
+	CursorCreatedAt *time.Time
+	CursorID        string
+}
+
+type AgentTaskProgressRepo interface {
+	Get(ctx context.Context, familyID, taskKey string) (*AgentTaskProgress, error)
+	Save(ctx context.Context, p *AgentTaskProgress) error
+}
+
 // TimelineRepo 时光事件仓储。
 type TimelineRepo interface {
 	Create(ctx context.Context, e *model.TimelineEvent) error
@@ -119,6 +154,7 @@ type ReminderRepo interface {
 	Create(ctx context.Context, r *model.Reminder) error
 	FindByID(ctx context.Context, id string) (*model.Reminder, error)
 	List(ctx context.Context, q ReminderQuery) ([]*model.Reminder, error)
+	ListScheduled(ctx context.Context, q ReminderScheduleQuery) ([]*model.Reminder, error)
 	Update(ctx context.Context, r *model.Reminder) error
 	Delete(ctx context.Context, id string) error
 }
@@ -130,6 +166,19 @@ type ReminderQuery struct {
 	Status   string
 }
 
+// ReminderScheduleQuery 分页读取可计算时间的提醒，时间范围为左闭右开。
+// CursorAt/CursorID 是上一批最后一条的 (scheduled_at,id)。
+type ReminderScheduleQuery struct {
+	FamilyID    string
+	State       string
+	Types       []string
+	From        *time.Time
+	ToExclusive *time.Time
+	CursorAt    *time.Time
+	CursorID    string
+	Limit       int
+}
+
 // AgentMessageQuery Agent 消息查询条件。
 type AgentMessageQuery struct {
 	FamilyID         string
@@ -138,6 +187,7 @@ type AgentMessageQuery struct {
 	Status           string
 	Visibility       string
 	ExcludeDismissed bool
+	ExcludeTools     bool
 	Before           string
 	Limit            int
 }
@@ -146,19 +196,22 @@ type AgentMessageQuery struct {
 type AgentRepo interface {
 	CreateSession(ctx context.Context, s *model.AgentSession) error
 	UpdateSession(ctx context.Context, s *model.AgentSession) error
-	FindSession(ctx context.Context, id string) (*model.AgentSession, error)
+	FindSession(ctx context.Context, familyID, userID, id string) (*model.AgentSession, error)
 	ListSessions(ctx context.Context, familyID, userID, before string, limit int) ([]*model.AgentSession, error)
 	CreateMessage(ctx context.Context, m *model.AgentMessage) error
-	FindMessage(ctx context.Context, id string) (*model.AgentMessage, error)
+	// CreatePatrolMessage 锁定家庭后在事务内计数和写入，避免并发超过日额度。
+	CreatePatrolMessage(ctx context.Context, m *model.AgentMessage, from, to time.Time, maxNonDanger int64) error
+	FindMessage(ctx context.Context, familyID, id string) (*model.AgentMessage, error)
 	FindMessageByDedup(ctx context.Context, familyID, dedupKey string) (*model.AgentMessage, error)
-	FindMessageByClientID(ctx context.Context, sessionID, clientMessageID string) (*model.AgentMessage, error)
-	FindAnyMessageByClientID(ctx context.Context, familyID, userID, clientMessageID string) (*model.AgentMessage, error)
+	FindMessageByClientID(ctx context.Context, familyID, userID, sessionID, clientMessageID string) (*model.AgentMessage, error)
+	FindUserMessageByClientID(ctx context.Context, familyID, userID, clientMessageID string) (*model.AgentMessage, error)
 	ListMessages(ctx context.Context, q AgentMessageQuery) ([]*model.AgentMessage, error)
-	UpdateMessage(ctx context.Context, m *model.AgentMessage) error
-	UpdateMessageIfVersion(ctx context.Context, m *model.AgentMessage, expectedVersion int) error
+	CountNonDangerMessages(ctx context.Context, familyID string, from, to time.Time) (int64, error)
+	UpdateMessage(ctx context.Context, familyID string, m *model.AgentMessage) error
+	UpdateMessageIfVersion(ctx context.Context, familyID string, m *model.AgentMessage, expectedVersion int, expectedStatus string) error
 	// ConfirmMessageAndCreateReminder 在同一事务中锁定消息、创建提醒并确认草稿。
 	// created=false 表示并发请求已经完成确认，返回已有提醒。
-	ConfirmMessageAndCreateReminder(ctx context.Context, messageID string, expectedVersion int, now time.Time, reminder *model.Reminder) (created bool, err error)
+	ConfirmMessageAndCreateReminder(ctx context.Context, familyID, actorUserID, messageID string, expectedVersion int, now time.Time, reminder *model.Reminder) (created bool, err error)
 }
 
 // InventoryRepo 库存仓储。

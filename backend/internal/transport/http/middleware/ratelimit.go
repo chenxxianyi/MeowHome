@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -49,18 +50,19 @@ func (rl *RateLimiter) Handle(c *gin.Context) {
 		rl.clients[key] = b
 	}
 	b.count++
+	count := b.count
 	rl.mu.Unlock()
 
-	if b.count > rl.limit {
-		rl.logger.Warn("rate limit exceeded", zap.String("ip", key), zap.Int("count", b.count))
+	if count > rl.limit {
+		rl.logger.Warn("rate limit exceeded", zap.String("ip", key), zap.Int("count", count))
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"code":       errors.CodeSuccess,
+			"code":       errors.CodeRateLimited,
 			"message":    "rate limit exceeded",
 			"request_id": c.GetString("request_id"),
 		})
 		c.Abort()
 		return
 	}
-	c.Header("X-RateLimit-Limit", string(rune(rl.limit)))
+	c.Header("X-RateLimit-Limit", strconv.Itoa(rl.limit))
 	c.Next()
 }

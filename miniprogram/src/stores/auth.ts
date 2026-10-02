@@ -29,6 +29,7 @@ export const useAuthStore = defineStore('auth', {
     /** 应用启动时恢复会话：有 token 就拉一次 /me 校准用户与家庭。 */
     async bootstrap() {
       if (!getToken()) {
+        (await import('./agent')).useAgentStore().reset()
         this.ready = true
         return
       }
@@ -37,6 +38,7 @@ export const useAuthStore = defineStore('auth', {
         this.user = toUser(me)
         this.isAuthenticated = true
         if (me.family_id) {
+          if (this.familyId && this.familyId !== me.family_id) (await import('./agent')).useAgentStore().reset()
           this.familyId = me.family_id
           saveFamilyId(me.family_id)
         } else {
@@ -45,6 +47,7 @@ export const useAuthStore = defineStore('auth', {
           await this.resolveFamily()
         }
       } catch {
+        (await import('./agent')).useAgentStore().reset()
         clearAuthStorage()
         this.isAuthenticated = false
         this.user = null
@@ -59,6 +62,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const list = await authApi.myFamilies()
         if (list.length > 0) {
+          if (this.familyId && this.familyId !== list[0].id) (await import('./agent')).useAgentStore().reset()
           this.familyId = list[0].id
           saveFamilyId(list[0].id)
         }
@@ -94,6 +98,7 @@ export const useAuthStore = defineStore('auth', {
 
     async createFamily(name: string) {
       const f = await authApi.createFamily(name)
+      ;(await import('./agent')).useAgentStore().reset()
       this.familyId = f.id
       saveFamilyId(f.id)
       await this.bootstrap()
@@ -101,6 +106,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async logout() {
+      ;(await import('./agent')).useAgentStore().reset()
       const refresh = getRefreshToken()
       if (refresh) {
         try {

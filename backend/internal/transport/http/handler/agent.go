@@ -10,12 +10,19 @@ import (
 	"github.com/meowhome/backend/internal/transport/http/response"
 )
 
+const maxAgentJSONBytes int64 = 16 << 10
+
+func bindAgentJSON(c *gin.Context, dst any) error {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAgentJSONBytes)
+	return c.ShouldBindJSON(dst)
+}
+
 func (h *Handler) ListAgentMessages(c *gin.Context) {
 	q := app.AgentMessageListQuery{Type: c.Query("type"), Status: c.Query("status"), Before: c.Query("before")}
 	if v := c.Query("limit"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil {
-			response.Err(c, appInvalid("limit must be an integer"))
+		if err != nil || n < 1 || n > app.AgentMessageListMaxLimit {
+			response.Err(c, appInvalid("limit must be an integer between 1 and 50"))
 			return
 		}
 		q.Limit = n
@@ -39,7 +46,7 @@ func (h *Handler) GetAgentMessage(c *gin.Context) {
 
 func (h *Handler) EditAgentDraft(c *gin.Context) {
 	var in app.AgentReminderEditRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
+	if err := bindAgentJSON(c, &in); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -53,7 +60,7 @@ func (h *Handler) EditAgentDraft(c *gin.Context) {
 
 func (h *Handler) ConfirmAgentDraft(c *gin.Context) {
 	var in app.AgentConfirmRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
+	if err := bindAgentJSON(c, &in); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -75,7 +82,7 @@ func (h *Handler) DismissAgentMessage(c *gin.Context) {
 
 func (h *Handler) PatrolAgent(c *gin.Context) {
 	var in app.AgentPatrolRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
+	if err := bindAgentJSON(c, &in); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -93,7 +100,7 @@ func (h *Handler) PatrolAgent(c *gin.Context) {
 
 func (h *Handler) ChatAgent(c *gin.Context) {
 	var in app.AgentChatRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
+	if err := bindAgentJSON(c, &in); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -136,8 +143,8 @@ func (h *Handler) ListAgentSessionMessages(c *gin.Context) {
 func queryLimit(c *gin.Context) (int, error) {
 	if v := c.Query("limit"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil {
-			return 0, appInvalid("limit must be an integer")
+		if err != nil || n < 1 || n > app.AgentMessageListMaxLimit {
+			return 0, appInvalid("limit must be an integer between 1 and 50")
 		}
 		return n, nil
 	}

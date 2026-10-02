@@ -22,6 +22,7 @@ const (
 	CodeInvalidJSON      = "INVALID_JSON"
 	CodeValidationFailed = "VALIDATION_FAILED"
 	CodeUploadTooLarge   = "UPLOAD_TOO_LARGE"
+	CodeRateLimited      = "RATE_LIMITED"
 
 	CodeAuthRequired    = "AUTH_REQUIRED"
 	CodeTokenExpired    = "TOKEN_EXPIRED"

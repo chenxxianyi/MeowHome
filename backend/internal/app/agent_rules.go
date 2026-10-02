@@ -37,8 +37,19 @@ func evaluateRules(now time.Time, loc *time.Location, familyCreatedAt time.Time,
 	today := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
 	yesterdayStart := today.AddDate(0, 0, -1)
 	byCat := map[string][]*model.DailyRecord{}
+	seenByCat := map[string]map[string]bool{}
 	for _, r := range records {
+		if r.DeletedAt != nil || r.OccurredAt.After(now) {
+			continue
+		}
 		for _, catID := range r.CatIDs {
+			if seenByCat[catID] == nil {
+				seenByCat[catID] = map[string]bool{}
+			}
+			if seenByCat[catID][r.ID] {
+				continue
+			}
+			seenByCat[catID][r.ID] = true
 			byCat[catID] = append(byCat[catID], r)
 		}
 	}
@@ -57,16 +68,18 @@ func evaluateRules(now time.Time, loc *time.Location, familyCreatedAt time.Time,
 		return "该猫咪"
 	}
 	out := make([]RuleCandidate, 0)
-	for _, r := range records {
-		if r.Severity != "danger" || r.OccurredAt.Before(yesterdayStart) || !r.OccurredAt.Before(today) {
+	for _, c := range validCats {
+		var evidence []AgentEvidence
+		for _, r := range byCat[c.ID] {
+			if r.Severity == "danger" && !r.OccurredAt.Before(yesterdayStart) && r.OccurredAt.Before(today) {
+				evidence = append(evidence, evidenceForRecord(r, loc, r.Note))
+			}
+		}
+		if len(evidence) == 0 {
 			continue
 		}
-		catID := ""
-		if len(r.CatIDs) == 1 {
-			catID = r.CatIDs[0]
-		}
-		key := fmt.Sprintf("%s:%s:%s:%s", r.FamilyID, RuleR01, r.ID, today.Format("2006-01-02"))
-		out = append(out, RuleCandidate{RuleID: RuleR01, RuleVersion: "1", CatID: catID, Severity: "danger", Title: "昨日有高风险记录", Body: fmt.Sprintf("%s 昨日有一条 danger 记录：%s。请先核对原始记录。", catName(catID), labelOf(r.RecordType)), Scope: "family", WindowStart: yesterdayStart.UTC(), WindowEnd: today.UTC(), Evidence: []AgentEvidence{evidenceForRecord(r, loc, r.Note)}, Actions: []AgentAction{{Type: "view_records", Title: "查看原始记录", CatID: catID, Days: 2}}, DedupKey: key})
+		key := fmt.Sprintf("%s:%s:%s:%s", c.FamilyID, RuleR01, c.ID, yesterdayStart.Format("2006-01-02"))
+		out = append(out, RuleCandidate{RuleID: RuleR01, RuleVersion: "1", CatID: c.ID, Severity: "danger", Title: c.Name + "昨日有高风险记录", Body: fmt.Sprintf("%s 昨日有 %d 条原记录标为 danger，请核对原始记录。", catName(c.ID), len(evidence)), Scope: "cat", WindowStart: yesterdayStart.UTC(), WindowEnd: today.UTC(), Evidence: evidence, Actions: []AgentAction{{Type: "view_records", Title: "查看原始记录", CatID: c.ID, Days: 2}}, DedupKey: key})
 	}
 	// R-02：同一只猫同一类型在 7 天内至少三条（呕吐或腹泻）记录。
 	weekStart := today.AddDate(0, 0, -6)
@@ -85,7 +98,7 @@ func evaluateRules(now time.Time, loc *time.Location, familyCreatedAt time.Time,
 			}
 			p := decodePayload(r.Payload)
 			form, _ := p["form"].(string)
-			if form == "稀" || form == "稀便" || form == "水样" || form == "diarrhea" {
+			if form == "稀便" || form == "水样" {
 				diarrhea = append(diarrhea, evidenceForRecord(r, loc, form))
 			}
 		}
@@ -99,38 +112,49 @@ func evaluateRules(now time.Time, loc *time.Location, familyCreatedAt time.Time,
 	}
 	// R-03：待办用药提醒已超过计划时间 24 小时。
 	for _, r := range reminders {
-		if r.State != "todo" || r.Type != "medication" || r.ScheduledAt == nil || now.Sub(*r.ScheduledAt) <= 24*time.Hour {
+		if r.DeletedAt != nil || r.State != "todo" || r.Type != "medication" || r.ScheduledAt == nil || now.Sub(*r.ScheduledAt) <= 24*time.Hour {
 			continue
 		}
-		out = append(out, RuleCandidate{RuleID: RuleR03, RuleVersion: "1", CatID: r.CatID, Severity: "warning", Title: "用药提醒待确认", Body: "这条用药提醒已超过计划时间 24 小时，当前只能确认提醒状态，不能据此判断是否漏服。", Scope: "cat", WindowStart: r.ScheduledAt.UTC(), WindowEnd: now.UTC(), Evidence: []AgentEvidence{{SourceType: "reminder", SourceID: r.ID, CatIDs: []string{r.CatID}, OccurredAt: *r.ScheduledAt, Excerpt: r.Title}}, Actions: []AgentAction{{Type: "view_records", Title: "查看用药记录", CatID: r.CatID, Days: 3}}, DedupKey: fmt.Sprintf("%s:%s:%s", r.FamilyID, RuleR03, r.ID)})
+		out = append(out, RuleCandidate{RuleID: RuleR03, RuleVersion: "1", CatID: r.CatID, Severity: "warning", Title: "用药提醒待确认", Body: "这条用药提醒已超过计划时间 24 小时，当前只能确认提醒状态，不能据此判断是否漏服。", Scope: "cat", WindowStart: r.ScheduledAt.UTC(), WindowEnd: now.UTC(), Evidence: []AgentEvidence{{SourceType: "reminder", SourceID: r.ID, CatIDs: []string{r.CatID}, OccurredAt: *r.ScheduledAt, Excerpt: r.Title}}, Actions: []AgentAction{{Type: "view_records", Title: "查看用药记录", CatID: r.CatID, Days: 3}}, DedupKey: fmt.Sprintf("%s:%s:%s:%s", r.FamilyID, RuleR03, r.ID, today.Format("2006-01-02"))})
 	}
-	// R-04：仅周日 20:00 后检查每只猫最近一次体重距今是否超过 14 天。
+	// R-04：仅周日 20:00 后按家庭本地日历检查；从未称重时以猫咪建档日为起点。
 	if localNow.Weekday() == time.Sunday && localNow.Hour() >= 20 {
-		cutoff := localNow.AddDate(0, 0, -14).UTC()
+		cutoff := today.AddDate(0, 0, -14)
 		for _, c := range validCats {
-			latest := time.Time{}
+			var latest *model.DailyRecord
 			for _, r := range byCat[c.ID] {
-				if r.RecordType == "weight" && r.OccurredAt.After(latest) {
-					latest = r.OccurredAt
+				if r.RecordType == "weight" && (latest == nil || r.OccurredAt.After(latest.OccurredAt)) {
+					latest = r
 				}
 			}
-			if (!latest.IsZero() && latest.Before(cutoff)) || (latest.IsZero() && !familyCreatedAt.IsZero() && now.Sub(familyCreatedAt) > 14*24*time.Hour) {
-				out = append(out, RuleCandidate{RuleID: RuleR04, RuleVersion: "1", CatID: c.ID, Severity: "warning", Title: c.Name + "超过 14 天未称重", Body: "当前没有足够新的体重记录；这是记录覆盖提示，不代表体重异常。", Scope: "cat", WindowStart: cutoff.UTC(), WindowEnd: now.UTC(), Evidence: []AgentEvidence{{SourceType: "weight", SourceID: latest.Format(time.RFC3339), CatIDs: []string{c.ID}, Excerpt: "最近一次称重"}}, Actions: []AgentAction{{Type: "view_trend", Title: "查看体重趋势", CatID: c.ID, Days: 30}}, DedupKey: fmt.Sprintf("%s:%s:%s:%s", c.FamilyID, RuleR04, c.ID, today.Format("2006-01-02"))})
+			start := c.CreatedAt
+			evidence := AgentEvidence{SourceType: "cat_profile", SourceID: c.ID, CatIDs: []string{c.ID}, OccurredAt: c.CreatedAt, Excerpt: "猫咪建档起点；暂无称重记录"}
+			if latest != nil {
+				start = latest.OccurredAt
+				evidence = AgentEvidence{SourceType: "weight", SourceID: latest.ID, CatIDs: []string{c.ID}, OccurredAt: latest.OccurredAt, Excerpt: "最近一次称重记录"}
+			}
+			if start.IsZero() {
+				continue
+			}
+			startLocal := start.In(loc)
+			startDate := time.Date(startLocal.Year(), startLocal.Month(), startLocal.Day(), 0, 0, 0, 0, loc)
+			if startDate.Before(cutoff) {
+				out = append(out, RuleCandidate{RuleID: RuleR04, RuleVersion: "1", CatID: c.ID, Severity: "warning", Title: c.Name + "超过 14 天未称重", Body: "当前没有足够新的体重记录；这是记录覆盖提示，不代表体重异常。", Scope: "cat", WindowStart: cutoff.UTC(), WindowEnd: now.UTC(), Evidence: []AgentEvidence{evidence}, Actions: []AgentAction{{Type: "view_trend", Title: "查看体重趋势", CatID: c.ID, Days: 30}}, DedupKey: fmt.Sprintf("%s:%s:%s:%s", c.FamilyID, RuleR04, c.ID, today.Format("2006-01-02"))})
 			}
 		}
 	}
 	// R-05：疫苗/驱虫提醒未来 7 天内到期。
 	localSevenDaysLater := localNow.AddDate(0, 0, 7).UTC()
 	for _, r := range reminders {
-		if (r.Type != "vaccine" && r.Type != "deworm") || r.State == "done" || r.ScheduledAt == nil || r.ScheduledAt.Before(now) || !r.ScheduledAt.Before(localSevenDaysLater) {
+		if r.DeletedAt != nil || (r.Type != "vaccine" && r.Type != "deworm") || r.State != "todo" || r.ScheduledAt == nil || r.ScheduledAt.Before(now) || !r.ScheduledAt.Before(localSevenDaysLater) {
 			continue
 		}
-		out = append(out, RuleCandidate{RuleID: RuleR05, RuleVersion: "1", CatID: r.CatID, Severity: "info", Title: "护理计划即将到期", Body: fmt.Sprintf("%s 计划在 7 天内到期，请核对日期和猫咪归属。", r.Title), Scope: "cat", WindowStart: now.UTC(), WindowEnd: r.ScheduledAt.UTC(), Evidence: []AgentEvidence{{SourceType: "reminder", SourceID: r.ID, CatIDs: []string{r.CatID}, OccurredAt: *r.ScheduledAt, Excerpt: r.Title}}, Actions: []AgentAction{{Type: "view_records", Title: "查看护理计划", CatID: r.CatID, Days: 14}}, DedupKey: fmt.Sprintf("%s:%s:%s", r.FamilyID, RuleR05, r.ID)})
+		out = append(out, RuleCandidate{RuleID: RuleR05, RuleVersion: "1", CatID: r.CatID, Severity: "info", Title: "护理计划即将到期", Body: fmt.Sprintf("%s 计划在 7 天内到期，请核对日期和猫咪归属。", r.Title), Scope: "cat", WindowStart: now.UTC(), WindowEnd: r.ScheduledAt.UTC(), Evidence: []AgentEvidence{{SourceType: "reminder", SourceID: r.ID, CatIDs: []string{r.CatID}, OccurredAt: *r.ScheduledAt, Excerpt: r.Title}}, Actions: []AgentAction{{Type: "view_records", Title: "查看护理计划", CatID: r.CatID, Days: 14}}, DedupKey: fmt.Sprintf("%s:%s:%s:%s", r.FamilyID, RuleR05, r.ID, today.Format("2006-01-02"))})
 	}
 	// R-06：昨天家庭总记录数为零，只生成一条家庭级消息，避免每只猫重复提示。
 	hasFamilyRecord := false
 	for _, r := range records {
-		if !r.OccurredAt.Before(yesterdayStart) && r.OccurredAt.Before(today) {
+		if r.DeletedAt == nil && !r.OccurredAt.Before(yesterdayStart) && r.OccurredAt.Before(today) {
 			hasFamilyRecord = true
 			break
 		}
@@ -140,7 +164,10 @@ func evaluateRules(now time.Time, loc *time.Location, familyCreatedAt time.Time,
 		for _, c := range validCats {
 			catIDs = append(catIDs, c.ID)
 		}
-		out = append(out, RuleCandidate{RuleID: RuleR06, RuleVersion: "1", Severity: "info", Title: "家庭昨日暂无记录", Body: "昨日没有找到本家庭的照护记录，仅表示记录缺失，不能推断实际照护情况。", Scope: "family", WindowStart: yesterdayStart.UTC(), WindowEnd: today.UTC(), Evidence: []AgentEvidence{{SourceType: "family_scope", SourceID: validCats[0].FamilyID, CatIDs: catIDs, OccurredAt: yesterdayStart.UTC(), Excerpt: "查询范围：家庭昨日有效记录"}}, Actions: []AgentAction{{Type: "view_records", Title: "查看家庭记录", Days: 2}}, DedupKey: fmt.Sprintf("%s:%s:%s", validCats[0].FamilyID, RuleR06, yesterdayStart.Format("2006-01-02"))})
+		out = append(out, RuleCandidate{RuleID: RuleR06, RuleVersion: "1", Severity: "info", Title: "家庭昨日暂无记录", Body: "昨日没有找到本家庭的照护记录，仅表示记录缺失，不能推断实际照护情况。", Scope: "family", WindowStart: yesterdayStart.UTC(), WindowEnd: today.UTC(), Evidence: []AgentEvidence{{SourceType: "family_scope", SourceID: validCats[0].FamilyID, CatIDs: catIDs, OccurredAt: yesterdayStart.UTC(), Excerpt: fmt.Sprintf("查询范围：%s 至 %s，本家庭有效记录为零", yesterdayStart.Format("2006-01-02"), today.Format("2006-01-02"))}}, Actions: []AgentAction{{Type: "view_records", Title: "查看家庭记录", Days: 2}}, DedupKey: fmt.Sprintf("%s:%s:%s", validCats[0].FamilyID, RuleR06, yesterdayStart.Format("2006-01-02"))})
+	}
+	for i := range out {
+		out[i].DedupKey += ":v" + out[i].RuleVersion
 	}
 	return out
 }

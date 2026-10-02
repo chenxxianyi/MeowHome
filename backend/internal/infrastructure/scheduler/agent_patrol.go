@@ -1,12 +1,12 @@
-// Package scheduler 提供首版单实例 Agent 巡检调度。
+// Package scheduler 提供单实例 Agent 巡检和事件扫描调度。
 package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/meowhome/backend/internal/app"
@@ -15,34 +15,32 @@ import (
 )
 
 type patrolRunner interface {
-	PatrolSystem(context.Context, string) (*app.AgentPatrolResponse, error)
+	PatrolSystemAt(context.Context, string, time.Time) (*app.AgentPatrolResponse, error)
+	PatrolDangerRecordSystem(context.Context, string, string) error
 }
 
-// AgentPatrolScheduler 按家庭时区触发日巡检。状态保存在进程内，部署多实例前仍需数据库领取锁。
+// AgentPatrolScheduler 串行扫描家庭。多实例部署前需增加数据库领取锁。
 type AgentPatrolScheduler struct {
-	agent       patrolRunner
-	families    repository.FamilyRepo
-	enabled     bool
-	times       []patrolTime
-	interval    time.Duration
-	clock       func() time.Time
-	logf        func(string, ...any)
-	mu          sync.Mutex
-	lastRunKey  map[string]string
+	agent    patrolRunner
+	families repository.FamilyRepo
+	records  repository.AgentEventRecordRepo
+	progress repository.AgentTaskProgressRepo
+	enabled  bool
+	times    []patrolTime
+	interval time.Duration
+	clock    func() time.Time
+	logf     func(string, ...any)
+	done     chan struct{}
 }
 
-type patrolTime struct {
-	hour   int
-	minute int
-}
+type patrolTime struct{ hour, minute int }
 
-// NewAgentPatrolScheduler 创建调度器。patrolTimes 使用逗号分隔的 HH:MM。
-func NewAgentPatrolScheduler(agent patrolRunner, families repository.FamilyRepo, enabled bool, patrolTimes string) (*AgentPatrolScheduler, error) {
+func NewAgentPatrolScheduler(agent patrolRunner, families repository.FamilyRepo, records repository.AgentEventRecordRepo, progress repository.AgentTaskProgressRepo, enabled bool, patrolTimes string) (*AgentPatrolScheduler, error) {
 	times, err := parsePatrolTimes(patrolTimes)
 	if err != nil {
 		return nil, err
 	}
-	return &AgentPatrolScheduler{agent: agent, families: families, enabled: enabled, times: times, interval: 30 * time.Second, clock: func() time.Time { return time.Now().UTC() }, logf: func(string, ...any) {}, lastRunKey: map[string]string{}}, nil
+	return &AgentPatrolScheduler{agent: agent, families: families, records: records, progress: progress, enabled: enabled, times: times, interval: 30 * time.Second, clock: func() time.Time { return time.Now().UTC() }, logf: func(string, ...any) {}, done: make(chan struct{})}, nil
 }
 
 func parsePatrolTimes(raw string) ([]patrolTime, error) {
@@ -53,7 +51,7 @@ func parsePatrolTimes(raw string) ([]patrolTime, error) {
 	out := make([]patrolTime, 0)
 	for _, item := range strings.Split(raw, ",") {
 		parts := strings.Split(strings.TrimSpace(item), ":")
-		if len(parts) != 2 {
+		if len(parts) != 2 || len(parts[0]) != 2 || len(parts[1]) != 2 {
 			return nil, fmt.Errorf("invalid agent patrol time %q", item)
 		}
 		var hour, minute int
@@ -63,7 +61,7 @@ func parsePatrolTimes(raw string) ([]patrolTime, error) {
 		if _, err := fmt.Sscanf(parts[1], "%d", &minute); err != nil || minute < 0 || minute > 59 {
 			return nil, fmt.Errorf("invalid agent patrol minute %q", item)
 		}
-		pt := patrolTime{hour: hour, minute: minute}
+		pt := patrolTime{hour, minute}
 		if !seen[pt] {
 			seen[pt] = true
 			out = append(out, pt)
@@ -72,39 +70,61 @@ func parsePatrolTimes(raw string) ([]patrolTime, error) {
 	if len(out) == 0 {
 		return nil, fmt.Errorf("agent patrol times cannot be empty")
 	}
-	sort.Slice(out, func(i, j int) bool { if out[i].hour == out[j].hour { return out[i].minute < out[j].minute }; return out[i].hour < out[j].hour })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].hour == out[j].hour {
+			return out[i].minute < out[j].minute
+		}
+		return out[i].hour < out[j].hour
+	})
 	return out, nil
 }
 
-// Start 启动单实例 ticker；关闭 ctx 后等待当前家庭任务返回。
+// Start 立即补跑最近两个到期时段，随后每 30 秒扫描。Wait 用于退出等待。
 func (s *AgentPatrolScheduler) Start(ctx context.Context) {
-	if !s.enabled || s.agent == nil || s.families == nil {
+	if !s.enabled || s.agent == nil || s.families == nil || s.records == nil || s.progress == nil {
+		close(s.done)
 		return
 	}
 	go func() {
+		defer close(s.done)
 		ticker := time.NewTicker(s.interval)
 		defer ticker.Stop()
 		for {
+			if err := s.RunOnce(ctx, s.clock().UTC()); err != nil && ctx.Err() == nil {
+				s.logf("agent patrol scan failed: %v", err)
+			}
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := s.RunOnce(ctx, s.clock().UTC()); err != nil {
-					s.logf("agent patrol scan failed: %v", err)
-				}
 			}
 		}
 	}()
 }
 
-// RunOnce 扫描家庭并执行当前最近一个巡检时点，供启动补跑和测试使用。
+func (s *AgentPatrolScheduler) Wait(ctx context.Context) error {
+	select {
+	case <-s.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// RunOnce 按家庭游标扫描；单家庭失败不影响后续家庭。
 func (s *AgentPatrolScheduler) RunOnce(ctx context.Context, now time.Time) error {
 	if !s.enabled {
 		return nil
 	}
+	if s.agent == nil || s.families == nil || s.records == nil || s.progress == nil {
+		return repository.ErrInvalidQuery
+	}
 	beforeID := ""
 	const pageSize = 50
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		families, err := s.families.List(ctx, beforeID, pageSize)
 		if err != nil {
 			return err
@@ -113,54 +133,119 @@ func (s *AgentPatrolScheduler) RunOnce(ctx context.Context, now time.Time) error
 			if family == nil || family.DeletedAt != nil {
 				continue
 			}
-			slot, key, due := s.dueSlot(family, now)
-			_ = slot
-			if !due || s.alreadyRun(family.ID, key) {
-				continue
-			}
 			familyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			_, patrolErr := s.agent.PatrolSystem(familyCtx, family.ID)
-			cancel()
-			if patrolErr != nil {
-				s.logf("agent patrol failed family=%s: %v", family.ID, patrolErr)
-				continue
+			if err := s.runFamily(familyCtx, family, now); err != nil && ctx.Err() == nil {
+				s.logf("agent patrol failed family=%s: %v", family.ID, err)
 			}
-			s.markRun(family.ID, key)
+			cancel()
 		}
 		if len(families) < pageSize {
 			return nil
 		}
 		last := families[len(families)-1]
 		if last == nil || last.ID == beforeID {
-			return nil
+			return repository.ErrInvalidQuery
 		}
 		beforeID = last.ID
 	}
 }
 
-func (s *AgentPatrolScheduler) dueSlot(family *model.Family, now time.Time) (patrolTime, string, bool) {
+type dueWindow struct {
+	key string
+	at  time.Time
+}
+
+func (s *AgentPatrolScheduler) dueWindows(family *model.Family, now time.Time) []dueWindow {
 	loc, err := time.LoadLocation(family.Timezone)
 	if err != nil {
 		loc = time.FixedZone("CST", 8*3600)
 	}
 	local := now.In(loc)
 	date := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
-	selectedDate := date
-	selected := patrolTime{}
-	found := false
-	for _, slot := range s.times {
-		scheduled := time.Date(date.Year(), date.Month(), date.Day(), slot.hour, slot.minute, 0, 0, loc)
-		if !local.Before(scheduled) {
-			selected, found = slot, true
+	all := make([]dueWindow, 0, 2*len(s.times))
+	for _, day := range []time.Time{date.AddDate(0, 0, -1), date} {
+		for _, slot := range s.times {
+			at := time.Date(day.Year(), day.Month(), day.Day(), slot.hour, slot.minute, 0, 0, loc)
+			if !at.After(now) {
+				all = append(all, dueWindow{fmt.Sprintf("patrol:%s:%02d:%02d", day.Format("2006-01-02"), slot.hour, slot.minute), at.UTC()})
+			}
 		}
 	}
-	if !found {
-		selected = s.times[len(s.times)-1]
-		selectedDate = date.AddDate(0, 0, -1)
+	if len(all) > 2 {
+		return all[len(all)-2:]
 	}
-	key := fmt.Sprintf("%s|%02d:%02d", selectedDate.Format("2006-01-02"), selected.hour, selected.minute)
-	return selected, key, true
+	return all
 }
 
-func (s *AgentPatrolScheduler) alreadyRun(familyID, key string) bool { s.mu.Lock(); defer s.mu.Unlock(); return s.lastRunKey[familyID] == key }
-func (s *AgentPatrolScheduler) markRun(familyID, key string) { s.mu.Lock(); defer s.mu.Unlock(); s.lastRunKey[familyID] = key }
+func (s *AgentPatrolScheduler) runFamily(ctx context.Context, family *model.Family, now time.Time) error {
+	var firstErr error
+	for _, slot := range s.dueWindows(family, now) {
+		p, err := s.getProgress(ctx, family.ID, slot.key)
+		if err != nil {
+			return err
+		}
+		if p.Status == "success" {
+			continue
+		}
+		_, err = s.agent.PatrolSystemAt(ctx, family.ID, slot.at)
+		if saveErr := s.saveResult(ctx, p, err, now); saveErr != nil {
+			return saveErr
+		}
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if err := s.scanEvents(ctx, family.ID, now); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return firstErr
+}
+
+func (s *AgentPatrolScheduler) getProgress(ctx context.Context, familyID, key string) (*repository.AgentTaskProgress, error) {
+	p, err := s.progress.Get(ctx, familyID, key)
+	if errors.Is(err, repository.ErrNotFound) {
+		return &repository.AgentTaskProgress{FamilyID: familyID, TaskKey: key}, nil
+	}
+	return p, err
+}
+
+func (s *AgentPatrolScheduler) saveResult(ctx context.Context, p *repository.AgentTaskProgress, runErr error, now time.Time) error {
+	now = now.UTC()
+	if runErr == nil {
+		p.Status, p.LastSuccessAt = "success", &now
+	} else {
+		p.Status, p.LastFailureAt = "failed", &now
+	}
+	return s.progress.Save(ctx, p)
+}
+
+func (s *AgentPatrolScheduler) scanEvents(ctx context.Context, familyID string, now time.Time) error {
+	p, err := s.getProgress(ctx, familyID, "danger-events")
+	if err != nil {
+		return err
+	}
+	const batchSize = 100
+	// 每次唤醒最多处理 100 条；下轮沿持久化游标继续。
+	rows, err := s.records.ListCreatedAfter(ctx, repository.CreatedRecordQuery{FamilyID: familyID, AfterAt: p.CursorCreatedAt, AfterID: p.CursorID, Limit: batchSize})
+	if err != nil {
+		_ = s.saveResult(ctx, p, err, now)
+		return err
+	}
+	for _, row := range rows {
+		if row == nil {
+			return repository.ErrInvalidQuery
+		}
+		if row.Severity == "danger" {
+			if err := s.agent.PatrolDangerRecordSystem(ctx, familyID, row.ID); err != nil {
+				_ = s.saveResult(ctx, p, err, now)
+				return err
+			}
+		}
+		at := row.CreatedAt.UTC()
+		p.CursorCreatedAt, p.CursorID = &at, row.ID
+		if err := s.progress.Save(ctx, p); err != nil {
+			return err
+		}
+	}
+	return s.saveResult(ctx, p, nil, now)
+}

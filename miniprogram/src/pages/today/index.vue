@@ -8,6 +8,7 @@ import AIEvidencePanel from '../../components/ai/AIEvidencePanel.vue'
 import OfflineBanner from '../../components/app/OfflineBanner.vue'
 import { useAppStore } from '../../stores/app'
 import { useCatStore } from '../../stores/cat'
+import { useAgentStore } from '../../stores/agent'
 import { services } from '../../services'
 import { greeting, todayDateLabel } from '../../utils/date'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
@@ -16,6 +17,8 @@ import type { FocusItemData, Reminder, TodayStatusData } from '../../types'
 const router = useRouter()
 const app = useAppStore()
 const catStore = useCatStore()
+const agentStore = useAgentStore()
+const agentMessages = computed(() => agentStore.important.slice(0, 2))
 
 interface StatusRow {
   icon: string
@@ -164,6 +167,7 @@ function groupLevel(group: StatusGroup) {
 }
 
 async function load() {
+  void agentStore.load({ limit: 2 })
   loading.value = true
   loadError.value = ''
   try {
@@ -353,6 +357,13 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
         </view>
       </view>
 
+      <view v-if="agentMessages.length" class="today-section" aria-label="猫管家巡检消息">
+        <view class="today-section-heading"><view class="records-section-title">猫管家提醒</view><button class="reminder-btn" @click="router.push('/agent')">查看全部</button></view>
+        <button v-for="item in agentMessages" :key="item.id" class="agent-card" :class="`agent-${item.severity}`" @click="router.push(`/agent?messageId=${encodeURIComponent(item.id)}`)">
+          <view class="agent-card-header"><text class="agent-card-title">{{ item.title }}</text><text class="ai-badge">{{ item.severity }}</text></view>
+          <view class="agent-card-body">{{ item.body }}</view>
+        </button>
+      </view>
       <view v-if="statusGroups.length" class="today-section" aria-label="猫咪今日状态">
         <view class="today-section-heading">
           <view>

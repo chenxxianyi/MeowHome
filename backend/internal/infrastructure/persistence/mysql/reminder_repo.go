@@ -57,6 +57,35 @@ func (r *ReminderRepo) List(ctx context.Context, q repository.ReminderQuery) ([]
 	return out, nil
 }
 
+// ListScheduled 用稳定游标读取计划提醒，供巡检完整扫描到期窗口。
+func (r *ReminderRepo) ListScheduled(ctx context.Context, q repository.ReminderScheduleQuery) ([]*model.Reminder, error) {
+	if q.FamilyID == "" || q.Limit < 1 || q.Limit > 1000 {
+		return nil, repository.ErrInvalidQuery
+	}
+	tx := r.db.WithContext(ctx).Model(&model.Reminder{}).
+		Where("family_id = ? AND deleted_at IS NULL AND scheduled_at IS NOT NULL", q.FamilyID)
+	if q.State != "" {
+		tx = tx.Where("state = ?", q.State)
+	}
+	if len(q.Types) > 0 {
+		tx = tx.Where("type IN ?", q.Types)
+	}
+	if q.From != nil {
+		tx = tx.Where("scheduled_at >= ?", *q.From)
+	}
+	if q.ToExclusive != nil {
+		tx = tx.Where("scheduled_at < ?", *q.ToExclusive)
+	}
+	if q.CursorAt != nil && q.CursorID != "" {
+		tx = tx.Where("(scheduled_at, id) > (?, ?)", *q.CursorAt, q.CursorID)
+	}
+	var out []*model.Reminder
+	if err := tx.Order("scheduled_at ASC, id ASC").Limit(q.Limit).Find(&out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Update 更新提醒。
 func (r *ReminderRepo) Update(ctx context.Context, m *model.Reminder) error {
 	return r.db.WithContext(ctx).Save(m).Error

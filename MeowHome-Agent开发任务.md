@@ -4,7 +4,7 @@
 > 编制日期：2026-09-25  
 > 设计依据：[MeowHome-Agent设计方案.md](./MeowHome-Agent设计方案.md)  
 > 面向对象：在本仓库中实现功能的 AI 编程助手及代码审查者  
-> 当前状态：任务拆解完成，下面的开发任务均未验收完成。
+> 当前状态：AG-00、AG-01 已完成；阶段 A/B/C 尚未完成，详见第 12 节执行日志。
 
 ## 1. 目标、范围和执行约定
 
@@ -88,7 +88,7 @@
 | 完成 | 任务 ID | 任务 | 依赖 | 对应设计章节 |
 |---|---|---|---|---|
 | [x] | AG-00 | 基线核对与测试环境 | 无 | 全文 |
-| [ ] | AG-01 | 冻结 DTO、状态、接口和规则语义 | AG-00 | §2–5、§7、§9 |
+| [x] | AG-01 | 冻结 DTO、状态、接口和规则语义 | AG-00 | §2–5、§7、§9 |
 | [ ] | AG-A01 | Agent 数据模型、迁移与仓储 | AG-01 | §4、§5.1 |
 | [ ] | AG-A02 | 提醒到期时间与归属校验 | AG-01 | §3.3、§7 |
 | [ ] | AG-A03 | 六条确定性巡检规则 | AG-A01、AG-A02 | §3.1、§7 |
@@ -129,12 +129,12 @@
 
 **修改范围：**`backend/openapi/openapi.yaml`、拟新增 `backend/internal/app/agent_dto.go`、`miniprogram/src/types/agent.ts`；必要的契约说明可放 `docs/agent-api-contract.md`。
 
-- [ ] 按第 2 节明确字段命名、消息可见性、草稿状态、错误码、开关和时间窗口，定义 DTO/Schema 后再实现业务。
-- [ ] `AgentMessage` 增加 `session_id? / role / visibility / cat_id? / evidence / action_suggestions / draft_version? / action_status? / generated_at / model`，禁止 API 暴露完整工具原始响应。
-- [ ] 证据支持 `source_type + source_id + cat_ids + occurred_at + excerpt`；规则 R-03/R-05 引用提醒，R-04 引用最近称重或建档起点，R-06 记录“该家庭昨日无记录”的查询范围。
-- [ ] 列表固定返回 `{messages, next_cursor}`，聊天返回 `{session_id, message, degraded}`，确认返回 `{reminder, message_id, action_status}`，外层仍使用现有响应 Envelope。
-- [ ] 定义 `AGENT_DISABLED / AGENT_UNAVAILABLE / AGENT_INVALID_OUTPUT / AGENT_DRAFT_EXPIRED / AGENT_CONFLICT` 等码及 HTTP 映射；超出权限的 ID 统一按项目策略处理。
-- [ ] 明确内容长度、查询范围、分页上限、每轮调用预算以及模型输出校验失败行为，写入 OpenAPI 和配置默认值。
+- [x] 按第 2 节明确字段命名、消息可见性、草稿状态、错误码、开关和时间窗口，定义 DTO/Schema 后再实现业务。
+- [x] `AgentMessage` 增加 `session_id? / role / visibility / cat_id? / evidence / action_suggestions / draft_version? / action_status? / generated_at / model`，禁止 API 暴露完整工具原始响应。
+- [x] 证据支持 `source_type + source_id + cat_ids + occurred_at + excerpt`；规则 R-03/R-05 引用提醒，R-04 引用最近称重或建档起点，R-06 记录“该家庭昨日无记录”的查询范围。
+- [x] 列表固定返回 `{messages, next_cursor}`，聊天返回 `{session_id, message, degraded}`，确认返回 `{reminder, message_id, action_status}`，外层仍使用现有响应 Envelope。
+- [x] 定义 `AGENT_DISABLED / AGENT_UNAVAILABLE / AGENT_INVALID_OUTPUT / AGENT_DRAFT_EXPIRED / AGENT_CONFLICT` 等码及 HTTP 映射；超出权限的 ID 统一按项目策略处理。
+- [x] 明确内容长度、查询范围、分页上限、每轮调用预算以及模型输出校验失败行为，写入 OpenAPI 和配置默认值。
 
 **验收：**后端 DTO、小程序类型和 OpenAPI 的样例可逐字段对应；不存在列表返回数组与 `{messages}` 混用的问题。
 
@@ -144,12 +144,12 @@
 
 **修改范围：**新增 `backend/internal/domain/model/agent.go`、`backend/internal/domain/repository/agent_repo.go`、`backend/internal/infrastructure/persistence/mysql/agent_repo.go` 和下一组空闲 migration；更新必要测试。
 
-- [ ] 创建原方案的 `ai_agent_sessions / ai_agent_messages`，沿用 ULID、审计字段和软删除风格。
-- [ ] 会话保存家庭、创建者、标题、状态；消息保存会话、角色、可见性、猫咪/家庭范围、类型、正文、证据、动作、规则版本和生成时间。
-- [ ] 增加 `dedup_key` 唯一约束、草稿版本/有效期/已确认提醒 ID，以及聊天的 `client_message_id` 和工具调用关联字段。
-- [ ] 未设置去重键时使用 NULL，不能让空字符串唯一索引阻塞普通聊天。索引同时覆盖家庭消息列表和私有会话分页。
+- [x] 创建原方案的 `ai_agent_sessions / ai_agent_messages`，沿用 ULID、审计字段和软删除风格（源码与迁移已具备；真实 MySQL 建表仍列在本任务验收待办）。
+- [x] 会话保存家庭、创建者、标题、状态；消息保存会话、角色、可见性、猫咪/家庭范围、类型、正文、证据、动作、规则版本和生成时间。
+- [x] 增加 `dedup_key` 唯一约束、草稿版本/有效期/已确认提醒 ID，以及聊天的 `client_message_id` 和工具调用关联字段。
+- [x] 未设置去重键时使用 NULL，不能让空字符串唯一索引阻塞普通聊天。索引同时覆盖家庭消息列表和私有会话分页（索引迁移已写，MySQL 执行效果待验证）。
 - [ ] 单条查询、分页、更新和软删除均要求家庭范围；私有消息再校验会话拥有者。使用 `(generated_at,id)` 等稳定游标处理同一时间多消息。
-- [ ] 提供事务句柄注入或仓储事务执行接口，供 AG-A05 同一事务创建提醒并更新消息。
+- [x] 提供事务句柄注入或仓储事务执行接口，供 AG-A05 同一事务创建提醒并更新消息（`ConfirmMessageAndCreateReminder` 使用行锁和事务；回滚与并发仍待 MySQL 验证）。
 - [ ] 显式实现 `TableName()`，验证模型、迁移字段长度和可空性一致；模型名不要误生成 `agent_messages`。
 
 **测试/验收：**空测试库可建表；已有数据升级不丢失；仅新增 migration 的回滚在隔离库通过；跨家庭 ID、软删除、同时间分页、去重并发有测试。
@@ -158,12 +158,12 @@
 
 **修改范围：**`backend/internal/domain/model/core.go`、`app/reminder_service.go`、提醒仓储/接口、新增 migration、OpenAPI；保持旧客户端兼容。
 
-- [ ] 为一次性提醒增加可空 `scheduled_at`、`timezone`、`completed_at`；旧 `time_label` 继续用于兼容展示，不能作为到期判断依据。
+- [x] 为一次性提醒增加可空 `scheduled_at`、`timezone`、`completed_at`；旧 `time_label` 继续用于兼容展示，不能作为到期判断依据。
 - [ ] 旧提醒默认 `scheduled_at=NULL`。无法确定日期的文本不自动回填；相关规则跳过并给出可识别的数据不足状态。
-- [ ] 扩展创建/完成流程及 DTO，校验 RFC3339、时区和猫咪归属；确认创建后保存 UTC 和展示时区。
-- [ ] Agent 单猫提醒要求明确猫咪；明确家庭级提醒可兼容现有 `both`，由服务端转换，不能将漏填猫咪当家庭级。
+- [x] 扩展创建/完成流程及 DTO，校验 RFC3339、时区和猫咪归属；确认创建后保存 UTC 和展示时区。
+- [x] Agent 单猫提醒要求明确猫咪；明确家庭级提醒可兼容现有 `both`，由服务端转换，不能将漏填猫咪当家庭级。
 - [ ] 新提醒的计划时间必须在未来；相对时间经服务端基准时间转换，含糊表达先补充，不默认为现在。
-- [ ] 复用创建校验逻辑并支持事务内调用，避免 AG-A05 复制出一套不同的提醒规则。
+- [x] 复用创建校验逻辑并支持事务内调用，避免 AG-A05 复制出一套不同的提醒规则。
 
 **测试/验收：**历史提醒仍能显示与完成；未来/过去/不合法时间、UTC 跨日、其他家庭猫咪、缺少猫咪都有确定结果；准确查到超期待办与七天内到期项。
 
@@ -171,11 +171,11 @@
 
 **修改范围：**新增 `backend/internal/app/agent_rules.go` 及测试，必要的受控聚合查询。
 
-- [ ] 将规则写成可注入时钟的确定性函数，输入不包含模型输出，输出携带 `rule_id / rule_version / scope / window / evidence / actions`。
-- [ ] 日期窗口使用家庭时区的本地午夜和下一日本地午夜，转换 UTC 查询，采用左闭右开；不要用固定 24 小时替代所有时区的下一天。
-- [ ] 单猫规则逐猫判断；多猫事件按记录关联展开，各猫内按记录 ID 去重；家庭级 R-06 单独处理。
+- [x] 将规则写成可注入时钟的确定性函数，输入不包含模型输出，输出携带 `rule_id / rule_version / scope / window / evidence / actions`。
+- [x] 日期窗口使用家庭时区的本地午夜和下一日本地午夜，转换 UTC 查询，采用左闭右开；不要用固定 24 小时替代所有时区的下一天。
+- [x] 单猫规则逐猫判断；多猫事件按记录关联展开，各猫内按记录 ID 去重；家庭级 R-06 单独处理。
 - [ ] 对缺字段、软删除、无记录、分页截断采用显式分支，不能把错误当零条记录触发提示。
-- [ ] 提醒建议保留为未确认动作；没有明确时间时返回待填写字段，不编造医疗安排或精确时间。
+- [x] 提醒建议保留为未确认动作；没有明确时间时返回待填写字段，不编造医疗安排或精确时间。
 
 **固定规则语义：**下表是把原方案条件转成可测试约定，不是新增临床阈值。
 
@@ -194,12 +194,12 @@
 
 **修改范围：**新增 `backend/internal/app/agent_service.go`，扩展记录/家庭仓储的必要查询，使用 AG-A01 仓储。
 
-- [ ] 实现指定授权家庭的 `Patrol`；近七天事件、最后称重、待办分开查询，不用七天内“没称重”推断十四天没称重。
-- [ ] 统计使用完整聚合或分页；当前 `ListByFamily` 有 500/1000 条上限，需要补齐查询能力，证据展示可限量但计数不能截断。
-- [ ] 将规则结果变为 `rule-engine-v1` 消息，健康提示附固定免责声明，保存猫咪、规则版本、时间窗口与证据来源。
-- [ ] 用“家庭 + 猫咪/家庭范围 + 规则 + 版本 + 日/周/事件窗口”生成唯一键；唯一冲突按已生成处理，不能靠先查后写保证去重。
-- [ ] 重跑不复活已忽略消息；新窗口允许按规则再次提醒。非 danger 提示每日最多三条，danger 不因普通消息额度被隐藏；按危险度排序。
-- [ ] 当用户点击创建提醒时，从服务端消息生成/补全唯一草稿。若直接在消息中预置完整草稿，仍须符合 AG-A05 的版本和确认机制。
+- [x] 实现指定授权家庭的 `Patrol`；近七天事件、最后称重、待办分开查询，不用七天内“没称重”推断十四天没称重。
+- [x] 统计使用完整聚合或分页；当前 `ListByFamily` 有 500/1000 条上限，需要补齐查询能力，证据展示可限量但计数不能截断（记录与计划提醒按游标读取；消息额度使用数据库计数）。
+- [x] 将规则结果变为 `rule-engine-v1` 消息，健康提示附固定免责声明，保存猫咪、规则版本、时间窗口与证据来源。
+- [x] 用“家庭 + 猫咪/家庭范围 + 规则 + 版本 + 日/周/事件窗口”生成唯一键；唯一冲突按已生成处理，不能靠先查后写保证去重（代码和内存测试已覆盖，数据库唯一索引待独立测试库验证）。
+- [x] 重跑不复活已忽略消息；新窗口允许按规则再次提醒。非 danger 提示每日最多三条，danger 不因普通消息额度被隐藏；按危险度排序（按家庭行锁在事务内计数和写入，真实 MySQL 并发验收待办）。
+- [x] 当用户点击创建提醒时，从服务端消息生成/补全唯一草稿。若直接在消息中预置完整草稿，仍须符合 AG-A05 的版本和确认机制（现用同一消息的 `PATCH draft` 首次版本 0→1）。
 
 **测试/验收：**重复巡检、并发巡检、忽略后重跑、超量记录及不同家庭/猫咪互不干扰；检查实际消息行数与来源引用。
 
@@ -208,10 +208,10 @@
 **修改范围：**新增 `backend/internal/app/agent_action_service.go`，Agent 与提醒仓储事务适配、审计。
 
 - [ ] 实现创建/编辑提醒草稿，校验标题、猫咪范围、时间和期限，服务器保存规范化内容；建议有效期默认 24 小时且可配置。
-- [ ] `ConfirmReminderDraft` 从消息加载草稿；确认请求只提交预期版本，不重新信任任意 `family_id / user_id / payload`。
-- [ ] 再次校验登录身份、家庭成员资格、消息可见性、猫咪归属、Agent 开关、草稿状态、有效期和计划时间。
-- [ ] 在同一数据库事务中锁消息行、创建提醒、写审计、标记 confirmed 并保存 reminder ID。所有仓储使用同一个事务句柄。
-- [ ] 已确认消息的重复请求直接返回同一提醒；编辑与确认并发通过版本检查失败；拒绝和过期不能确认。
+- [x] `ConfirmReminderDraft` 从消息加载草稿；确认请求只提交预期版本，不重新信任任意 `family_id / user_id / payload`。
+- [x] 再次校验登录身份、家庭成员资格、消息可见性、猫咪归属、Agent 开关、草稿状态、有效期和计划时间（应用层及事务内复核；真实数据库并发验证待办）。
+- [x] 在同一数据库事务中锁消息行、创建提醒、写审计、标记 confirmed 并保存 reminder ID。所有仓储使用同一个事务句柄（源码路径已接通，原子回滚待 MySQL 验证）。
+- [x] 已确认消息的重复请求直接返回同一提醒；编辑与确认并发通过版本检查失败；拒绝和过期不能确认（业务测试通过，数据库并发仍待验收）。
 - [ ] `DismissMessage` 幂等；忽略已确认消息仅隐藏该消息，不撤销正式提醒。事务失败不留下孤立提醒或假成功状态。
 
 **测试/验收：**双击/并发确认只创建一条；注入提醒写入或消息更新失败时整体回滚；无权用户、旧版本、过去时间及过期草稿被拒绝。
@@ -220,13 +220,13 @@
 
 **修改范围：**新增 `backend/internal/infrastructure/scheduler/agent_patrol.go` 或同级实现，`config.go`、`cmd/server/main.go`、家庭分页扫描和持久化调度进度；必要新增任务状态 migration。
 
-- [ ] 实现 `AI_AGENT_ENABLED / AI_AGENT_PATROL_TIMES / AI_AGENT_LLM_ENHANCE` 的默认值、显式环境变量绑定和校验；测试读取实际环境变量，不只测试默认值。
-- [ ] 单实例 `time.Ticker` 负责唤醒，按家庭时区判断任务。日规则在默认 08:00 和 20:00 均执行，消息按日期去重；R-04 周日 20:00 单独执行。
-- [ ] 持久化最后成功调度时点与失败状态，包括“扫描成功但零消息”；08:00 和 20:00 的执行进度分别记录。启动按策略补跑最近遗漏窗口，禁止反复全历史回放。
-- [ ] 新增家庭游标分页，忽略已删除家庭。任务以受限系统作用域调用巡检；用户 API 仍走用户鉴权。
-- [ ] 新增 danger 记录尽快生成事件消息：可用持久化变更游标的短周期扫描，初始扫描间隔 30 秒；扫描依据 `created_at + id`，不能用业务发生时间漏掉补录。
-- [ ] 事件消息引用新增记录，按 record ID 去重；进度只在处理成功后前移，支持重启重放。这里表示应用内提示，不发送外部通知。
-- [ ] 限制单家庭执行时间 30 秒、并发和每批数量；单家庭失败记录并继续其他家庭。应用退出时取消并等待任务，避免 goroutine 泄漏。
+- [x] 实现 `AI_AGENT_ENABLED / AI_AGENT_PATROL_TIMES / AI_AGENT_LLM_ENHANCE` 的默认值、显式环境变量绑定和校验；测试读取实际环境变量，不只测试默认值。
+- [x] 单实例 `time.Ticker` 负责唤醒，按家庭时区判断任务。日规则在默认 08:00 和 20:00 均执行，消息按日期去重；R-04 周日 20:00 单独执行（按计划时刻计算补跑）。
+- [x] 持久化最后成功调度时点与失败状态，包括“扫描成功但零消息”；08:00 和 20:00 的执行进度分别记录。启动按策略补跑最近遗漏窗口，禁止反复全历史回放（迁移/持久化真实库验收待办）。
+- [x] 新增家庭游标分页，忽略已删除家庭。任务以受限系统作用域调用巡检；用户 API 仍走用户鉴权。
+- [x] 新增 danger 记录尽快生成事件消息：可用持久化变更游标的短周期扫描，初始扫描间隔 30 秒；扫描依据 `created_at + id`，不能用业务发生时间漏掉补录（真实库索引/游标待验证）。
+- [x] 事件消息引用新增记录，按 record ID 去重；进度只在处理成功后前移，支持重启重放。这里表示应用内提示，不发送外部通知。
+- [x] 限制单家庭执行时间 30 秒、并发和每批数量；单家庭失败记录并继续其他家庭。应用退出时取消并等待任务，避免 goroutine 泄漏。
 - [ ] 首版默认单个调度执行实例；部署成多实例前启用数据库领取/锁保护，不能假定消息去重同时解决所有调度状态竞争。
 
 **测试/验收：**固定时钟验证 07:59/08:00、周日、跨日、重启补跑、零消息进度；模拟一家庭失败不影响下一家庭；关闭开关停止新任务；事件补录不漏报。
@@ -235,12 +235,12 @@
 
 **修改范围：**`backend/internal/transport/http/handler/agent.go`、handler 构造器、路由、错误映射、OpenAPI、`main.go`。
 
-- [ ] 实现第 8 节阶段 A 的列表、详情、编辑、确认、忽略和巡检入口；校验分页、过滤、请求体长度与版本。
-- [ ] 用户 API 放在现有 `/api/v1/families/:familyId` 认证组；逐资源检查家庭和消息可见性。
-- [ ] `/api/v1/internal/agent/patrol` 保留原方案路径语义，限制为请求中目标家庭的真实 admin，手动执行只针对该家庭并受限流；应用层也复核角色。
-- [ ] 后台调度直接调用受限服务方法，不通过公开 HTTP 模拟 admin；不使用 `RequireAdmin` 占位实现作为唯一校验。
-- [ ] 对齐 Envelope、状态码和小程序 method override；确认端点不得让客户端再直接调用普通创建提醒接口。
-- [ ] 通过真实 handler/router 链路测试注入成功，不能只测试 service 后遗漏路由注册。
+- [x] 实现第 8 节阶段 A 的列表、详情、编辑、确认、忽略和巡检入口；校验分页、过滤、请求体长度与版本（16 KiB Agent JSON 上限；真实路由测试待执行）。
+- [x] 用户 API 放在现有 `/api/v1/families/:familyId` 认证组；逐资源检查家庭和消息可见性。
+- [x] `/api/v1/internal/agent/patrol` 保留原方案路径语义，限制为请求中目标家庭的真实 admin，手动执行只针对该家庭并受限流与审计；应用层复核角色（进程内每来源 IP 每分钟 3 次，联调待验收）。
+- [x] 后台调度直接调用受限服务方法，不通过公开 HTTP 模拟 admin；不使用 `RequireAdmin` 占位实现作为唯一校验。
+- [x] 对齐 Envelope、状态码和小程序 method override；确认端点不得让客户端再直接调用普通创建提醒接口。
+- [x] 通过真实 handler/router 链路测试注入成功，不能只测试 service 后遗漏路由注册（认证/越权/参数/限流与合法编辑→确认→忽略路径已执行通过；真实 MySQL 另属 A09）。
 
 **验收：**未登录、非成员、普通成员调用 admin 巡检、跨家庭消息 ID 均正确拒绝；合法列表、编辑、确认、忽略路径完整运行。
 
@@ -248,14 +248,14 @@
 
 **修改范围：**`miniprogram/src/api/endpoints.ts`、`types/agent.ts`、`stores/agent.ts`、`pages.json`、`utils/navigation.ts`、`pages/today/index.vue`、新增 `pages/agent/index.vue` 与 Agent 组件。
 
-- [ ] 新增 `agentApi`，沿用统一 client 和响应解包；GET 显式设置 method，聊天后续使用 AI 超时客户端。
-- [ ] 注册页面和 `/agent` 路由，支持 `messageId / catId / sessionId` 等参数；使用 `useProtectedPage` 和家庭初始化状态。
-- [ ] 今日页增加管家消息区，默认展示优先级最高的两条，提供“查看全部”；加载失败不阻断今日页原有功能。
-- [ ] A 阶段先完成 Agent 消息列表/详情页，对话入口显示尚未启用或相应降级状态，不让今日页跳到空白未注册页面。
-- [ ] 证据卡片展示来源时间、猫咪和内容；点击进入正确记录/趋势。现有记录页若无按 ID 定位能力，补充最小筛选和定位支持；不能把查不到的目标导航当成功。
-- [ ] 操作卡片支持编辑猫咪、标题和具体时间，展示确认/忽略、处理中、失败、已确认和过期状态；拿到后端成功后更新提醒 store。
-- [ ] 导航仅允许已定义动作，处理 query 与 tab 页参数传递，不能直接依赖当前无法识别的 `/records?cat=...` 映射。
-- [ ] 切换家庭/登出清理 Agent 状态；通过请求版本或家庭标识阻止旧请求晚到覆盖新家庭界面。
+- [x] 新增 `agentApi`，沿用统一 client 和响应解包；GET 显式设置 method，聊天后续使用 AI 超时客户端。
+- [x] 注册页面和 `/agent` 路由，支持 `messageId / catId / sessionId` 参数；使用 `useProtectedPage` 和家庭初始化状态。
+- [x] 今日页增加管家消息区，默认展示优先级最高的两条，提供“查看全部”；加载失败不阻断今日页原有功能。
+- [x] A 阶段完成 Agent 消息列表/详情页，对话入口显示尚未启用，不让今日页跳到空白未注册页面。
+- [x] 证据卡片展示来源时间、猫咪和内容；原始记录通过新增按 ID 详情接口定位，趋势进入对应猫咪趋势页；查不到的目标明确显示失败（真机导航待验证）。
+- [x] 操作卡片支持编辑猫咪、标题和具体时间，展示确认/忽略、处理中、失败、已确认和过期状态；后端成功后更新提醒 store（设备时区选时，真机流程待验证）。
+- [x] 导航仅允许已定义动作，处理 query 与 tab 页参数传递，不依赖无法识别的 `/records?cat=...` 映射。
+- [x] 切换家庭/登出清理 Agent 状态；通过请求序号与家庭标识阻止旧请求晚到覆盖新家庭界面。
 
 **测试/验收：**今日页 → 消息 → 查看证据 → 编辑提醒 → 确认 → 提醒页看见真实条目；双击、断网、401、切换家庭和忽略状态都可验证。
 
@@ -277,12 +277,12 @@
 
 **修改范围：**新增 `backend/internal/infrastructure/ai/` 实现、应用层 Provider 接口与类型、Fake Provider；扩展 `config.go` 和 `main.go`。
 
-- [ ] 定义 `LLMProvider.ChatWithTools` 及请求/响应类型，保留原方案接口意图；补齐工具调用 ID、工具结果关联、usage、停止原因及协议所需上下文项。
-- [ ] 实现一个可配置供应商适配器，复用 `AI_BASE_URL / AI_API_KEY / AI_MODEL / timeout / retries`。实现前核对实际供应商官方接口，不假设所有兼容服务行为相同。
-- [ ] 模型启用且配置缺失时给出可识别错误；Agent 未启用或仅规则模式时不因缺 API Key 阻断核心服务启动。
-- [ ] 限制 HTTP 超时、响应体大小和有限重试，支持 context 取消；不重试无效参数或权限错误，不在错误信息输出授权头。
+- [x] 定义 `LLMProvider.ChatWithTools` 及请求/响应类型，保留原方案接口意图；补齐工具调用 ID、工具结果关联、usage、停止原因及协议所需上下文项。
+- [x] 实现可配置的 Chat Completions function-tools 适配器，复用 `AI_BASE_URL / AI_API_KEY / AI_MODEL / timeout / retries`；依据官方接口文档核对协议形状，仅适用于确实支持该协议的供应商，真实密钥联调待办。
+- [x] 模型启用且配置缺失时给出 `ErrLLMUnavailable`；Agent 未启用或仅规则模式时不因缺 API Key 阻断核心服务启动。
+- [x] 限制 HTTP 超时、响应体大小和有限重试，支持 context 取消；不重试无效参数或权限错误，不在错误信息输出授权头。
 - [ ] 初始采用非流式工具调用；全轮聊天预算默认 25 秒，低于当前小程序 AI 请求 30 秒与后端写超时，重试不能超出全轮预算。
-- [ ] 用 `httptest.Server` 和 Fake Provider 验证普通回复、单次/多次工具调用、错误 JSON、429、5xx、超时及取消。
+- [x] 用 `httptest.Server` 和 Fake Provider 的契约接口验证普通回复、单次/多次工具调用、错误 JSON、429、5xx、超时及取消（真实供应商联调另列 B06）。
 
 **验收：**没有真实密钥也能运行 Provider 契约测试；测试证明会请求配置中的地址/模型，工具调用结果可完整往返；日志不含密钥或全文病历。
 
@@ -290,13 +290,13 @@
 
 **修改范围：**新增 `backend/internal/app/agent_tools.go`，必要的 `agent_query_service.go`，复用猫咪、健康档案、记录、趋势和草稿服务。
 
-- [ ] 注册且只注册 `listRecords / getCatProfile / getTrends / createReminderDraft`，分别定义 JSON Schema 与服务端参数校验。
-- [ ] `family_id / user_id` 来自认证后的服务端上下文；客户端/模型提交这些越权参数时不覆盖服务端范围。
-- [ ] 每次按家庭核验猫咪和相关资源，返回字段白名单；通过查询门面读取，不向模型暴露任意 SQL、密钥、仓储对象或家庭成员联系方式。
-- [ ] `listRecords` 默认七天，days 限制 1–90、limit 限制 1–50，合法类型沿用项目枚举；返回证据 ID、完整时间、截断信息。
-- [ ] `getCatProfile` 合并基础信息和已有 `CatHealthProfileRepo`，区分无档案与查询失败。
-- [ ] `getTrends` 输出指定指标的确定性统计、单位、缺测和覆盖信息。可复用 `CareService` 查询代码，但对 Agent 增加完整聚合及证据，不能把默认 normal/0 作为观测结果。
-- [ ] `createReminderDraft` 复用 AG-A05，返回可追溯消息/草稿 ID；工具调用结束前数据库中不得出现正式提醒。
+- [x] 注册且只注册 `listRecords / getCatProfile / getTrends / createReminderDraft`，分别定义 JSON Schema 与服务端参数校验。
+- [x] `family_id / user_id` 来自认证后的服务端上下文；客户端/模型提交这些越权参数时不覆盖服务端范围。
+- [x] 每次按家庭核验猫咪和相关资源，返回字段白名单；通过查询门面读取，不向模型暴露任意 SQL、密钥、仓储对象或家庭成员联系方式。
+- [x] `listRecords` 默认七天，days 限制 1–90、limit 限制 1–50，合法类型沿用项目枚举；返回证据 ID、完整时间、截断信息。
+- [x] `getCatProfile` 合并基础信息和已有 `CatHealthProfileRepo`，区分无档案与查询失败。
+- [x] `getTrends` 输出指定指标的确定性统计、单位、缺测和覆盖信息。可复用 `CareService` 查询代码，但对 Agent 增加完整聚合及证据，不能把默认 normal/0 作为观测结果。
+- [x] `createReminderDraft` 复用 AG-A05，返回可追溯消息/草稿 ID；工具调用结束前数据库中不得出现正式提醒。此处由无数据库仓储替身验证，真实 MySQL 事务仍待验收。
 - [ ] 会话初始化时提供经授权的猫咪 ID/名称候选，让模型能选择现有 ID；同名或指代不明时返回澄清，不新增第五个工具来规避设计范围。
 
 **测试/验收：**四个工具分别覆盖有效参数、边界、未知工具/字段、跨家庭 cat ID、缺数据和读取失败；确认前正式提醒数量不变。
@@ -535,7 +535,69 @@ npm run build:mp-weixin
 
 ## 12. 开发执行日志
 
-本次仅创建任务文档。实际开发从 AG-00 开始，所有功能任务保持未完成。
+文档初建时仅完成任务拆解；以下按日期追加实际开发记录，未满足的验收项继续保持未完成。
+
+### 2026-09-28 / Codex：AG-01
+
+状态：完成。实际修改：`backend/internal/app/agent_dto.go`、`agent_service.go`、`backend/internal/transport/http/handler/agent.go`、`backend/openapi/openapi.yaml`、`backend/.env.example`、`miniprogram/src/types/agent.ts`；新增 `docs/agent-api-contract.md`。统一 `next_cursor` 必有、分页 1–50、聊天幂等键必填及输入长度，并记录证据、权限、时间窗、错误码和模型预算。固定默认值写在 Go DTO 常量和配置模板注释中，目前不提供环境变量覆盖。
+
+验证命令及工作目录：`backend/` 执行 `go test ./internal/app ./internal/transport/http/... -count=1` 通过（transport 包无测试）；`miniprogram/` 执行 `npm.cmd run type-check` 通过，并用 Node YAML 解析器解析 OpenAPI 成功。跳过：真实 MySQL、真实模型、微信开发者工具；这些是后续任务的集成验收，不计入本任务通过范围。与任务文档不同之处：契约补充说明放在 `docs/agent-api-contract.md`；现有业务实现已先于任务勾选存在，后续按依赖重新核验。剩余问题 / 下一任务：AG-A01，核对仓储作用域、游标与事务及迁移实测。
+
+### 2026-09-28 / Codex：AG-A01～AG-A03 持续实施
+
+状态：进行中，三个任务总表均未勾选。实际修改：`backend/internal/domain/model/agent.go`、`backend/internal/domain/repository/repository.go`、`backend/internal/infrastructure/persistence/mysql/agent_repo.go`、`backend/internal/app/agent_service.go`、`agent_rules.go`、`reminder_service.go` 与对应测试；迁移 `008_agent_idempotency.down.sql`、`009_agent_message_linkage.up.sql`、`009_agent_message_linkage.down.sql`；同步 `backend/openapi/openapi.yaml`、`miniprogram/src/types/agent.ts` 和契约说明。修复分页游标跳过一条、仓储单条操作缺家庭作用域、私有消息只信任消息 user_id、事务行锁、提醒新计划时间允许过去一分钟等问题；提醒校验在普通提醒与 Agent 间共用。R-01 按猫展开并去重，R-02 仅识别明确稀便/水样，R-04 取每猫全历史最近称重且证据指向记录或猫咪建档，R-06 记录查询范围。
+
+验证：`backend/` 的 `go build ./...`、`go vet ./...` 通过；`go test ./internal/app -run 'TestEvaluateRules|TestReminderValidation|TestAgentMessagePage' -count=1` 通过；`miniprogram/` 的 `npm.cmd run type-check` 通过。`go test ./internal/app` 在修改前通过，修改后一次执行遭 Windows Application Control 拦截临时测试程序；针对性测试随后通过。`MYSQL_TEST_DSN` 未设置，未运行迁移、索引、事务与回滚的真实 MySQL 测试，也未触碰业务库。剩余：补齐仓储软删除与完整数据分页、提醒到期查询及状态、规则全边界和高记录量测试；在明确隔离的测试库执行迁移/并发/事务验收后才能勾选 AG-A01～A03。下一步继续 AG-A01 的数据库验证条件和 AG-A02 的到期查询能力。
+
+### 2026-09-28 / Codex：AG-A02～AG-A05 继续实现
+
+状态：进行中，任务总表和阶段 A 验收仍未勾选。实际修改：`backend/internal/app/agent_service.go`、`agent_service_test.go`、`reminder_service.go`、`reminder_validation_test.go`、`agent_rules.go`、`agent_rules_test.go`，仓储接口和 MySQL 实现，Agent 模型/DTO、OpenAPI、小程序类型与 store；新增 `010_agent_reminder_schedule_index.up/down.sql`、`011_agent_message_display_status.up/down.sql`。到期提醒改为按计划时间区间和 `(scheduled_at,id)` 游标读取，501 条待办测试覆盖原 500 条截断；家庭消息日额度改为数据库计数。草稿确认要求未来绝对时间，状态更新同时检查旧版本与旧状态，避免过期请求覆盖已确认提醒。忽略已确认消息仅写 `display_status=dismissed`，保留正式提醒与 `action_status=confirmed`；确认事务内复核成员/猫咪并写审计日志。
+
+验证：`backend/` 的针对性命令 `go test ./internal/app -run 'TestConfirmDraft|TestDismissConfirmed|TestStaleDismiss' -count=1` 通过，`go build ./...` 通过；`miniprogram/` 的 `npm.cmd run type-check` 通过。另一次完整 `go test ./... -count=1` 中 `internal/app` 与 `scheduler` 通过，`backend/tests` 的临时可执行文件被 Windows Application Control 拦截，因此完整测试失败，不能记为通过。Go vet 和 OpenAPI YAML 解析通过。用户已选择继续无数据库开发；MySQL 迁移、索引、并发、事务回滚仍未验证。后续需要完成 A04 去重键规则版本与并发额度、A05 真实 MySQL 验收、A06 调度持久化和事件扫描、A07/A08 真正接口与小程序闭环，再继续 B/C。
+
+补充验证（同日）：`backend/` 的 `go vet ./...`、`go build ./...`、`go test ./internal/app ./internal/infrastructure/scheduler -count=1` 均通过；完整 `go test ./... -count=1` 再次只在 `backend/tests` 被 Application Control 拦截，非业务断言失败。`miniprogram/` 的 `npm test` 通过 3/3，`npm run build:mp-weixin` 构建完成；OpenAPI YAML 解析及 Agent 字段检查通过。微信开发者工具/真机操作未做，不能以构建替代交互验收。
+
+### 2026-09-28 / Codex：AG-A04 去重键与 AG-A06 调度事件扫描
+
+状态：继续实施；AG-A04、AG-A06 总表保持未完成。实际修改：规则键加入 `RuleVersion`；巡检唯一冲突后读取已存消息，不把未写入对象作为成功结果。新增 `012_agent_task_progress.up/down.sql`、`agent_task_progress_repo.go` 和 `(created_at,id)` 记录扫描；调度进度以家庭和窗口键分别保存成功/失败、零消息成功及事件游标。启动立即补跑最近两个到期时段，后续每 30 秒扫描；按原计划时间计算周日 R-04 和跨日窗口。danger 补录事件按记录 ID 去重，成功处理后才推进游标；家庭失败不阻塞其他家庭，退出时取消并等待任务。配置增加真实环境变量绑定测试，Go 固定时钟测试覆盖 07:59/08:00、重启、零消息、周日补跑、事件失败重放及补录。
+
+验证（`backend/`）：`go test ./internal/app ./internal/infrastructure/scheduler ./internal/platform/config -count=1`、`go vet ./...`、`go build ./...` 通过。`MYSQL_TEST_DSN` 仍未设置，迁移 012 及真实库进度/索引未执行；多实例领取锁和 A04 普通消息并发额度仍待实现，故不勾选总任务。用户要求先继续无数据库开发；未操作业务库。下一步继续 AG-A07/A08 的接口与小程序闭环，并在独立测试库可用时补 A01/A05/A06 集成验收。
+
+### 2026-09-30 / Codex：AG-A07/A08 代码路径与界面
+
+状态：继续实施；AG-A07/A08 总表保持未完成。后端新增原始记录按 ID 详情接口（家庭成员权限与软删除过滤），Agent 消息详情返回服务端保存的草稿供恢复编辑；Agent JSON 请求限制 16 KiB，手动巡检按真实 admin 校验、每来源 IP 每分钟限 3 次并写审计。真实 router 测试代码覆盖认证、跨家庭、错误分页、method override、手动巡检拒绝及限流。小程序今日页接入前两条巡检消息，Agent 页实现列表、证据详情、编辑猫咪/标题/时间、确认、忽略、状态与过期显示，新增按 ID 原始记录详情页；家庭切换和登出清空消息状态，请求序号避免旧响应覆盖。OpenAPI 和契约同步。
+
+本轮先执行 Go 测试时，`TestChatRecoversSessionWhenFirstResponseIsRetried` 实际暴露一个幂等键复用漏洞：仓储测试替身随机先返回助手消息，导致不同内容可复用同一键。已改为先固定查询用户消息并检查原文，随后重跑的临时测试程序连续被 Windows Application Control 拦截，**修复后的运行结果尚未取得**；新 router 测试也受同一限制。`backend/` 的 `go vet ./...`、`go build ./...` 和 `go test -c` 编译 app/router 测试包通过，只能证明可编译。`miniprogram/` 的 `npm.cmd run type-check`、`npm.cmd run build:mp-weixin` 通过；OpenAPI YAML 解析通过。未设置 `MYSQL_TEST_DSN`，未运行迁移或事务测试；微信开发者工具/真机尚未验收，故 A 阶段闭环不标完成。下一步需要恢复 Go 测试执行条件、独立 MySQL 验证 A01/A05/A06，以及实机确认 A08，再进入 B 阶段。
+
+补充实现（同日）：AG-A04 普通消息每日三条额度改为 `AgentRepo.CreatePatrolMessage` 内锁定家庭行、统计本地日窗口并写入消息的单事务路径；danger 跳过普通额度。并发同规则唯一冲突仍回查已存行，额度满时若该规则已写入也返回原行。`go vet ./...`、`go build ./...`、app/router 测试包编译通过；MySQL 并发执行尚未验证。
+
+验证更新（同日）：随后 Windows Application Control 允许执行 Go 测试；`backend/` 的 `go test ./... -count=1` 全部通过，包括此前失败的聊天幂等键用例、Agent router、Provider 和 `backend/tests`。`backend/tests` 因 `MYSQL_TEST_DSN` 未设置而跳过数据库集成用例，因此绿色结果不代表迁移/事务验收。`miniprogram/` 的 `npm.cmd test` 通过 3/3；此前本轮 `type-check` 与微信构建通过。
+
+### 2026-09-30 / Codex：AG-B01 Provider 基础实现
+
+状态：代码与无密钥协议测试完成；任务总表暂不勾选，整轮共享 25 秒预算需要 B03 工具循环落地，真实供应商兼容性尚未联调。新增 `backend/internal/app/agent_llm.go` 的请求/响应和 Fake Provider，`backend/internal/infrastructure/ai/chat_completions.go` 非流式工具调用适配器及 `httptest.Server` 测试；`main.go` 注入 Provider。适配器保留工具调用 ID、原始参数、结果关联、usage 和停止原因；限制一次调用及重试合计 25 秒、响应 1 MiB、最多两次重试。远程地址强制 HTTPS，本地回环允许 HTTP，禁止带授权头重定向，错误不输出密钥或正文。配置继续复用现有 `AI_*`，缺失时仅模型调用返回可识别错误，规则巡检不受影响。协议选择与限制见 `docs/agent-llm-provider.md`，依据官方 OpenAI Chat Completions/function calling 文档；其他兼容供应商和需 Responses API 的模型未验证。
+
+验证（`backend/`）：`go test ./internal/infrastructure/ai ./internal/transport/http/router -count=1`、`go vet ./...`、`go build ./...` 均通过。无真实模型密钥，未调用外部模型；B02/B03/B04/B05/B06 和 C 阶段仍未实现或验收。
+
+### 2026-09-30 / Codex：AG-B02 四个受控工具（独立调用层）
+
+状态：四个工具的查询、参数校验与草稿动作已实现并通过应用层测试；总表暂不勾选。新增 `backend/internal/app/agent_tools.go`、`agent_tool_actions.go`、`agent_tools_test.go`，`main.go` 注入健康档案仓储。模型参数不接受家庭/用户 ID，执行范围由服务端鉴权上下文提供；猫咪按家庭复核，读取只返回白名单。记录默认七天并限制 1–90 天、1–50 条；趋势按 `(occurred_at,id)` 分页聚合全部匹配记录，报告缺测日期、无数值记录与证据截断；健康档案区分不存在和读取故障。提醒草稿走既有 `EditDraft` 和版本校验，测试证明确认前没有正式提醒。工具调用需要 B03 会话循环传入服务端草稿目标；候选猫咪已提供受权查询方法，但尚未注入会话初始化，指代不明的澄清也尚未落地，因此最后一项保持未勾选。
+
+验证（`backend/`）：`go test ./internal/app -run 'TestAgentTool|TestAgentListRecords|TestAgentGetCatProfile|TestAgentGetTrends|TestAgentReminderTool' -count=1`、`go vet ./...`、`go build ./...` 通过。随后 `go test ./... -count=1` 中 app、scheduler、router、config、tests 等包通过，只有 `internal/infrastructure/ai` 的临时测试可执行文件被 Windows Application Control 拦截；单独重跑该包仍被拦截，属于执行环境限制，不能记为全量测试通过。`MYSQL_TEST_DSN` 未设置，未运行真实 MySQL 迁移/事务，也未用真实模型调用工具。
+
+补充修正（同日）：趋势读取现在区分记录中明确的 `0` 和无数值字段，保留有效零值观测并将缺字段计入 `records_without_value`。`go test ./internal/app -count=1` 通过。
+
+### 2026-09-30 / Codex：AG-B03 模型工具循环核心（尚未接入聊天入口）
+
+状态：进行中，总表与子项暂不勾选。新增 `backend/internal/app/agent_chat_loop.go` 和测试，固定版本提示词并注入当前时间、家庭时区、授权猫咪 ID/名称；提示把记录与候选当作数据、歧义先澄清、不能把缺记录当作没发生或提供诊断/药量。独立循环通过 Fake Provider 验证一次工具调用、重复调用复用、非法参数反馈、引用 ID 白名单、无效模型输出和取消；最多四次模型请求、八个工具调用，整轮 `context` 限 25 秒。最终答案要求结构化 JSON，未知证据 ID 不进入返回的证据数组。
+
+验证（`backend/`）：`go test ./internal/app -count=1` 通过。**该循环尚未由现有 `Chat` 路径调用**；工具调用/结果持久化、历史截断、草稿目标及故障恢复尚未实现，因此不能作为阶段 B 功能验收。下一步先建立可重试的轮次持久化，再连接聊天入口，避免中断时生成重复草稿。
+
+补充修复（同日）：检查 AG-B04 幂等索引时发现 `ai_agent_messages.client_message_id` 在迁移中可为 `NULL`，但 Go 模型原先使用普通 `string`；巡检消息未设置键时可能写成空串，导致同家庭多条巡检消息触发唯一冲突。现将模型字段改为 `*string`，聊天用户/助手消息显式提供键，巡检及工具消息保留 `NULL`；内存仓储替身同步按非空键比较；迁移 008 在加唯一索引前把历史空串归一化为 `NULL`。`go vet ./...`、`go build ./...` 通过。此次修改后的 `go test ./internal/app -count=1` 两次均因 Windows Application Control 拦截临时可执行文件而未运行，不能记为测试通过；真实 MySQL 唯一索引行为还需独立测试库验证。
+
+补充实现（同日）：`createReminderDraft` 在收到服务端轮次 ID 时才懒创建家庭可见草稿目标，目标主键由轮次 ID 确定性派生；同轮同内容重试复用 pending 草稿，不同内容返回冲突，正式提醒仍未创建。`runAgentTurn` 在工具返回草稿后更新本轮目标与版本。`go test ./internal/app -run 'TestAgentReminderTool|TestAgentTurn' -count=1` 通过；真实 MySQL 去重、并发和轮次落库仍待验收。
+
+验证更新（同日）：`go test ./... -count=1` 中 app、AI 适配器、router、config、tests 等包均通过，scheduler 测试临时可执行文件被 Windows Application Control 拦截；单独重跑 scheduler 仍被拦截，因此全量测试不能记为通过。`go vet ./...`、`go build ./...` 通过。`backend/tests` 的数据库用例仍因缺少 `MYSQL_TEST_DSN` 而跳过。
 
 每完成一个任务追加一条，不覆盖上一轮记录：
 

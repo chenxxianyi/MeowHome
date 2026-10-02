@@ -39,29 +39,32 @@ const (
 // JSON 字段名与小程序 agent.ts 严格一致；列表接口返回
 // {messages, next_cursor}，聊天接口返回 {session_id, message, degraded}。
 type AgentMessage struct {
-	ID           string          `json:"id"`
-	SessionID    string          `json:"session_id,omitempty"` // 对话消息所属会话；巡检消息可空
-	Role         Role            `json:"role"`
-	Visibility   Visibility      `json:"visibility"`
-	FamilyID     string          `json:"family_id,omitempty"` // 会话恢复/审计用；列表接口可省
-	UserID       string          `json:"user_id,omitempty"`   // 系统消息可空；私有消息必填
-	CatID        string          `json:"cat_id,omitempty"`    // 单猫消息可见的明确归属
-	Type         string          `json:"type"`                // 见 AgentMessageType 常量
-	Severity     string          `json:"severity"`            // info | warning | danger
-	Title        string          `json:"title"`
-	Body         string          `json:"body"`
-	Evidence     []AgentEvidence `json:"evidence,omitempty"`
-	Actions      []AgentAction   `json:"action_suggestions,omitempty"`
-	DraftVersion int             `json:"draft_version,omitempty"` // 消息携带的提醒草稿版本
-	ActionStatus string          `json:"action_status,omitempty"` // pending | confirmed | dismissed | expired
-	GeneratedAt  time.Time       `json:"generated_at"`
-	Model        string          `json:"model"` // rule-engine-v1 | llm-enhance-v1 | chat-llm-v1
-	Disclaimer   string          `json:"disclaimer,omitempty"`
+	ID             string              `json:"id"`
+	SessionID      string              `json:"session_id,omitempty"` // 对话消息所属会话；巡检消息可空
+	Role           Role                `json:"role"`
+	Visibility     Visibility          `json:"visibility"`
+	FamilyID       string              `json:"family_id,omitempty"` // 会话恢复/审计用；列表接口可省
+	UserID         string              `json:"user_id,omitempty"`   // 系统消息可空；私有消息必填
+	CatID          string              `json:"cat_id,omitempty"`    // 单猫消息可见的明确归属
+	Type           string              `json:"type"`                // 见 AgentMessageType 常量
+	Severity       string              `json:"severity"`            // info | warning | danger
+	Title          string              `json:"title"`
+	Body           string              `json:"body"`
+	Evidence       []AgentEvidence     `json:"evidence,omitempty"`
+	Actions        []AgentAction       `json:"action_suggestions,omitempty"`
+	DraftVersion   int                 `json:"draft_version,omitempty"`  // 消息携带的提醒草稿版本
+	DraftReminder  *AgentReminderInput `json:"draft_reminder,omitempty"` // 服务端保存的编辑值
+	DraftExpiresAt *time.Time          `json:"draft_expires_at,omitempty"`
+	ActionStatus   string              `json:"action_status,omitempty"`  // pending | confirmed | dismissed | expired
+	DisplayStatus  string              `json:"display_status,omitempty"` // dismissed 表示在家庭消息列表隐藏，不改变已确认提醒
+	GeneratedAt    time.Time           `json:"generated_at"`
+	Model          string              `json:"model"` // rule-engine-v1 | llm-enhance-v1 | chat-llm-v1
+	Disclaimer     string              `json:"disclaimer,omitempty"`
 }
 
 // AgentEvidence 证据条目：引用必须来自真实查询结果，不得虚构（§2.1 / D12）。
 type AgentEvidence struct {
-	SourceType string    `json:"source_type"` // record | reminder | trend | weight | family_scope
+	SourceType string    `json:"source_type"` // record | reminder | trend | weight | cat_profile | family_scope
 	SourceID   string    `json:"source_id"`   // 记录/提醒 ID；趋势类可空
 	CatIDs     []string  `json:"cat_ids,omitempty"`
 	OccurredAt time.Time `json:"occurred_at,omitempty"`
@@ -131,7 +134,7 @@ type AgentMessageListQuery struct {
 // AgentMessageListResponse 家庭消息列表（仅 visibility=family 且 status≠dismissed）。
 type AgentMessageListResponse struct {
 	Messages   []*AgentMessage `json:"messages"`
-	NextCursor string          `json:"next_cursor,omitempty"`
+	NextCursor string          `json:"next_cursor"`
 }
 
 // AgentChatRequest POST /agent/chat。
@@ -188,23 +191,23 @@ type AgentConfirmRequest struct {
 // AgentConfirmResponse 确认结果：幂等，重复确认返回同一提醒。
 type AgentConfirmResponse struct {
 	Reminder     *AgentReminderResult `json:"reminder"`
-	MessageID    string            `json:"message_id"`
-	ActionStatus string            `json:"action_status"`
+	MessageID    string               `json:"message_id"`
+	ActionStatus string               `json:"action_status"`
 }
 
 type AgentReminderResult struct {
-	ID string `json:"id"`
-	FamilyID string `json:"family_id"`
-	CatID string `json:"cat_id"`
-	Type string `json:"type"`
-	Title string `json:"title"`
-	Subtitle string `json:"subtitle,omitempty"`
-	Time string `json:"time,omitempty"`
-	State string `json:"state"`
-	Icon string `json:"icon,omitempty"`
-	Rule string `json:"rule,omitempty"`
+	ID          string     `json:"id"`
+	FamilyID    string     `json:"family_id"`
+	CatID       string     `json:"cat_id"`
+	Type        string     `json:"type"`
+	Title       string     `json:"title"`
+	Subtitle    string     `json:"subtitle,omitempty"`
+	Time        string     `json:"time,omitempty"`
+	State       string     `json:"state"`
+	Icon        string     `json:"icon,omitempty"`
+	Rule        string     `json:"rule,omitempty"`
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
-	Timezone string `json:"timezone,omitempty"`
+	Timezone    string     `json:"timezone,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
@@ -221,7 +224,7 @@ type AgentPatrolResponse struct {
 // AgentSessionListResponse GET /agent/sessions。
 type AgentSessionListResponse struct {
 	Sessions   []AgentSessionSummary `json:"sessions"`
-	NextCursor string                `json:"next_cursor,omitempty"`
+	NextCursor string                `json:"next_cursor"`
 }
 
 // AgentSessionSummary 会话摘要（仅本人私有会话，§8）。
@@ -235,7 +238,7 @@ type AgentSessionSummary struct {
 // AgentSessionMessagesResponse GET /agent/sessions/:id/messages。
 type AgentSessionMessagesResponse struct {
 	Messages   []*AgentMessage `json:"messages"`
-	NextCursor string          `json:"next_cursor,omitempty"`
+	NextCursor string          `json:"next_cursor"`
 }
 
 // 分页/预算上限（写入 OpenAPI 与配置默认值，AG-01 第 6 条）。

@@ -33,19 +33,25 @@ type AgentMessage struct {
 	DraftPayload        string     `gorm:"type:text"`
 	DraftVersion        int        `gorm:"not null;default:0"`
 	ActionStatus        string     `gorm:"index;type:varchar(16)"`
+	DisplayStatus       string     `gorm:"type:varchar(16)"`
 	GeneratedAt         time.Time  `gorm:"index;not null"`
 	DraftExpiresAt      *time.Time `gorm:"index"`
 	ConfirmedReminderID string     `gorm:"type:varchar(26)"`
 	Model               string     `gorm:"type:varchar(80);not null"`
 	Disclaimer          string     `gorm:"type:text"`
 	// DedupKey 仅用于巡检消息；聊天消息必须保持 NULL，不能用空字符串占用唯一键。
-	DedupKey        *string    `gorm:"uniqueIndex;type:varchar(255)"`
-	ClientMessageID string     `gorm:"type:varchar(128)"`
-	RuleID          string     `gorm:"type:varchar(16)"`
-	RuleVersion     string     `gorm:"type:varchar(32)"`
-	Scope           string     `gorm:"type:varchar(255)"`
-	WindowStart     *time.Time `gorm:"index"`
-	WindowEnd       *time.Time `gorm:"index"`
+	DedupKey *string `gorm:"uniqueIndex;type:varchar(255)"`
+	// nil 表示非聊天消息。MySQL 唯一索引允许多个 NULL；空字符串会让巡检消息互相冲突。
+	ClientMessageID *string `gorm:"type:varchar(128)"`
+	// ToolCallID 关联一次模型工具调用；工具结果仅存受控摘要，不向客户端透出原始响应。
+	ToolCallID  string     `gorm:"type:varchar(128)"`
+	ToolName    string     `gorm:"type:varchar(64)"`
+	TurnID      string     `gorm:"type:varchar(26)"`
+	RuleID      string     `gorm:"type:varchar(16)"`
+	RuleVersion string     `gorm:"type:varchar(32)"`
+	Scope       string     `gorm:"type:varchar(255)"`
+	WindowStart *time.Time `gorm:"index"`
+	WindowEnd   *time.Time `gorm:"index"`
 }
 
 func (AgentMessage) TableName() string { return "ai_agent_messages" }

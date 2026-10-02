@@ -80,6 +80,10 @@ func classify(err error) *errors.AppError {
 	var syntaxErr *json.SyntaxError
 	var typeErr *json.UnmarshalTypeError
 	var validationErrs validator.ValidationErrors
+	var sizeErr *http.MaxBytesError
+	if stderrors.As(err, &sizeErr) {
+		return errors.InvalidRequest(errors.CodeUploadTooLarge, "request body is too large")
+	}
 	if stderrors.As(err, &syntaxErr) || stderrors.As(err, &typeErr) ||
 		stderrors.As(err, &validationErrs) ||
 		stderrors.Is(err, io.EOF) || stderrors.Is(err, io.ErrUnexpectedEOF) {

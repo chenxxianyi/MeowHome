@@ -31,7 +31,7 @@ func (r *DailyRecordRepo) Create(ctx context.Context, rec *model.DailyRecord) er
 // FindByID 按 ID 查找。
 func (r *DailyRecordRepo) FindByID(ctx context.Context, id string) (*model.DailyRecord, error) {
 	var rec model.DailyRecord
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&rec).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&rec).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, repository.ErrNotFound
 		}
@@ -75,6 +75,21 @@ func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRe
 		return nil, err
 	}
 	return out, nil
+}
+
+var _ repository.AgentEventRecordRepo = (*DailyRecordRepo)(nil)
+
+func (r *DailyRecordRepo) ListCreatedAfter(ctx context.Context, q repository.CreatedRecordQuery) ([]*model.DailyRecord, error) {
+	if q.FamilyID == "" || q.Limit < 1 || q.Limit > 500 || (q.AfterAt == nil) != (q.AfterID == "") {
+		return nil, repository.ErrInvalidQuery
+	}
+	tx := r.db.WithContext(ctx).Where("family_id = ? AND deleted_at IS NULL", q.FamilyID)
+	if q.AfterAt != nil {
+		tx = tx.Where("(created_at, id) > (?, ?)", *q.AfterAt, q.AfterID)
+	}
+	var out []*model.DailyRecord
+	err := tx.Order("created_at ASC, id ASC").Limit(q.Limit).Find(&out).Error
+	return out, err
 }
 
 // Delete 软删除记录。

@@ -96,6 +96,12 @@
       }
     },
     {
+      "path": "pages/record-detail/index",
+      "style": {
+        "navigationBarTitleText": "记录详情"
+      }
+    },
+    {
       "path": "pages/inventory/index",
       "style": {
         "navigationBarTitleText": "库存"

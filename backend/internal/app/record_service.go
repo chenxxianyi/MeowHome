@@ -98,6 +98,21 @@ func (s *RecordService) CreateBatch(ctx context.Context, familyID, userID string
 }
 
 // List 查询家庭记录。
+func (s *RecordService) Get(ctx context.Context, familyID, userID, recordID string) (*RecordEnvelope, error) {
+	if err := requireFamilyAccess(ctx, s.members, familyID, userID); err != nil {
+		return nil, err
+	}
+	r, err := s.records.FindByID(ctx, recordID)
+	if err != nil && err != repository.ErrNotFound {
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to read record", err)
+	}
+	if err != nil || r == nil || r.FamilyID != familyID || r.DeletedAt != nil {
+		return nil, errors.NotFound(errors.CodeNotFound, "record not found")
+	}
+	return toRecordEnvelope(r), nil
+}
+
+// List 查询家庭记录。
 func (s *RecordService) List(ctx context.Context, familyID, userID string, q repository.DailyRecordQuery) ([]*RecordEnvelope, error) {
 	if err := requireFamilyAccess(ctx, s.members, familyID, userID); err != nil {
 		return nil, err

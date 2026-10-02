@@ -11,10 +11,11 @@ export type AgentMessageType =
   | 'chat_answer'
   | 'reminder_draft'
 export type AgentActionStatus = 'pending' | 'confirmed' | 'dismissed' | 'expired'
-export type AgentModel = 'rule-engine-v1' | 'llm-enhance-v1' | 'chat-llm-v1'
+// 实际 Provider 模型名由服务端给出，不限于当前规则和降级实现的名称。
+export type AgentModel = string
 
 export interface AgentEvidence {
-  source_type: 'record' | 'reminder' | 'trend' | 'weight' | 'family_scope'
+  source_type: 'record' | 'reminder' | 'trend' | 'weight' | 'cat_profile' | 'family_scope'
   source_id: string
   cat_ids?: ID[]
   occurred_at?: string // RFC3339
@@ -44,7 +45,10 @@ export interface AgentMessage {
   evidence?: AgentEvidence[]
   action_suggestions?: AgentActionSuggestion[]
   draft_version?: number
+  draft_reminder?: AgentReminderInput
+  draft_expires_at?: string
   action_status?: AgentActionStatus
+  display_status?: 'dismissed'
   generated_at: string // RFC3339
   model: AgentModel
   disclaimer?: string
@@ -86,7 +90,7 @@ export interface AgentConfirmRequest {
 
 export interface AgentMessageListResponse {
   messages: AgentMessage[]
-  next_cursor?: string
+  next_cursor: string
 }
 
 export interface AgentChatResponse {
@@ -150,12 +154,12 @@ export interface AgentSessionSummary {
 
 export interface AgentSessionListResponse {
   sessions: AgentSessionSummary[]
-  next_cursor?: string
+  next_cursor: string
 }
 
 export interface AgentSessionMessagesResponse {
   messages: AgentMessage[]
-  next_cursor?: string
+  next_cursor: string
 }
 
 // ── 错误码（与后端对齐；request() 解包后按 code 分支）──
@@ -169,3 +173,4 @@ export type AgentErrorCode =
   | 'FAMILY_FORBIDDEN'
   | 'NOT_FOUND'
   | 'VALIDATION_FAILED'
+  | 'RATE_LIMITED'

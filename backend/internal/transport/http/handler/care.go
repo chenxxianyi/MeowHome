@@ -40,6 +40,16 @@ func (h *Handler) ListRecords(c *gin.Context) {
 }
 
 // CreateRecord 创建单条记录。
+func (h *Handler) GetRecord(c *gin.Context) {
+	record, err := h.record.Get(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId"))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, record)
+}
+
+// CreateRecord 创建单条记录。
 func (h *Handler) CreateRecord(c *gin.Context) {
 	var in app.RecordInput
 	if err := c.ShouldBindJSON(&in); err != nil {

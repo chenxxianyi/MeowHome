@@ -25,7 +25,15 @@ export function toMiniProgramUrl(path: string): string {
   if (path === '/family/expenses') return '/pages/expenses/index'
   if (path === '/medical/upload') return '/pages/medical-upload/index'
   if (path === '/reminders') return '/pages/reminders/index'
-  if (path === '/agent') return '/pages/agent/index'
+  const agent = path.match(/^\/agent(?:\?(.*))?$/)
+  if (agent) {
+    const allowed = new Set(['messageId', 'catId', 'sessionId'])
+    const query = (agent[1] || '').split('&').filter(Boolean).map((part) => {
+      const [key, value = ''] = part.split('=', 2)
+      return allowed.has(key) ? `${key}=${encodeURIComponent(decodeURIComponent(value))}` : ''
+    }).filter(Boolean).join('&')
+    return `/pages/agent/index${query ? `?${query}` : ''}`
+  }
   if (path === '/settings') return '/pages/settings/index'
 
   const quickRecord = path.match(/^\/records\/quick\/([^/?#]+)(?:\?(.+))?$/)
@@ -33,6 +41,9 @@ export function toMiniProgramUrl(path: string): string {
     const suffix = quickRecord[2] ? `&${quickRecord[2]}` : ''
     return `/pages/quick-record/index?type=${encodeURIComponent(quickRecord[1])}${suffix}`
   }
+
+  const recordDetail = path.match(/^\/records\/detail\/([^/?#]+)$/)
+  if (recordDetail) return `/pages/record-detail/index?id=${encodeURIComponent(recordDetail[1])}`
 
   const trends = path.match(/^\/cats\/([^/?#]+)\/trends$/)
   if (trends) return `/pages/trends/index?id=${encodeURIComponent(trends[1])}`

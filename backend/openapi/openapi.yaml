@@ -303,6 +303,24 @@ paths:
         '204':
           description: 删除成功
   # --- Agent（猫管家）---
+  /families/{familyId}/records/{recordId}:
+    get:
+      tags: [records]
+      summary: 按编号读取本家庭未删除的原始记录
+      operationId: getFamilyRecord
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: recordId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 原始记录详情，使用现有 Envelope
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 记录不存在、已删除或不属于当前家庭
   /families/{familyId}/agent/messages:
     get:
       tags: [agent]
@@ -310,6 +328,9 @@ paths:
       description: |
         过滤不可识别的 type/status 时返回 400，不默认为全部数据。
         游标 before 为 `generated_at|id`，不允许跨家庭或绕过权限。
+        仅返回 family 可见消息。默认 20 条，最多 50 条；next_cursor 始终存在，
+        空字符串表示没有下一页。日期窗口按家庭 IANA 时区的本地日历计算，
+        UTC 查询区间使用左闭右开边界。
       operationId: listAgentMessages
       parameters:
         - $ref: '#/components/parameters/FamilyId'
@@ -398,6 +419,7 @@ paths:
       description: |
         服务端从消息行内加载草稿，客户端只提交 expected_version；
         再次校验身份、成员资格、可见性、猫咪归属、开关、草稿状态/有效期/计划时间。
+        确认时草稿必须有未来的绝对 scheduled_at；只有文字时间的草稿可保存但不可确认。
         重复确认返回同一提醒，不新建。
       operationId: confirmAgentReminderDraft
       parameters:
@@ -446,7 +468,10 @@ paths:
       summary: Agent 对话
       description: |
         首轮不携带 session_id 时按 family+user+client_message_id 恢复已创建会话。
-        模型不可用时 degraded=true，返回确定性兜底结果。
+        消息去除首尾空白后长度为 1–2000 个 Unicode 字符。每轮最多携带
+        5 轮历史、4 次模型请求和 8 次工具执行，整体预算 25 秒。
+        模型输出校验失败时返回 AGENT_INVALID_OUTPUT（422）；模型不可用时
+        degraded=true，且兜底内容只能依据已成功取得的授权数据。
       operationId: agentChat
       parameters:
         - $ref: '#/components/parameters/FamilyId'
@@ -465,6 +490,10 @@ paths:
                 $ref: '#/components/schemas/AgentChatEnvelope'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          description: 模型输出不合法；Envelope.code 为 AGENT_INVALID_OUTPUT
+        '503':
+          description: Agent 关闭或模型不可用；Envelope.code 为 AGENT_DISABLED 或 AGENT_UNAVAILABLE
   /families/{familyId}/agent/sessions:
     get:
       tags: [agent]
@@ -531,6 +560,8 @@ paths:
                 $ref: '#/components/schemas/AgentPatrolEnvelope'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          description: RATE_LIMITED；每来源 IP 每分钟最多 3 次
 components:
   parameters:
     FamilyId:
@@ -891,21 +922,32 @@ components:
           items:
             $ref: '#/components/schemas/AgentAction'
         draft_version: { type: integer, minimum: 0 }
+        draft_reminder:
+          $ref: '#/components/schemas/AgentReminderInput'
+        draft_expires_at: { type: string, format: date-time }
         action_status:
           type: string
           enum: [pending, confirmed, dismissed, expired]
+        display_status:
+          type: string
+          enum: [dismissed]
+          description: 忽略后从家庭消息列表隐藏；已确认提醒的 action_status 保持 confirmed
         generated_at: { type: string, format: date-time }
         model:
           type: string
-          enum: [rule-engine-v1, llm-enhance-v1, chat-llm-v1]
+          description: 规则引擎或实际 Provider 模型名；规则巡检为 rule-engine-v1
         disclaimer: { type: string }
     AgentEvidence:
       type: object
       required: [source_type, source_id]
+      description: |
+        R-03/R-05 的 source_type=reminder 且 source_id 为提醒 ID；R-04
+        引用最近称重记录 ID，若从未称重则以 cat_profile 引用猫咪建档 ID；R-06 使用
+        family_scope 和家庭 ID，并在 excerpt 写明查询的本地日期范围。
       properties:
         source_type:
           type: string
-          enum: [record, reminder, trend, weight, family_scope]
+          enum: [record, reminder, trend, weight, cat_profile, family_scope]
         source_id: { type: string, description: 记录/提醒 ID；趋势类可空 }
         cat_ids:
           type: array
@@ -972,8 +1014,8 @@ components:
       required: [client_message_id, message]
       properties:
         session_id: { type: string, description: 首轮可缺省 }
-        client_message_id: { type: string, description: 幂等键，同会话内唯一 }
-        message: { type: string, maxLength: 2000 }
+        client_message_id: { type: string, minLength: 1, maxLength: 128, description: 幂等键，同会话内唯一 }
+        message: { type: string, minLength: 1, maxLength: 2000 }
     AgentSessionSummary:
       type: object
       required: [id, created_at, updated_at]
@@ -1006,7 +1048,7 @@ components:
           properties:
             data:
               type: object
-              required: [messages]
+              required: [messages, next_cursor]
               properties:
                 messages:
                   type: array
@@ -1075,7 +1117,7 @@ components:
           properties:
             data:
               type: object
-              required: [sessions]
+              required: [sessions, next_cursor]
               properties:
                 sessions:
                   type: array
@@ -1089,7 +1131,7 @@ components:
           properties:
             data:
               type: object
-              required: [messages]
+              required: [messages, next_cursor]
               properties:
                 messages:
                   type: array

@@ -44,7 +44,7 @@ func New(
 	registerHealth(r, health)
 
 	if h != nil {
-		registerV1(r, h, cfg.Auth.JWTSecret)
+		registerV1(r, h, cfg.Auth.JWTSecret, my.NewRateLimiter(logger, 3, time.Minute))
 	} else {
 		registerV1Placeholder(r)
 	}
@@ -72,7 +72,7 @@ func registerHealth(r *gin.Engine, health HealthChecker) {
 	})
 }
 
-func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
+func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimiter *my.RateLimiter) {
 	v1 := r.Group("/api/v1")
 	v1.GET("/ping", func(c *gin.Context) {
 		response.OK(c, gin.H{"message": "pong"})
@@ -106,6 +106,7 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
 
 	// 日常记录
 	familyG.GET("/:familyId/records", h.ListRecords)
+	familyG.GET("/:familyId/records/:recordId", h.GetRecord)
 	familyG.POST("/:familyId/records", h.CreateRecord)
 	familyG.POST("/:familyId/records/batch", h.CreateRecordBatch)
 
@@ -144,7 +145,7 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string) {
 	familyG.POST("/:familyId/agent/chat", h.ChatAgent)
 	familyG.GET("/:familyId/agent/sessions", h.ListAgentSessions)
 	familyG.GET("/:familyId/agent/sessions/:sessionId/messages", h.ListAgentSessionMessages)
-	protected.POST("/internal/agent/patrol", h.PatrolAgent)
+	protected.POST("/internal/agent/patrol", patrolLimiter.Handle, h.PatrolAgent)
 }
 
 func registerV1Placeholder(r *gin.Engine) {

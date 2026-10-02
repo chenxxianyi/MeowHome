@@ -285,7 +285,7 @@ func validatePatrolTimes(raw string) error {
 	}
 	for _, item := range strings.Split(raw, ",") {
 		parts := strings.Split(strings.TrimSpace(item), ":")
-		if len(parts) != 2 {
+		if len(parts) != 2 || len(parts[0]) != 2 || len(parts[1]) != 2 {
 			return fmt.Errorf("invalid agent.patrol_times value %q", item)
 		}
 		hour, hourErr := strconv.Atoi(parts[0])
