@@ -39,27 +39,32 @@ const (
 // JSON 字段名与小程序 agent.ts 严格一致；列表接口返回
 // {messages, next_cursor}，聊天接口返回 {session_id, message, degraded}。
 type AgentMessage struct {
-	ID             string              `json:"id"`
-	SessionID      string              `json:"session_id,omitempty"` // 对话消息所属会话；巡检消息可空
-	Role           Role                `json:"role"`
-	Visibility     Visibility          `json:"visibility"`
-	FamilyID       string              `json:"family_id,omitempty"` // 会话恢复/审计用；列表接口可省
-	UserID         string              `json:"user_id,omitempty"`   // 系统消息可空；私有消息必填
-	CatID          string              `json:"cat_id,omitempty"`    // 单猫消息可见的明确归属
-	Type           string              `json:"type"`                // 见 AgentMessageType 常量
-	Severity       string              `json:"severity"`            // info | warning | danger
-	Title          string              `json:"title"`
-	Body           string              `json:"body"`
-	Evidence       []AgentEvidence     `json:"evidence,omitempty"`
-	Actions        []AgentAction       `json:"action_suggestions,omitempty"`
-	DraftVersion   int                 `json:"draft_version,omitempty"`  // 消息携带的提醒草稿版本
-	DraftReminder  *AgentReminderInput `json:"draft_reminder,omitempty"` // 服务端保存的编辑值
-	DraftExpiresAt *time.Time          `json:"draft_expires_at,omitempty"`
-	ActionStatus   string              `json:"action_status,omitempty"`  // pending | confirmed | dismissed | expired
-	DisplayStatus  string              `json:"display_status,omitempty"` // dismissed 表示在家庭消息列表隐藏，不改变已确认提醒
-	GeneratedAt    time.Time           `json:"generated_at"`
-	Model          string              `json:"model"` // rule-engine-v1 | llm-enhance-v1 | chat-llm-v1
-	Disclaimer     string              `json:"disclaimer,omitempty"`
+	ID              string              `json:"id"`
+	SessionID       string              `json:"session_id,omitempty"` // 对话消息所属会话；巡检消息可空
+	Role            Role                `json:"role"`
+	Visibility      Visibility          `json:"visibility"`
+	FamilyID        string              `json:"family_id,omitempty"` // 会话恢复/审计用；列表接口可省
+	UserID          string              `json:"user_id,omitempty"`   // 系统消息可空；私有消息必填
+	CatID           string              `json:"cat_id,omitempty"`    // 单猫消息可见的明确归属
+	Type            string              `json:"type"`                // 见 AgentMessageType 常量
+	Severity        string              `json:"severity"`            // info | warning | danger
+	Title           string              `json:"title"`
+	Body            string              `json:"body"`
+	Evidence        []AgentEvidence     `json:"evidence,omitempty"`
+	Actions         []AgentAction       `json:"action_suggestions,omitempty"`
+	DraftVersion    int                 `json:"draft_version,omitempty"`  // 消息携带的提醒草稿版本
+	DraftReminder   *AgentReminderInput `json:"draft_reminder,omitempty"` // 服务端保存的编辑值
+	DraftExpiresAt  *time.Time          `json:"draft_expires_at,omitempty"`
+	ActionStatus    string              `json:"action_status,omitempty"`  // pending | confirmed | dismissed | expired
+	DisplayStatus   string              `json:"display_status,omitempty"` // dismissed 表示在家庭消息列表隐藏，不改变已确认提醒
+	GeneratedAt     time.Time           `json:"generated_at"`
+	Model           string              `json:"model"` // rule-engine-v1 | llm-enhance-v1 | chat-llm-v1
+	Disclaimer      string              `json:"disclaimer,omitempty"`
+	TurnID          string              `json:"turn_id,omitempty"`
+	ClientMessageID *string             `json:"client_message_id,omitempty"`
+	RunStatus       string              `json:"run_status,omitempty"`
+	RunLeaseUntil   *time.Time          `json:"run_lease_until,omitempty"`
+	Degraded        bool                `json:"degraded,omitempty"`
 }
 
 // AgentEvidence 证据条目：引用必须来自真实查询结果，不得虚构（§2.1 / D12）。
@@ -147,9 +152,12 @@ type AgentChatRequest struct {
 
 // AgentChatResponse 聊天响应。
 type AgentChatResponse struct {
-	SessionID string        `json:"session_id"`
-	Message   *AgentMessage `json:"message"`
-	Degraded  bool          `json:"degraded"` // true=模型不可用，返回的是确定性兜底
+	SessionID       string        `json:"session_id"`
+	TurnID          string        `json:"turn_id"`
+	ClientMessageID string        `json:"client_message_id"`
+	Status          string        `json:"status"`
+	Message         *AgentMessage `json:"message"`
+	Degraded        bool          `json:"degraded"` // true=模型不可用，返回的是确定性兜底
 }
 
 // AgentReminderDraft 可确认的提醒草稿（一条消息至多携带一份，§2.1）。

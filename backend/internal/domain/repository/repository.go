@@ -194,6 +194,14 @@ type AgentMessageQuery struct {
 
 // AgentRepo 持久化 Agent 会话、消息和提醒草稿。
 type AgentRepo interface {
+	// ClaimChatTurn serializes admission per family/session and recovers first-turn retries.
+	// acquired=false means the same turn is running or already completed. Arguments
+	// are replaced with the stored session/user message before returning.
+	ClaimChatTurn(ctx context.Context, session *model.AgentSession, userMessage *model.AgentMessage, requestedSessionID, token string, now, leaseUntil time.Time) (acquired bool, err error)
+	// FinishChatTurn publishes an answer only while the worker still owns the lease.
+	FinishChatTurn(ctx context.Context, userMessage *model.AgentMessage, token string, answer *model.AgentMessage) error
+	ClaimEnhancement(ctx context.Context, message *model.AgentMessage) (bool, error)
+	SaveEnhancement(ctx context.Context, message *model.AgentMessage) error
 	CreateSession(ctx context.Context, s *model.AgentSession) error
 	UpdateSession(ctx context.Context, s *model.AgentSession) error
 	FindSession(ctx context.Context, familyID, userID, id string) (*model.AgentSession, error)

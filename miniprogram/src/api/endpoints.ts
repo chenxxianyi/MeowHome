@@ -514,8 +514,8 @@ export const agentApi = {
   chat(familyId: string, data: AgentChatRequest) {
     return request<AgentChatResponse>(aiHttp, { method: 'POST', url: `/families/${familyId}/agent/chat`, data })
   },
-  sessions(familyId: string) {
-    return request<AgentSessionListResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/sessions` })
+  sessions(familyId: string, params: { before?: string; limit?: number } = {}) {
+    return request<AgentSessionListResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/sessions`, params })
   },
   sessionMessages(familyId: string, sessionId: string, params: { limit?: number; before?: string } = {}) {
     return request<AgentSessionMessagesResponse>(http, { method: 'GET', url: `/families/${familyId}/agent/sessions/${sessionId}/messages`, params })

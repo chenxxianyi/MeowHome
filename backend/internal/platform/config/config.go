@@ -88,9 +88,10 @@ type AI struct {
 
 // Agent 业务 Agent 开关。Agent 巡检与通用 AI 模型开关相互独立。
 type Agent struct {
-	Enabled     bool   `mapstructure:"enabled"`
-	LLMEnhance  bool   `mapstructure:"llm_enhance"`
-	PatrolTimes string `mapstructure:"patrol_times"`
+	Enabled         bool   `mapstructure:"enabled"`
+	LLMEnhance      bool   `mapstructure:"llm_enhance"`
+	PatrolTimes     string `mapstructure:"patrol_times"`
+	AllowedFamilies string `mapstructure:"allowed_families"`
 }
 
 // OCR Provider 配置。
@@ -215,6 +216,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("agent.enabled", false)
 	v.SetDefault("agent.llm_enhance", false)
 	v.SetDefault("agent.patrol_times", "08:00,20:00")
+	v.SetDefault("agent.allowed_families", "")
 
 	v.SetDefault("ocr.enabled", false)
 	v.SetDefault("ocr.timeout", "30s")
@@ -247,10 +249,11 @@ func bindEnvs(v *viper.Viper) {
 		"auth.refresh_ttl": "JWT_REFRESH_TTL",
 		"auth.bcrypt_cost": "BCRYPT_COST",
 
-		"rate.per_minute":    "RATE_LIMIT_PER_MINUTE",
-		"agent.enabled":      "AI_AGENT_ENABLED",
-		"agent.llm_enhance":  "AI_AGENT_LLM_ENHANCE",
-		"agent.patrol_times": "AI_AGENT_PATROL_TIMES",
+		"rate.per_minute":        "RATE_LIMIT_PER_MINUTE",
+		"agent.enabled":          "AI_AGENT_ENABLED",
+		"agent.llm_enhance":      "AI_AGENT_LLM_ENHANCE",
+		"agent.patrol_times":     "AI_AGENT_PATROL_TIMES",
+		"agent.allowed_families": "AI_AGENT_ALLOWED_FAMILIES",
 	}
 	for key, env := range pairs {
 		_ = v.BindEnv(key, env)

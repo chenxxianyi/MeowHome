@@ -937,6 +937,11 @@ components:
           type: string
           description: 规则引擎或实际 Provider 模型名；规则巡检为 rule-engine-v1
         disclaimer: { type: string }
+        turn_id: { type: string }
+        client_message_id: { type: string }
+        run_status: { type: string, enum: [pending, running, completed, failed] }
+        run_lease_until: { type: string, format: date-time }
+        degraded: { type: boolean }
     AgentEvidence:
       type: object
       required: [source_type, source_id]
@@ -1076,11 +1081,16 @@ components:
           properties:
             data:
               type: object
-              required: [session_id, message, degraded]
+              required: [session_id, turn_id, client_message_id, status, message, degraded]
               properties:
                 session_id: { type: string }
+                turn_id: { type: string }
+                client_message_id: { type: string }
+                status: { type: string, enum: [running, completed] }
                 message:
-                  $ref: '#/components/schemas/AgentMessage'
+                  nullable: true
+                  allOf:
+                    - $ref: '#/components/schemas/AgentMessage'
                 degraded: { type: boolean }
     AgentConfirmEnvelope:
       allOf:

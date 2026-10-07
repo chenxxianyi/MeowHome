@@ -156,6 +156,9 @@ func (p *ChatCompletionsProvider) ChatWithTools(ctx context.Context, req app.LLM
 		attempts = 3
 	}
 	for attempt := 0; attempt < attempts; attempt++ {
+		if err := app.ConsumeLLMRequest(ctx); err != nil {
+			return nil, err
+		}
 		result, retry, err := p.once(ctx, target, payload)
 		if err == nil {
 			return result, nil

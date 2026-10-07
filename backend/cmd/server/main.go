@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
@@ -80,11 +81,17 @@ func main() {
 	agentSvc.SetAuditRepo(auditRepo)
 	agentSvc.SetLLMProvider(ai.NewChatCompletionsProvider(cfg.AI))
 	agentSvc.SetHealthProfileRepo(healthRepo)
+	agentSvc.SetLogger(logger)
+	agentSvc.SetAllowedFamilies(strings.Split(cfg.Agent.AllowedFamilies, ","))
+	agentSvc.SetEnhancementEnabled(cfg.AI.Enabled && cfg.Agent.LLMEnhance)
 	patrolScheduler, err := scheduler.NewAgentPatrolScheduler(agentSvc, familyRepo, recordRepo, mysql.NewAgentTaskProgressRepo(db), cfg.Agent.Enabled && db != nil, cfg.Agent.PatrolTimes)
 	if err != nil {
 		logger.Fatal("agent patrol scheduler", zap.Error(err))
 	}
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	patrolScheduler.SetFamilyFilter(agentSvc.FamilyAllowed)
+	patrolScheduler.SetLogger(logger)
+	agentSvc.StartEnhancementWorker(schedulerCtx)
 	patrolScheduler.Start(schedulerCtx)
 
 	// 组装 HTTP 层
@@ -109,6 +116,9 @@ func main() {
 	defer cancel()
 	if err := patrolScheduler.Wait(ctx); err != nil {
 		logger.Warn("agent scheduler did not stop before shutdown timeout", zap.Error(err))
+	}
+	if err := agentSvc.WaitEnhancementWorker(ctx); err != nil {
+		logger.Warn("agent enhancement worker shutdown timeout")
 	}
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Fatal("shutdown", zap.Error(err))

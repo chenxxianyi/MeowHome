@@ -5,6 +5,62 @@
 
 ## 环境阻塞记录
 
+### 2026-10-06 最终完整后端回归（真实数据库启用）
+
+`backend/` 设置进程变量 `MYSQL_TEST_DSN=''`、`MYSQL_TEST_ENV_FILE=(Resolve-Path .env).Path`、`GIN_MODE=release`，`go test ./... -count=1 -v` 完整命令退出 0。所有包通过，`tests` 包耗时 55.190s，15 项顶层数据库用例全部实际执行，无 SKIP：11 项 Agent、3 项原有权限/审计与 1 项基础套件。每项独立测试库清理成功。最终 `go vet ./...`、`go build ./...` 和 Git diff 空白检查通过。
+
+本轮新增七项 Agent 集成用例及显式 .env 数据库配置入口，配置模板、运行说明和任务状态同步。已按证据完成 AG-A01、AG-B04 与 V08/V09/V11；尚未调用真实供应商模型或操作微信工具/真机，阶段总体仍未完成。没有修改 `backend/.env` 或向业务库写测试数据、执行迁移/回滚。早先失败记录保留，最新完整验证已通过。
+
+### 2026-10-06 AG-B04 聊天恢复与调度真实数据库验证
+
+`go test ./tests -run TestAgentMySQLChatRouteInterruptedDraftRecovery -count=1 -v` 通过。真实 router/JWT/MySQL 覆盖处理中返回、同会话忙碌冲突、租约到期恢复原 session/turn、重试复用已保存 pending 草稿、完成答案幂等、旧 worker 拒绝提交、工具结果隐藏和续聊，无自动正式提醒。AG-B04 勾选。
+
+调度/计划提醒命令曾因 Application Control 以及 Go 缓存访问被阻止，授权缓存访问后的原命令 `go test ./tests -run 'TestAgentMySQL(Scheduler|Scheduled)' -count=1 -v` 两项通过。零消息成功窗口、45 天前业务事件补录、事件失败游标不前移、重建调度器及写消息后游标未保存重放去重通过，V08 勾选；计划提醒窗口、NULL、done、软删除、跨家庭和同时间分页通过。各临时库均清理成功。
+
+### 2026-10-06 AG-A01 数据库验收与并发确认
+
+`agent_persistence_test.go` 的并发巡检、并发确认/写入回滚、同时间稳定分页三个用例通过。12 同键巡检请求只保存一条；普通提示最多三条，已忽略提示继续计额度；danger 仍可保存。12 同时确认只生成一条提醒和一条审计，返回同一 ID。提醒/消息写入失败回滚，确认后重复忽略不撤销提醒。
+
+升级/回滚用例首次因测试的 information_schema 列别名错误失败，修正后单独重跑通过；验证旧提醒 NULL 计划时间、旧草稿 private 修正、空客户端键 NULL、字段元数据、007–014 回滚与重建，原家庭/提醒保留。勾选 AG-A01、V09、V11。新增调度/计划提醒边界用例首次被 Application Control 拦截，保持未验证并继续原命令重跑。测试库均清理成功。
+
+### 2026-10-06 使用授权的 .env 完成首批 MySQL 实测
+
+用户已授权使用 `backend/.env` 的数据库凭据。测试 helper 新增显式 `MYSQL_TEST_ENV_FILE` 入口，只读取数据库连接字段，不读取业务库名或加载 AI/认证配置；默认仍不自动连接。连接 MySQL 8.0.41，启用 STRICT_TRANS_TABLES、ONLY_FULL_GROUP_BY 等服务器现有 SQL mode。
+
+在 `backend/` 设置进程环境 `MYSQL_TEST_DSN=''`、`MYSQL_TEST_ENV_FILE=(Resolve-Path .env).Path` 后执行 `go test ./tests -run TestAgentMySQL -count=1 -v`，4/4 通过，无 SKIP。空库 001–014、重复迁移、并发首轮幂等、私有草稿权限、审计触发器失败的原子回滚、重复确认、租约 fencing、增强状态竞争与真实 HTTP 鉴权均实际执行。四个由本次测试创建的临时库均记录清理成功；没有在业务库执行迁移或写入。
+
+后续继续补齐迁移升级/回滚、稳定分页、巡检额度与并发确认；真实模型和微信交互仍未验收。
+### 2026-10-06 调度器最终补测
+
+`go test ./internal/infrastructure/scheduler -count=1` 单独重跑通过，最终各 Go 测试包均有通过记录；保留先前完整命令被策略拦截而失败的原记录。Go vet/build、小程序 13/13、类型检查、静态迁移检查、微信构建与 OpenAPI 引用检查通过。MySQL 测试全部 SKIP、真实 Provider/模型和微信交互未验证；任务总表不把这些外部验收标为完成。
+
+### 2026-10-06 最终预算与检查
+
+内部 HTTP 重试共享每轮四次请求预算，巡检增强只有一次 HTTP 请求；新增 Provider 模拟服务器测试通过。最终 Go vet/build 通过；最新全量测试 app/ai/config/router/tests 通过、scheduler 被 Windows Application Control 拦截，不能记为该次全量通过。MySQL 集成用例 DSN 缺失 SKIP。小程序测试 13/13、类型检查、静态迁移检查与微信构建通过；OpenAPI 116 个本地引用及新响应契约检查通过。真实 MySQL、真实模型和微信交互验收仍未完成。
+
+### 2026-10-06 业务验收补充与交接
+
+新增 24 条固定业务 fixtures 及受控数字、诊断/药量、无查询统计校验，模拟应用测试通过；小程序实际 store 的超时、运行中、重复点击、家庭切换、重新进入、旧响应及登录失效清理测试通过，总计 13/13。补充移除成员、删除猫咪/记录、聊天原文不能改为草稿、趋势失败时显示实际观测、增强超时与 worker 停止、开关矩阵下草稿行为。数据库测试 helper 只创建/清理本次唯一临时库；新增四项 MySQL 集成测试但 DSN 缺失全部 SKIP。Provider 后续测试被 Windows Application Control 拦截，不能宣称最新全量 Go 测试通过。新增 `docs/agent-runbook.md`，任务实现子项与接口契约同步，真实数据库/模型/微信验收继续保留未完成。
+
+### 2026-10-06 巡检正文增强及灰度
+
+新增迁移 014，保留规则正文、增强正文、状态、模型、Prompt 版本及 usage。规则消息先入库；单线程、队列 8 条、单条 5 秒异步增强，danger 不调用模型，读取不会重新调用。首版仅接受原规则正文加批准前后缀；自由改写、新诊断、药量、数字变化等拒绝并保留模板。版本/动作/忽略状态检查防止覆盖后续编辑，同消息只认领一次；进程中断的增强保留模板，不自动重新付费。环境配置增加家庭白名单，未纳入家庭禁止新 Agent 操作，但历史仍可读取/忽略；模型与增强双开关在 main 接线。增加脱敏日志与 request/turn/message ID。
+
+验证：增强事实保护、danger、关闭开关、重复调用、并发忽略与灰度历史读取应用测试通过；`go test ./internal/platform/config -count=1` 单独重跑通过。加入日志后的全量内部测试中 app/ai 临时程序被 Windows Application Control 拦截，其他包通过，尚不能宣称该次全量通过。独立数据库、真实 Provider 与真机仍未验证。
+
+### 2026-10-06 小程序聊天页面接入
+
+猫管家页增加家庭巡检/本人对话切换、选猫、推荐问题、发送和重复点击保护、历史会话与消息分页、降级标识、同键恢复结果；证据及私有提醒草稿复用详情页。未保存修改禁止确认。草稿编辑统一明确显示北京时间并保存 Asia/Shanghai，修正设备时区与服务端时区可能不一致的问题。小程序 `request<T>()` 实际直接返回解包后的 T，已纠正文档 D15。`npm.cmd run type-check`、`npm.cmd test`（6/6）、`npm.cmd run build:mp-weixin` 通过；新增恢复合并、草稿版本与幂等键测试。微信开发者工具/真机交互待验证。
+
+### 2026-10-06 接通真实聊天与持久化轮次
+
+`Chat` 接入四工具循环，保存内部工具结果和 usage；上下文限制为五轮完成的问答。轮次元数据保存在用户消息中，事务认领与 35 秒租约避免同会话交错；同键处理中返回 running，完成后复用答案，过期租约可恢复。模型总预算 25 秒。模型故障返回真实查询状态及草稿恢复入口，不自动创建正式提醒。新增迁移 013；012 索引创建改为可重复执行。`go test ./internal/... -count=1` 通过，覆盖真实服务入口、上下文、幂等、降级、租约和旧 worker 拒绝提交。MySQL 并发、迁移和真实 Provider 尚未验证，小程序接入继续实施。
+
+### 2026-10-06 聊天草稿权限修复
+
+聊天草稿改为私有，会话创建者可编辑和确认；同家庭其他成员不能读取、编辑或确认。MySQL 确认事务补充相同权限检查，包含重复确认路径。应用层权限、家庭列表隔离、重复确认测试通过：`go test ./internal/app -run 'TestPrivate|TestAgentReminderTool|TestConfirmDraft' -count=1`。数据库事务仍待独立环境验证，B 阶段整体继续实施。
+
+
 ### 2026-09-25 环境核对（AG-00 前置）
 
 - 工作区状态：`MeowHome-Agent开发任务.md`、`MeowHome-Agent设计方案.md`、`docs/agent-implementation-plan.md` 为未跟踪新文件，无其他未提交改动。

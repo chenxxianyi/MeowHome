@@ -8,11 +8,15 @@
 
 一条消息最多有一份提醒草稿。草稿状态为 `pending → confirmed | dismissed | expired`；展示隐藏状态单独保存在 `display_status`，忽略已确认消息不撤销正式提醒，导航动作不更改草稿状态。消息详情可返回已保存的 `draft_reminder` 和 `draft_expires_at` 供编辑恢复。草稿编辑使用 `expected_version`，成功后版本加一；确认只提交版本，服务端从持久化消息取草稿。重复确认返回同一个提醒 ID。单猫草稿必须有有效猫咪 ID；家庭级草稿由用户明确选择 `cat_id=both`，缺省不能解释为家庭级。确认前必须补齐未来的绝对 `scheduled_at`。
 
+聊天工具草稿保存在独立的 private 助手消息中，只允许会话创建者读取、编辑、确认。原始用户输入与最终聊天答案不能转换成草稿，以保留历史和重试结果；家庭巡检消息可作为手动草稿目标。Chat 幂等键实际唯一范围为 `family_id + user_id + client_message_id + role`，同键不同正文或指定不同会话返回冲突。
+
 ## 消息、证据与分页
 
 消息 JSON 使用 snake_case。`session_id`、`cat_id` 对非对应范围可省略；`role`、`visibility`、`generated_at`、`model` 必须存在。证据格式为 `{source_type,source_id,cat_ids?,occurred_at?,excerpt?}`：R-03/R-05 引用提醒 ID；R-04 引用最近称重记录 ID（`source_type=weight`），若从未称重则引用猫咪建档 ID（`source_type=cat_profile`）；R-06 使用家庭 ID 和昨日查询范围。`excerpt` 只节选原始信息，不把缺失记录、展示默认值或模型猜测写成医疗事实。
 
-家庭消息列表和会话消息列表的 `data` 始终为 `{messages,next_cursor}`，会话列表为 `{sessions,next_cursor}`。`next_cursor` 无下一页时为空字符串；游标以消息 `(generated_at,id)` 或会话 `(updated_at,id)` 稳定排序，且始终受家庭和会话权限限制。分页默认 20 条，最大 50 条；显式 `limit=0`、负数、超过 50、无效 `type/status/before` 均返回 400。聊天响应 `data` 为 `{session_id,message,degraded}`，确认响应为 `{reminder,message_id,action_status}`。
+家庭消息列表和会话消息列表的 `data` 始终为 `{messages,next_cursor}`，会话列表为 `{sessions,next_cursor}`。`next_cursor` 无下一页时为空字符串；游标以消息 `(generated_at,id)` 或会话 `(updated_at,id)` 稳定排序，且始终受家庭和会话权限限制。分页默认 20 条，最大 50 条；显式 `limit=0`、负数、超过 50、无效 `type/status/before` 均返回 400。聊天响应 `data` 为 `{session_id,turn_id,client_message_id,status,message,degraded}`：同键处理中 `status=running,message=null`，完成后 `status=completed` 并复用原答案。确认响应为 `{reminder,message_id,action_status}`。小程序 `request<T>()` 已解包 Envelope，直接返回 T；不要再访问 success/data。
+
+聊天轮次元数据存于用户消息（`turn_id/run_status/run_lease_until/client_message_id`），running 为事务认领状态；模型故障可完成为 degraded 回答，历史加载失败记 failed 并允许同键重试。同会话不同消息并发返回 `AGENT_CONFLICT`；同键租约有效时只返回 running，35 秒租约过期后可认领中断轮次。草稿 ID 由服务端 turn ID 派生且只属于私有会话；模型失败后仍可确认。内部工具结果不返回客户端。usage、耗时、固定错误原因只在数据库/服务端诊断中保存。
 
 ## 时间、长度与模型预算
 

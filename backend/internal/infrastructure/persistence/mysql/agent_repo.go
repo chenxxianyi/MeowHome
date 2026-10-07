@@ -244,6 +244,22 @@ func (r *AgentRepo) ConfirmMessageAndCreateReminder(ctx context.Context, familyI
 		}
 		return rollback(err)
 	}
+	// Private drafts retain the session owner's permissions inside the transaction,
+	// including idempotent confirmation of an already confirmed draft.
+	if msg.Visibility == "private" {
+		var session model.AgentSession
+		if msg.Role == "tool" || msg.SessionID == "" {
+			return rollback(repository.ErrNotFound)
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND family_id = ? AND user_id = ? AND deleted_at IS NULL", msg.SessionID, familyID, actorUserID).First(&session).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return rollback(repository.ErrNotFound)
+			}
+			return rollback(err)
+		}
+	} else if msg.Visibility != "family" || msg.Role == "tool" {
+		return rollback(repository.ErrNotFound)
+	}
 	if msg.ActionStatus == "confirmed" && msg.ConfirmedReminderID != "" {
 		var existing model.Reminder
 		if err := tx.Where("id = ? AND family_id = ? AND deleted_at IS NULL", msg.ConfirmedReminderID, familyID).First(&existing).Error; err != nil {
@@ -258,7 +274,7 @@ func (r *AgentRepo) ConfirmMessageAndCreateReminder(ctx context.Context, familyI
 	if msg.DraftVersion != expectedVersion || msg.ActionStatus != "pending" || msg.DraftExpiresAt == nil || !msg.DraftExpiresAt.After(now) {
 		return rollback(repository.ErrConflict)
 	}
-	if msg.Visibility != "family" || reminder.ScheduledAt == nil || !reminder.ScheduledAt.After(now) {
+	if reminder.ScheduledAt == nil || !reminder.ScheduledAt.After(now) {
 		return rollback(repository.ErrConflict)
 	}
 	if reminder.CatID != "both" {

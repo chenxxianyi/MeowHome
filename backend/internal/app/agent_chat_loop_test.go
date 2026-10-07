@@ -17,7 +17,7 @@ func TestAgentTurnSingleToolAndAuthorizedCitations(t *testing.T) {
 	calls := 0
 	s.SetLLMProvider(FakeLLMProvider{ChatFunc: func(_ context.Context, req LLMRequest, defs []ToolDef) (*LLMResponse, error) {
 		calls++
-		if len(defs) != 4 || len(req.Messages) < 3 || !strings.Contains(req.Messages[1].Content, `"id":"cat"`) {
+		if len(defs) != 4 || len(req.Messages) < 4 || req.Messages[2].Role != "user" || !strings.Contains(req.Messages[2].Content, `"id":"cat"`) || strings.Contains(req.Messages[1].Content, `"name"`) {
 			t.Fatalf("missing authorized context: %+v", req)
 		}
 		if calls == 1 {

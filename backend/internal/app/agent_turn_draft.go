@@ -22,9 +22,12 @@ func (s *AgentService) ensureTurnDraftTarget(ctx context.Context, scope AgentToo
 	if scope.FamilyID == "" || scope.UserID == "" || scope.SessionID == "" || scope.TurnID == "" {
 		return nil, apperr.InvalidRequest(apperr.CodeValidationFailed, "draft turn scope is incomplete")
 	}
+	if session, err := s.repo.FindSession(ctx, scope.FamilyID, scope.UserID, scope.SessionID); err != nil || session == nil {
+		return nil, apperr.NotFound(apperr.CodeNotFound, "agent session not found")
+	}
 	messageID := draftIDForTurn(scope.TurnID)
 	now := s.clock().UTC()
-	target := &model.AgentMessage{Base: model.Base{ID: messageID, CreatedBy: scope.UserID, CreatedAt: now, UpdatedAt: now}, FamilyID: scope.FamilyID, SessionID: scope.SessionID, UserID: scope.UserID, TurnID: scope.TurnID, Role: string(RoleAssistant), Visibility: string(VisibilityFamily), Type: AgentTypeReminderDraft, Severity: "info", Title: "待确认提醒", Body: "请核对提醒内容并手动确认。", GeneratedAt: now, Model: agentChatPromptVersion, Disclaimer: "提醒草稿未经确认不会创建正式提醒。"}
+	target := &model.AgentMessage{Base: model.Base{ID: messageID, CreatedBy: scope.UserID, CreatedAt: now, UpdatedAt: now}, FamilyID: scope.FamilyID, SessionID: scope.SessionID, UserID: scope.UserID, TurnID: scope.TurnID, Role: string(RoleAssistant), Visibility: string(VisibilityPrivate), Type: AgentTypeReminderDraft, Severity: "info", Title: "待确认提醒", Body: "请核对提醒内容并手动确认。", GeneratedAt: now, Model: agentChatPromptVersion, Disclaimer: "提醒草稿未经确认不会创建正式提醒。"}
 	if err := s.repo.CreateMessage(ctx, target); err == nil {
 		return target, nil
 	} else if err != repository.ErrDuplicateKey {
@@ -34,7 +37,7 @@ func (s *AgentService) ensureTurnDraftTarget(ctx context.Context, scope AgentToo
 	if err != nil {
 		return nil, err
 	}
-	if existing == nil || existing.FamilyID != scope.FamilyID || existing.SessionID != scope.SessionID || existing.UserID != scope.UserID || existing.TurnID != scope.TurnID || existing.Visibility != string(VisibilityFamily) || existing.Type != AgentTypeReminderDraft {
+	if existing == nil || existing.FamilyID != scope.FamilyID || existing.SessionID != scope.SessionID || existing.UserID != scope.UserID || existing.TurnID != scope.TurnID || existing.Visibility != string(VisibilityPrivate) || existing.Type != AgentTypeReminderDraft {
 		return nil, apperr.Conflict(CodeAgentConflict, "draft turn conflict")
 	}
 	return existing, nil

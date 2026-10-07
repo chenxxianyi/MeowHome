@@ -11,32 +11,55 @@ import (
 	"github.com/meowhome/backend/internal/domain/repository"
 	apperr "github.com/meowhome/backend/internal/platform/errors"
 	"github.com/meowhome/backend/internal/platform/id"
+	"go.uber.org/zap"
 )
 
 // AgentService 实现阶段 A 的确定性巡检、消息查询和提醒草稿闭环。
 type AgentService struct {
-	repo           repository.AgentRepo
-	records        repository.DailyRecordRepo
-	reminders      repository.ReminderRepo
-	cats           repository.CatRepo
-	families       repository.FamilyRepo
-	members        repository.MemberRepo
-	audit          repository.AuditRepo
-	llm            LLMProvider
-	healthProfiles repository.CatHealthProfileRepo
-	enabled        bool
-	clock          func() time.Time
+	repo            repository.AgentRepo
+	records         repository.DailyRecordRepo
+	reminders       repository.ReminderRepo
+	cats            repository.CatRepo
+	families        repository.FamilyRepo
+	members         repository.MemberRepo
+	audit           repository.AuditRepo
+	llm             LLMProvider
+	healthProfiles  repository.CatHealthProfileRepo
+	enabled         bool
+	clock           func() time.Time
+	logger          *zap.Logger
+	allowedFamilies map[string]bool
+	enhanceEnabled  bool
+	enhanceQueue    chan agentEnhanceTask
+	enhanceDone     chan struct{}
 }
 
 func NewAgentService(repo repository.AgentRepo, records repository.DailyRecordRepo, reminders repository.ReminderRepo, cats repository.CatRepo, families repository.FamilyRepo, members repository.MemberRepo, enabled bool) *AgentService {
-	return &AgentService{repo: repo, records: records, reminders: reminders, cats: cats, families: families, members: members, enabled: enabled, clock: func() time.Time { return time.Now().UTC() }}
+	return &AgentService{repo: repo, records: records, reminders: reminders, cats: cats, families: families, members: members, enabled: enabled, logger: zap.NewNop(), enhanceQueue: make(chan agentEnhanceTask, 8), enhanceDone: make(chan struct{}), clock: func() time.Time { return time.Now().UTC() }}
 }
 
 func (s *AgentService) SetAuditRepo(audit repository.AuditRepo) { s.audit = audit }
 func (s *AgentService) SetLLMProvider(provider LLMProvider)     { s.llm = provider }
 
-func (s *AgentService) ensureEnabled() error {
-	if !s.enabled {
+func (s *AgentService) SetLogger(logger *zap.Logger) {
+	if logger != nil {
+		s.logger = logger
+	}
+}
+func (s *AgentService) SetAllowedFamilies(ids []string) {
+	s.allowedFamilies = map[string]bool{}
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			s.allowedFamilies[id] = true
+		}
+	}
+}
+func (s *AgentService) FamilyAllowed(familyID string) bool {
+	return len(s.allowedFamilies) == 0 || s.allowedFamilies[familyID]
+}
+
+func (s *AgentService) ensureEnabled(familyIDs ...string) error {
+	if !s.enabled || (len(familyIDs) > 0 && !s.FamilyAllowed(familyIDs[0])) {
 		return apperr.New(apperr.TypeExternal, CodeAgentDisabled, "agent is disabled")
 	}
 	return nil
@@ -80,7 +103,7 @@ func (s *AgentService) GetMessage(ctx context.Context, familyID, userID, message
 	if err != nil || m == nil || m.FamilyID != familyID || !s.canReadMessage(ctx, familyID, userID, m) {
 		return nil, apperr.NotFound(apperr.CodeNotFound, "agent message not found")
 	}
-	return toAgentMessage(m), nil
+	return toAgentMessage(m, s.enhanceEnabled), nil
 }
 
 func (s *AgentService) canReadMessage(ctx context.Context, familyID, userID string, m *model.AgentMessage) bool {
@@ -94,11 +117,14 @@ func (s *AgentService) canReadMessage(ctx context.Context, familyID, userID stri
 		return false
 	}
 	session, err := s.repo.FindSession(ctx, familyID, userID, m.SessionID)
-	return err == nil && session.FamilyID == familyID && session.UserID == userID
+	return err == nil && session != nil && session.FamilyID == familyID && session.UserID == userID
 }
 
-func (s *AgentService) EditDraft(ctx context.Context, familyID, userID, messageID string, in AgentReminderEditRequest) (*AgentReminderDraft, error) {
-	if err := s.ensureEnabled(); err != nil {
+func (s *AgentService) EditDraft(ctx context.Context, familyID, userID, messageID string, in AgentReminderEditRequest) (result *AgentReminderDraft, err error) {
+	defer func() {
+		s.logger.Info("agent_draft_edit", zap.String("request_id", agentRequestID(ctx)), zap.String("family_id", familyID), zap.String("message_id", messageID), zap.Bool("success", err == nil))
+	}()
+	if err := s.ensureEnabled(familyID); err != nil {
 		return nil, err
 	}
 	if err := s.access(ctx, familyID, userID); err != nil {
@@ -111,10 +137,7 @@ func (s *AgentService) EditDraft(ctx context.Context, familyID, userID, messageI
 	if err != nil && err != repository.ErrNotFound {
 		return nil, err
 	}
-	if err != nil || m == nil || m.FamilyID != familyID || m.Visibility != string(VisibilityFamily) {
-		return nil, apperr.NotFound(apperr.CodeNotFound, "agent message not found")
-	}
-	if m.Visibility == string(VisibilityPrivate) && m.UserID != userID {
+	if err != nil || m == nil || m.FamilyID != familyID || !s.canReadMessage(ctx, familyID, userID, m) {
 		return nil, apperr.NotFound(apperr.CodeNotFound, "agent message not found")
 	}
 	if m.ActionStatus == DraftConfirmed {
@@ -128,6 +151,9 @@ func (s *AgentService) EditDraft(ctx context.Context, familyID, userID, messageI
 	}
 	if in.ExpectedVersion != m.DraftVersion {
 		return nil, apperr.Conflict(CodeAgentConflict, "draft version conflict")
+	}
+	if m.Role != string(RoleAssistant) || (m.Visibility == string(VisibilityPrivate) && m.Type != AgentTypeReminderDraft) {
+		return nil, apperr.InvalidRequest(apperr.CodeValidationFailed, "message is not a reminder draft target")
 	}
 	if err := s.validateReminder(ctx, familyID, in.Reminder); err != nil {
 		return nil, err
@@ -148,8 +174,11 @@ func (s *AgentService) EditDraft(ctx context.Context, familyID, userID, messageI
 	return &AgentReminderDraft{MessageID: m.ID, Version: m.DraftVersion, ExpiresAt: expires, Reminder: in.Reminder, ConfirmedReminderID: m.ConfirmedReminderID}, nil
 }
 
-func (s *AgentService) ConfirmDraft(ctx context.Context, familyID, userID, messageID string, expected int) (*AgentConfirmResponse, error) {
-	if err := s.ensureEnabled(); err != nil {
+func (s *AgentService) ConfirmDraft(ctx context.Context, familyID, userID, messageID string, expected int) (result *AgentConfirmResponse, err error) {
+	defer func() {
+		s.logger.Info("agent_draft_confirm", zap.String("request_id", agentRequestID(ctx)), zap.String("family_id", familyID), zap.String("message_id", messageID), zap.Bool("success", err == nil))
+	}()
+	if err := s.ensureEnabled(familyID); err != nil {
 		return nil, err
 	}
 	if err := s.access(ctx, familyID, userID); err != nil {
@@ -159,7 +188,7 @@ func (s *AgentService) ConfirmDraft(ctx context.Context, familyID, userID, messa
 	if err != nil && err != repository.ErrNotFound {
 		return nil, err
 	}
-	if err != nil || m == nil || m.FamilyID != familyID || m.Visibility != string(VisibilityFamily) {
+	if err != nil || m == nil || m.FamilyID != familyID || !s.canReadMessage(ctx, familyID, userID, m) {
 		return nil, apperr.NotFound(apperr.CodeNotFound, "agent message not found")
 	}
 	if m.ActionStatus == DraftConfirmed && m.ConfirmedReminderID != "" {
@@ -239,83 +268,6 @@ func (s *AgentService) DismissMessage(ctx context.Context, familyID, userID, mes
 	return nil
 }
 
-// Chat 提供无模型时也可用的确定性降级对话，并持久化用户/助手两轮消息。
-func (s *AgentService) Chat(ctx context.Context, familyID, userID string, in AgentChatRequest) (*AgentChatResponse, error) {
-	if err := s.ensureEnabled(); err != nil {
-		return nil, err
-	}
-	if err := s.access(ctx, familyID, userID); err != nil {
-		return nil, err
-	}
-	in.Message = strings.TrimSpace(in.Message)
-	if in.Message == "" || len([]rune(in.Message)) > AgentChatMessageMaxLen {
-		return nil, apperr.InvalidRequest(apperr.CodeValidationFailed, "message length is invalid")
-	}
-	if in.ClientMessageID == "" || len(in.ClientMessageID) > 128 {
-		return nil, apperr.InvalidRequest(apperr.CodeValidationFailed, "client_message_id length is invalid")
-	}
-	var session *model.AgentSession
-	var err error
-	var existingMessage *model.AgentMessage
-	if in.ClientMessageID != "" {
-		if old, e := s.repo.FindUserMessageByClientID(ctx, familyID, userID, in.ClientMessageID); e == nil {
-			existingMessage = old
-			if old.Role == string(RoleUser) && old.Body != in.Message {
-				return nil, apperr.Conflict(CodeAgentConflict, "client_message_id was already used for different content")
-			}
-			if in.SessionID != "" && old.SessionID != in.SessionID {
-				return nil, apperr.Conflict(CodeAgentConflict, "client_message_id belongs to another session")
-			}
-			session, err = s.repo.FindSession(ctx, familyID, userID, old.SessionID)
-			if err != nil {
-				return nil, err
-			}
-			if old.Role == string(RoleAssistant) {
-				return &AgentChatResponse{SessionID: session.ID, Message: toAgentMessage(old), Degraded: true}, nil
-			}
-		} else if e != repository.ErrNotFound {
-			return nil, e
-		}
-	}
-	if in.SessionID != "" {
-		session, err = s.repo.FindSession(ctx, familyID, userID, in.SessionID)
-		if err != nil || session.FamilyID != familyID || session.UserID != userID {
-			return nil, apperr.NotFound(apperr.CodeNotFound, "agent session not found")
-		}
-	} else if session == nil {
-		now := s.clock().UTC()
-		session = &model.AgentSession{Base: model.Base{ID: id.ULIDGenerator{}.New(), CreatedBy: userID, CreatedAt: now, UpdatedAt: now}, FamilyID: familyID, UserID: userID, Status: "active"}
-		if err := s.repo.CreateSession(ctx, session); err != nil {
-			return nil, err
-		}
-	}
-	if in.ClientMessageID != "" && session != nil {
-		if old, e := s.repo.FindMessageByClientID(ctx, familyID, userID, session.ID, in.ClientMessageID); e == nil {
-			return &AgentChatResponse{SessionID: session.ID, Message: toAgentMessage(old), Degraded: true}, nil
-		}
-	}
-	now := s.clock().UTC()
-	userMsg := &model.AgentMessage{Base: model.Base{ID: id.ULIDGenerator{}.New(), CreatedBy: userID, CreatedAt: now, UpdatedAt: now}, FamilyID: familyID, SessionID: session.ID, UserID: userID, Role: string(RoleUser), Visibility: string(VisibilityPrivate), Type: AgentTypeChatAnswer, Severity: "info", Title: "用户消息", Body: in.Message, GeneratedAt: now, Model: "chat-llm-v1", ClientMessageID: &in.ClientMessageID}
-	if existingMessage == nil || existingMessage.Role != string(RoleUser) {
-		if err := s.repo.CreateMessage(ctx, userMsg); err != nil && err != repository.ErrDuplicateKey {
-			return nil, err
-		}
-	}
-	assistant := &model.AgentMessage{Base: model.Base{ID: id.ULIDGenerator{}.New(), CreatedBy: "system", CreatedAt: now, UpdatedAt: now}, FamilyID: familyID, SessionID: session.ID, UserID: userID, Role: string(RoleAssistant), Visibility: string(VisibilityPrivate), Type: AgentTypeChatAnswer, Severity: "info", Title: "猫管家", Body: "我可以帮你查询本家庭的猫咪记录、趋势和待办。请告诉我猫咪名称或具体时间范围；如果信息不明确，我会先请你澄清。", GeneratedAt: now, Model: "chat-llm-v1", Disclaimer: "当前为确定性降级回复，未调用模型。", ClientMessageID: &in.ClientMessageID}
-	if err := s.repo.CreateMessage(ctx, assistant); err != nil {
-		if err == repository.ErrDuplicateKey && in.ClientMessageID != "" {
-			if old, findErr := s.repo.FindMessageByClientID(ctx, familyID, userID, session.ID, in.ClientMessageID); findErr == nil {
-				return &AgentChatResponse{SessionID: session.ID, Message: toAgentMessage(old), Degraded: true}, nil
-			}
-		}
-		return nil, err
-	}
-	session.LastMessageAt = &now
-	session.UpdatedAt = now
-	_ = s.repo.UpdateSession(ctx, session)
-	return &AgentChatResponse{SessionID: session.ID, Message: toAgentMessage(assistant), Degraded: true}, nil
-}
-
 func (s *AgentService) ListSessions(ctx context.Context, familyID, userID, before string, limit int) (*AgentSessionListResponse, error) {
 	if err := s.access(ctx, familyID, userID); err != nil {
 		return nil, err
@@ -372,7 +324,7 @@ func (s *AgentService) ListSessionMessages(ctx context.Context, familyID, userID
 			out.NextCursor = cursorFor(rows[limit-1])
 			break
 		}
-		out.Messages = append(out.Messages, toAgentMessage(r))
+		out.Messages = append(out.Messages, toAgentMessage(r, s.enhanceEnabled))
 	}
 	return out, nil
 }
@@ -404,7 +356,7 @@ func (s *AgentService) PatrolSystemAt(ctx context.Context, familyID string, sche
 
 // PatrolDangerRecordSystem 为新增 danger 记录生成单条家庭消息；游标重放依靠唯一键去重。
 func (s *AgentService) PatrolDangerRecordSystem(ctx context.Context, familyID, recordID string) error {
-	if err := s.ensureEnabled(); err != nil {
+	if err := s.ensureEnabled(familyID); err != nil {
 		return err
 	}
 	if familyID == "" || recordID == "" {
@@ -444,8 +396,12 @@ func (s *AgentService) PatrolDangerRecordSystem(ctx context.Context, familyID, r
 	return nil
 }
 
-func (s *AgentService) patrol(ctx context.Context, familyID, actorID string, systemScope bool, now time.Time) (*AgentPatrolResponse, error) {
-	if err := s.ensureEnabled(); err != nil {
+func (s *AgentService) patrol(ctx context.Context, familyID, actorID string, systemScope bool, now time.Time) (result *AgentPatrolResponse, err error) {
+	started := time.Now()
+	defer func() {
+		s.logger.Info("agent_patrol_finished", zap.String("request_id", agentRequestID(ctx)), zap.String("family_id", familyID), zap.Bool("success", err == nil), zap.Int64("duration_ms", time.Since(started).Milliseconds()))
+	}()
+	if err := s.ensureEnabled(familyID); err != nil {
 		return nil, err
 	}
 	if familyID == "" {
@@ -514,7 +470,8 @@ func (s *AgentService) patrol(ctx context.Context, familyID, actorID string, sys
 	out := make([]*AgentMessage, 0, len(candidates))
 	for _, c := range candidates {
 		if old, e := s.repo.FindMessageByDedup(ctx, familyID, c.DedupKey); e == nil {
-			out = append(out, toAgentMessage(old))
+			s.logger.Info("agent_patrol_dedup", zap.String("family_id", familyID), zap.String("message_id", old.ID), zap.String("rule_id", c.RuleID))
+			out = append(out, toAgentMessage(old, s.enhanceEnabled))
 			continue
 		} else if e != repository.ErrNotFound {
 			return nil, e
@@ -526,10 +483,11 @@ func (s *AgentService) patrol(ctx context.Context, familyID, actorID string, sys
 			messageType = AgentTypePatrolWeight
 		}
 		m := &model.AgentMessage{Base: model.Base{ID: id.ULIDGenerator{}.New(), CreatedBy: "system", CreatedAt: now, UpdatedAt: now}, FamilyID: familyID, CatID: c.CatID, Role: string(RoleAssistant), Visibility: string(VisibilityFamily), Type: messageType, Severity: c.Severity, Title: c.Title, Body: c.Body, Evidence: encodeJSON(c.Evidence), ActionSuggestions: encodeJSON(c.Actions), GeneratedAt: generated, Model: "rule-engine-v1", Disclaimer: "仅根据已记录数据提示，不构成诊断或用药建议。", RuleID: c.RuleID, RuleVersion: c.RuleVersion, Scope: c.Scope, WindowStart: &c.WindowStart, WindowEnd: &c.WindowEnd, DedupKey: &dedupKey}
+		m.RuleBody = m.Body
 		if err := s.repo.CreatePatrolMessage(ctx, m, today.UTC(), today.AddDate(0, 0, 1).UTC(), 3); err != nil {
 			if err == repository.ErrDailyLimit {
 				if old, findErr := s.repo.FindMessageByDedup(ctx, familyID, c.DedupKey); findErr == nil {
-					out = append(out, toAgentMessage(old))
+					out = append(out, toAgentMessage(old, s.enhanceEnabled))
 				} else if findErr != repository.ErrNotFound {
 					return nil, findErr
 				}
@@ -543,7 +501,9 @@ func (s *AgentService) patrol(ctx context.Context, familyID, actorID string, sys
 				return nil, err
 			}
 		}
-		out = append(out, toAgentMessage(m))
+		s.queueEnhancement(m)
+		s.logger.Info("agent_patrol_rule", zap.String("family_id", familyID), zap.String("message_id", m.ID), zap.String("rule_id", c.RuleID), zap.String("severity", m.Severity))
+		out = append(out, toAgentMessage(m, s.enhanceEnabled))
 	}
 	return &AgentPatrolResponse{Messages: out}, nil
 }
@@ -597,7 +557,7 @@ func (s *AgentService) messageList(rows []*model.AgentMessage, limit int) *Agent
 			out.NextCursor = cursorFor(rows[limit-1])
 			break
 		}
-		out.Messages = append(out.Messages, toAgentMessage(r))
+		out.Messages = append(out.Messages, toAgentMessage(r, s.enhanceEnabled))
 	}
 	return out
 }
@@ -621,7 +581,13 @@ func validAgentCursor(v string) bool {
 	_, err := time.Parse(time.RFC3339Nano, p[0])
 	return err == nil
 }
-func toAgentMessage(m *model.AgentMessage) *AgentMessage {
+func toAgentMessage(m *model.AgentMessage, enhancementAllowed ...bool) *AgentMessage {
+	copy := *m
+	if len(enhancementAllowed) > 0 && enhancementAllowed[0] && m.Severity != "danger" && m.EnhanceStatus == "completed" && m.EnhancedBody != "" {
+		copy.Body = m.EnhancedBody
+		copy.Model = m.EnhanceModel
+	}
+	m = &copy
 	var ev []AgentEvidence
 	var ac []AgentAction
 	var draft *AgentReminderInput
@@ -633,7 +599,7 @@ func toAgentMessage(m *model.AgentMessage) *AgentMessage {
 			draft = &parsed
 		}
 	}
-	return &AgentMessage{ID: m.ID, SessionID: emptyToOmit(m.SessionID), Role: Role(m.Role), Visibility: Visibility(m.Visibility), FamilyID: m.FamilyID, UserID: m.UserID, CatID: m.CatID, Type: m.Type, Severity: m.Severity, Title: m.Title, Body: m.Body, Evidence: ev, Actions: ac, DraftVersion: m.DraftVersion, DraftReminder: draft, DraftExpiresAt: m.DraftExpiresAt, ActionStatus: m.ActionStatus, DisplayStatus: m.DisplayStatus, GeneratedAt: m.GeneratedAt, Model: m.Model, Disclaimer: m.Disclaimer}
+	return &AgentMessage{ID: m.ID, SessionID: emptyToOmit(m.SessionID), Role: Role(m.Role), Visibility: Visibility(m.Visibility), FamilyID: m.FamilyID, UserID: m.UserID, CatID: m.CatID, Type: m.Type, Severity: m.Severity, Title: m.Title, Body: m.Body, Evidence: ev, Actions: ac, DraftVersion: m.DraftVersion, DraftReminder: draft, DraftExpiresAt: m.DraftExpiresAt, ActionStatus: m.ActionStatus, DisplayStatus: m.DisplayStatus, GeneratedAt: m.GeneratedAt, Model: m.Model, Disclaimer: m.Disclaimer, TurnID: m.TurnID, ClientMessageID: m.ClientMessageID, RunStatus: m.RunStatus, RunLeaseUntil: m.RunLeaseUntil, Degraded: m.Degraded}
 }
 
 func toAgentReminderResult(r *model.Reminder) *AgentReminderResult {

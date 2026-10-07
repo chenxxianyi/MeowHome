@@ -227,11 +227,15 @@ func TestAgentReminderToolSavesPendingDraftOnly(t *testing.T) {
 
 func TestAgentReminderToolReusesTurnDraftOnRetry(t *testing.T) {
 	s, repo := newAgentServiceForTest()
+	repo.sessions["session"] = &model.AgentSession{Base: model.Base{ID: "session"}, FamilyID: "fam", UserID: "user"}
 	scope := AgentToolScope{FamilyID: "fam", UserID: "user", SessionID: "session", TurnID: "turn-1"}
 	args := `{"cat_id":"cat","type":"custom","title":"喂药","scheduled_at":"2026-10-02T09:00:00+08:00","timezone":"Asia/Shanghai"}`
 	first, err := s.ExecuteTool(context.Background(), scope, "createReminderDraft", args)
 	if err != nil || first.Draft == nil {
 		t.Fatalf("first draft: %v", err)
+	}
+	if repo.messages[first.Draft.MessageID].Visibility != string(VisibilityPrivate) {
+		t.Fatal("conversation draft must stay private")
 	}
 	second, err := s.ExecuteTool(context.Background(), scope, "createReminderDraft", args)
 	if err != nil || second.Draft == nil || first.Draft.MessageID != second.Draft.MessageID || second.Draft.Version != 1 || len(repo.messages) != 1 || len(repo.reminders) != 0 {

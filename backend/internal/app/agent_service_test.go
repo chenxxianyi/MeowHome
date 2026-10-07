@@ -21,6 +21,91 @@ type agentRepoMemory struct {
 func newAgentRepoMemory() *agentRepoMemory {
 	return &agentRepoMemory{sessions: map[string]*model.AgentSession{}, messages: map[string]*model.AgentMessage{}, reminders: map[string]*model.Reminder{}}
 }
+
+func (r *agentRepoMemory) ClaimChatTurn(ctx context.Context, session *model.AgentSession, user *model.AgentMessage, requested, token string, now, lease time.Time) (bool, error) {
+	old, err := r.FindUserMessageByClientID(ctx, user.FamilyID, user.UserID, *user.ClientMessageID)
+	found := err == nil
+	if found {
+		if old.Body != user.Body || (requested != "" && requested != old.SessionID) {
+			return false, repository.ErrConflict
+		}
+		storedSession, e := r.FindSession(ctx, user.FamilyID, user.UserID, old.SessionID)
+		if e != nil {
+			return false, e
+		}
+		*session = *storedSession
+		*user = *old
+		if _, e := r.FindMessageByClientID(ctx, user.FamilyID, user.UserID, user.SessionID, *user.ClientMessageID); e == nil {
+			return false, nil
+		}
+		if user.RunStatus == "running" && user.RunLeaseUntil != nil && user.RunLeaseUntil.After(now) {
+			return false, nil
+		}
+	} else if requested != "" {
+		storedSession, e := r.FindSession(ctx, user.FamilyID, user.UserID, requested)
+		if e != nil {
+			return false, e
+		}
+		*session = *storedSession
+	}
+	for _, m := range r.messages {
+		if m.SessionID == session.ID && m.ID != user.ID && m.RunStatus == "running" && m.RunLeaseUntil != nil && m.RunLeaseUntil.After(now) {
+			return false, repository.ErrConflict
+		}
+	}
+	if !found && requested == "" {
+		copy := *session
+		r.sessions[session.ID] = &copy
+	}
+	user.SessionID, user.TurnID = session.ID, user.ID
+	user.RunStatus, user.RunToken, user.RunLeaseUntil = "running", token, &lease
+	copy := *user
+	r.messages[user.ID] = &copy
+	return true, nil
+}
+
+func (r *agentRepoMemory) FinishChatTurn(ctx context.Context, user *model.AgentMessage, token string, answer *model.AgentMessage) error {
+	current := r.messages[user.ID]
+	if current == nil || current.RunToken != token || current.RunStatus != "running" {
+		return repository.ErrConflict
+	}
+	if answer != nil {
+		if err := r.CreateMessage(ctx, answer); err != nil {
+			return err
+		}
+		r.sessions[current.SessionID].LastMessageAt = &answer.GeneratedAt
+	}
+	copy := *user
+	copy.RunToken = ""
+	copy.RunLeaseUntil = nil
+	r.messages[user.ID] = &copy
+	return nil
+}
+
+func (r *agentRepoMemory) ClaimEnhancement(_ context.Context, m *model.AgentMessage) (bool, error) {
+	current := r.messages[m.ID]
+	if current == nil || current.EnhanceStatus != "" || current.DraftVersion != m.DraftVersion || current.ActionStatus != m.ActionStatus || current.DisplayStatus != m.DisplayStatus || current.Severity == "danger" {
+		return false, nil
+	}
+	copy := *current
+	copy.EnhanceStatus = "running"
+	r.messages[m.ID] = &copy
+	return true, nil
+}
+func (r *agentRepoMemory) SaveEnhancement(_ context.Context, m *model.AgentMessage) error {
+	current := r.messages[m.ID]
+	if current == nil || current.EnhanceStatus != "running" || current.DraftVersion != m.DraftVersion || current.ActionStatus != m.ActionStatus || current.DisplayStatus != m.DisplayStatus {
+		return repository.ErrConflict
+	}
+	copy := *current
+	copy.EnhanceStatus = m.EnhanceStatus
+	copy.EnhancedBody = m.EnhancedBody
+	copy.EnhanceModel = m.EnhanceModel
+	copy.EnhancePromptVersion = m.EnhancePromptVersion
+	copy.TotalTokens = m.TotalTokens
+	r.messages[m.ID] = &copy
+	return nil
+}
 func (r *agentRepoMemory) CreateSession(_ context.Context, s *model.AgentSession) error {
 	r.sessions[s.ID] = s
 	return nil
@@ -407,6 +492,45 @@ func TestPrivateAgentMessageUsesSessionOwner(t *testing.T) {
 	m := &model.AgentMessage{Base: model.Base{ID: "message"}, FamilyID: "fam", SessionID: "session", UserID: "user", Visibility: string(VisibilityPrivate)}
 	if s.canReadMessage(context.Background(), "fam", "user", m) {
 		t.Fatal("private message must follow the session owner, not a denormalized message user_id")
+	}
+}
+
+func TestPrivateDraftOwnerCanEditAndConfirmButOtherMemberCannot(t *testing.T) {
+	s, repo := newAgentServiceForTest()
+	repo.sessions["session"] = &model.AgentSession{Base: model.Base{ID: "session"}, FamilyID: "fam", UserID: "user"}
+	scope := AgentToolScope{FamilyID: "fam", UserID: "user", SessionID: "session", TurnID: "turn"}
+	result, err := s.ExecuteTool(context.Background(), scope, "createReminderDraft", `{"cat_id":"cat","title":"剪指甲","scheduled_at":"2026-10-02T09:00:00+08:00"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messageID := result.Draft.MessageID
+	list, err := s.ListMessages(context.Background(), "fam", "user", AgentMessageListQuery{})
+	if err != nil || len(list.Messages) != 0 {
+		t.Fatalf("private draft leaked into family list: %+v %v", list, err)
+	}
+	s.members = memberMemory{familyID: "fam", userID: "other", role: "member"}
+	if _, err := s.GetMessage(context.Background(), "fam", "other", messageID); err == nil {
+		t.Fatal("other member read private draft")
+	}
+	if _, err := s.EditDraft(context.Background(), "fam", "other", messageID, AgentReminderEditRequest{ExpectedVersion: 1, Reminder: result.Draft.Reminder}); err == nil {
+		t.Fatal("other member edited private draft")
+	}
+	if _, err := s.ConfirmDraft(context.Background(), "fam", "other", messageID, 1); err == nil {
+		t.Fatal("other member confirmed private draft")
+	}
+	s.members = memberMemory{familyID: "fam", userID: "user", role: "member"}
+	result.Draft.Reminder.Title = "剪指甲并记录"
+	draft, err := s.EditDraft(context.Background(), "fam", "user", messageID, AgentReminderEditRequest{ExpectedVersion: 1, Reminder: result.Draft.Reminder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.ConfirmDraft(context.Background(), "fam", "user", messageID, draft.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.ConfirmDraft(context.Background(), "fam", "user", messageID, draft.Version)
+	if err != nil || first.Reminder.ID != second.Reminder.ID || len(repo.reminders) != 1 {
+		t.Fatalf("private confirmation was not idempotent: %v", err)
 	}
 }
 

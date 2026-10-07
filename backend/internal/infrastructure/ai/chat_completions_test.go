@@ -20,6 +20,38 @@ func testConfig(base string) config.AI {
 	return config.AI{Enabled: true, BaseURL: base + "/v1", APIKey: "test-secret", Model: "test-model", Timeout: time.Second, MaxRetries: 1}
 }
 
+func TestProviderRetriesShareTurnRequestBudget(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) != 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_, _ = io.WriteString(w, `{"model":"test-model","choices":[{"finish_reason":"stop","message":{"content":"ok"}}]}`)
+	}))
+	defer server.Close()
+	cfg := testConfig(server.URL)
+	cfg.MaxRetries = 2
+	p := NewChatCompletionsProvider(cfg)
+	ctx := app.WithLLMRequestBudget(context.Background(), 4)
+	request := app.LLMRequest{Messages: []app.LLMMessage{{Role: "user", Content: "query"}}}
+	if _, err := p.ChatWithTools(ctx, request, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.ChatWithTools(ctx, request, nil); !errors.Is(err, app.ErrLLMRequestBudgetExhausted) {
+		t.Fatalf("missing shared budget: %v", err)
+	}
+	if calls.Load() != 4 {
+		t.Fatalf("HTTP requests=%d want=4 including retries", calls.Load())
+	}
+	if _, err := p.ChatWithTools(app.WithLLMRequestBudget(context.Background(), 1), request, nil); !errors.Is(err, app.ErrLLMRequestBudgetExhausted) {
+		t.Fatalf("enhancement budget not enforced: %v", err)
+	}
+	if calls.Load() != 5 {
+		t.Fatalf("enhancement retried beyond one HTTP request: %d", calls.Load())
+	}
+}
+
 func TestChatCompletionsProviderToolRoundTrip(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

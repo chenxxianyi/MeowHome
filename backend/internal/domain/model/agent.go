@@ -42,7 +42,21 @@ type AgentMessage struct {
 	// DedupKey 仅用于巡检消息；聊天消息必须保持 NULL，不能用空字符串占用唯一键。
 	DedupKey *string `gorm:"uniqueIndex;type:varchar(255)"`
 	// nil 表示非聊天消息。MySQL 唯一索引允许多个 NULL；空字符串会让巡检消息互相冲突。
-	ClientMessageID *string `gorm:"type:varchar(128)"`
+	ClientMessageID      *string `gorm:"type:varchar(128)"`
+	RunStatus            string  `gorm:"type:varchar(16)"`
+	RunToken             string  `gorm:"type:varchar(26)"`
+	RunLeaseUntil        *time.Time
+	Degraded             bool
+	PromptTokens         int
+	CompletionTokens     int
+	TotalTokens          int
+	RunError             string `gorm:"type:varchar(64)"`
+	DurationMS           int64
+	RuleBody             string `gorm:"type:text"`
+	EnhancedBody         string `gorm:"type:text"`
+	EnhanceStatus        string `gorm:"type:varchar(16)"`
+	EnhanceModel         string `gorm:"type:varchar(80)"`
+	EnhancePromptVersion string `gorm:"type:varchar(32)"`
 	// ToolCallID 关联一次模型工具调用；工具结果仅存受控摘要，不向客户端透出原始响应。
 	ToolCallID  string     `gorm:"type:varchar(128)"`
 	ToolName    string     `gorm:"type:varchar(64)"`

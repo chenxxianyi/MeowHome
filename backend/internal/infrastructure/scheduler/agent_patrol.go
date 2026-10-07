@@ -12,6 +12,7 @@ import (
 	"github.com/meowhome/backend/internal/app"
 	"github.com/meowhome/backend/internal/domain/model"
 	"github.com/meowhome/backend/internal/domain/repository"
+	"go.uber.org/zap"
 )
 
 type patrolRunner interface {
@@ -21,16 +22,17 @@ type patrolRunner interface {
 
 // AgentPatrolScheduler 串行扫描家庭。多实例部署前需增加数据库领取锁。
 type AgentPatrolScheduler struct {
-	agent    patrolRunner
-	families repository.FamilyRepo
-	records  repository.AgentEventRecordRepo
-	progress repository.AgentTaskProgressRepo
-	enabled  bool
-	times    []patrolTime
-	interval time.Duration
-	clock    func() time.Time
-	logf     func(string, ...any)
-	done     chan struct{}
+	agent         patrolRunner
+	families      repository.FamilyRepo
+	records       repository.AgentEventRecordRepo
+	progress      repository.AgentTaskProgressRepo
+	enabled       bool
+	times         []patrolTime
+	interval      time.Duration
+	clock         func() time.Time
+	logf          func(string, ...any)
+	familyAllowed func(string) bool
+	done          chan struct{}
 }
 
 type patrolTime struct{ hour, minute int }
@@ -77,6 +79,14 @@ func parsePatrolTimes(raw string) ([]patrolTime, error) {
 		return out[i].hour < out[j].hour
 	})
 	return out, nil
+}
+
+func (s *AgentPatrolScheduler) SetFamilyFilter(allowed func(string) bool) { s.familyAllowed = allowed }
+
+func (s *AgentPatrolScheduler) SetLogger(logger *zap.Logger) {
+	if logger != nil {
+		s.logf = func(event string, _ ...any) { logger.Warn("agent_scheduler_failure", zap.String("event", event)) }
+	}
 }
 
 // Start 立即补跑最近两个到期时段，随后每 30 秒扫描。Wait 用于退出等待。
@@ -130,6 +140,9 @@ func (s *AgentPatrolScheduler) RunOnce(ctx context.Context, now time.Time) error
 			return err
 		}
 		for _, family := range families {
+			if s.familyAllowed != nil && !s.familyAllowed(family.ID) {
+				continue
+			}
 			if family == nil || family.DeletedAt != nil {
 				continue
 			}

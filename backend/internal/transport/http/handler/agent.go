@@ -27,7 +27,7 @@ func (h *Handler) ListAgentMessages(c *gin.Context) {
 		}
 		q.Limit = n
 	}
-	data, err := h.agent.ListMessages(c.Request.Context(), c.Param("familyId"), mustUserID(c), q)
+	data, err := h.agent.ListMessages(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), q)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -36,7 +36,7 @@ func (h *Handler) ListAgentMessages(c *gin.Context) {
 }
 
 func (h *Handler) GetAgentMessage(c *gin.Context) {
-	data, err := h.agent.GetMessage(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("messageId"))
+	data, err := h.agent.GetMessage(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Param("messageId"))
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -50,7 +50,7 @@ func (h *Handler) EditAgentDraft(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	data, err := h.agent.EditDraft(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("messageId"), in)
+	data, err := h.agent.EditDraft(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Param("messageId"), in)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -64,7 +64,7 @@ func (h *Handler) ConfirmAgentDraft(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	data, err := h.agent.ConfirmDraft(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("messageId"), in.ExpectedVersion)
+	data, err := h.agent.ConfirmDraft(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Param("messageId"), in.ExpectedVersion)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -73,7 +73,7 @@ func (h *Handler) ConfirmAgentDraft(c *gin.Context) {
 }
 
 func (h *Handler) DismissAgentMessage(c *gin.Context) {
-	if err := h.agent.DismissMessage(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("messageId")); err != nil {
+	if err := h.agent.DismissMessage(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Param("messageId")); err != nil {
 		response.Err(c, err)
 		return
 	}
@@ -90,7 +90,7 @@ func (h *Handler) PatrolAgent(c *gin.Context) {
 		response.Err(c, appInvalid("family_id is required"))
 		return
 	}
-	data, err := h.agent.Patrol(c.Request.Context(), in.FamilyID, mustUserID(c))
+	data, err := h.agent.Patrol(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), in.FamilyID, mustUserID(c))
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -104,7 +104,7 @@ func (h *Handler) ChatAgent(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	data, err := h.agent.Chat(c.Request.Context(), c.Param("familyId"), mustUserID(c), in)
+	data, err := h.agent.Chat(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), in)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -118,7 +118,7 @@ func (h *Handler) ListAgentSessions(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	data, err := h.agent.ListSessions(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Query("before"), limit)
+	data, err := h.agent.ListSessions(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Query("before"), limit)
 	if err != nil {
 		response.Err(c, err)
 		return
@@ -132,7 +132,7 @@ func (h *Handler) ListAgentSessionMessages(c *gin.Context) {
 		response.Err(c, err)
 		return
 	}
-	data, err := h.agent.ListSessionMessages(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("sessionId"), c.Query("before"), limit)
+	data, err := h.agent.ListSessionMessages(app.WithAgentRequestID(c.Request.Context(), c.GetString("request_id")), c.Param("familyId"), mustUserID(c), c.Param("sessionId"), c.Query("before"), limit)
 	if err != nil {
 		response.Err(c, err)
 		return

@@ -10,5 +10,8 @@ CREATE TABLE IF NOT EXISTS ai_agent_task_progress (
     cursor_id         VARCHAR(26) NOT NULL DEFAULT '',
     PRIMARY KEY (family_id, task_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX idx_daily_records_family_created ON daily_records (family_id, created_at, id);
+SET @ddl = IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='daily_records' AND INDEX_NAME='idx_daily_records_family_created')=0, 'CREATE INDEX idx_daily_records_family_created ON daily_records (family_id, created_at, id)', 'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 -- +migrate StatementEnd

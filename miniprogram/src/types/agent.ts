@@ -52,6 +52,11 @@ export interface AgentMessage {
   generated_at: string // RFC3339
   model: AgentModel
   disclaimer?: string
+  turn_id?: string
+  client_message_id?: string
+  run_status?: 'pending' | 'running' | 'completed' | 'failed'
+  run_lease_until?: string
+  degraded?: boolean
 }
 
 export interface AgentReminderDraft {
@@ -95,7 +100,10 @@ export interface AgentMessageListResponse {
 
 export interface AgentChatResponse {
   session_id: ID
-  message: AgentMessage
+  turn_id: string
+  client_message_id: string
+  status: 'running' | 'completed'
+  message: AgentMessage | null
   degraded: boolean
 }
 

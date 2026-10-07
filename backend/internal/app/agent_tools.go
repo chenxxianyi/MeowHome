@@ -11,6 +11,7 @@ import (
 	"github.com/meowhome/backend/internal/domain/model"
 	"github.com/meowhome/backend/internal/domain/repository"
 	apperr "github.com/meowhome/backend/internal/platform/errors"
+	"go.uber.org/zap"
 )
 
 // AgentToolScope 只能由鉴权后的服务端构造，不能从模型参数读取。
@@ -90,8 +91,16 @@ func (s *AgentService) toolCat(ctx context.Context, familyID, catID string) (*mo
 	return cat, nil
 }
 
-func (s *AgentService) ExecuteTool(ctx context.Context, scope AgentToolScope, name, rawArgs string) (*AgentToolResult, error) {
-	if err := s.ensureEnabled(); err != nil {
+func (s *AgentService) ExecuteTool(ctx context.Context, scope AgentToolScope, name, rawArgs string) (result *AgentToolResult, err error) {
+	toolName := "unknown"
+	switch name {
+	case "listRecords", "getCatProfile", "getTrends", "createReminderDraft":
+		toolName = name
+	}
+	defer func() {
+		s.logger.Info("agent_tool_finished", zap.String("request_id", agentRequestID(ctx)), zap.String("turn_id", scope.TurnID), zap.String("family_id", scope.FamilyID), zap.String("tool", toolName), zap.Bool("success", err == nil), zap.String("reason", agentRunErrorCode(err)))
+	}()
+	if err := s.ensureEnabled(scope.FamilyID); err != nil {
 		return nil, err
 	}
 	if err := s.access(ctx, scope.FamilyID, scope.UserID); err != nil {
