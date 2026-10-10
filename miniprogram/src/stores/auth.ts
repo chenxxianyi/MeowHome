@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 
 import { clearAuthStorage, getRefreshToken, getStoredFamilyId, getToken, saveFamilyId, saveTokens } from '../api/client'
 import { authApi, toUser } from '../api/endpoints'
+// 小程序编译器会将业务模块的动态 import 转为路径字符串。
+// 保留静态导入，仅在 action 中调用 store，避免初始化时相互读取。
+import { useAgentStore } from './agent'
 import type { User } from '../types'
 
 interface AuthState {
@@ -28,9 +31,11 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     /** 应用启动时恢复会话：有 token 就拉一次 /me 校准用户与家庭。 */
     async bootstrap() {
+      console.info('[auth] bootstrap.start')
       if (!getToken()) {
-        (await import('./agent')).useAgentStore().reset()
+        useAgentStore().reset()
         this.ready = true
+        console.info('[auth] bootstrap.no-session')
         return
       }
       try {
@@ -38,7 +43,7 @@ export const useAuthStore = defineStore('auth', {
         this.user = toUser(me)
         this.isAuthenticated = true
         if (me.family_id) {
-          if (this.familyId && this.familyId !== me.family_id) (await import('./agent')).useAgentStore().reset()
+          if (this.familyId && this.familyId !== me.family_id) useAgentStore().reset()
           this.familyId = me.family_id
           saveFamilyId(me.family_id)
         } else {
@@ -47,13 +52,15 @@ export const useAuthStore = defineStore('auth', {
           await this.resolveFamily()
         }
       } catch {
-        (await import('./agent')).useAgentStore().reset()
+        console.info('[auth] bootstrap.failed')
+        useAgentStore().reset()
         clearAuthStorage()
         this.isAuthenticated = false
         this.user = null
         this.familyId = null
       } finally {
         this.ready = true
+        console.info('[auth] bootstrap.done')
       }
     },
 
@@ -62,7 +69,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const list = await authApi.myFamilies()
         if (list.length > 0) {
-          if (this.familyId && this.familyId !== list[0].id) (await import('./agent')).useAgentStore().reset()
+          if (this.familyId && this.familyId !== list[0].id) useAgentStore().reset()
           this.familyId = list[0].id
           saveFamilyId(list[0].id)
         }
@@ -73,16 +80,21 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async login(email: string, password: string) {
+      console.info('[auth] login.start')
       const res = await authApi.login(email, password)
+      console.info('[auth] login.response')
       saveTokens(res.access_token, res.refresh_token)
       this.isAuthenticated = true
       this.ready = true
       await this.bootstrap()
+      console.info('[auth] login.done')
       return this.familyId
     },
 
     async register(email: string, password: string, userName: string, familyName?: string) {
+      console.info('[auth] register.start')
       const res = await authApi.register(email, password, userName)
+      console.info('[auth] register.response')
       saveTokens(res.access_token, res.refresh_token)
       this.isAuthenticated = true
       this.ready = true
@@ -93,20 +105,24 @@ export const useAuthStore = defineStore('auth', {
       } else {
         await this.resolveFamily()
       }
+      console.info('[auth] register.done')
       return this.familyId
     },
 
     async createFamily(name: string) {
+      console.info('[auth] family.create.start')
       const f = await authApi.createFamily(name)
-      ;(await import('./agent')).useAgentStore().reset()
+      console.info('[auth] family.create.response')
+      useAgentStore().reset()
       this.familyId = f.id
       saveFamilyId(f.id)
       await this.bootstrap()
+      console.info('[auth] family.create.done')
       return f.id
     },
 
     async logout() {
-      ;(await import('./agent')).useAgentStore().reset()
+      useAgentStore().reset()
       const refresh = getRefreshToken()
       if (refresh) {
         try {

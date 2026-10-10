@@ -14,7 +14,7 @@
  */
 
 /** 后端源站（不含 /api/v1）。改这里即可切换环境。 */
-export const API_ORIGIN = 'http://127.0.0.1:8080'
+export const API_ORIGIN = 'http://192.168.1.13:8080'
 
 /** 业务接口前缀（与后端路由 /api/v1 对应）。 */
 export const API_BASE = `${API_ORIGIN}/api/v1`

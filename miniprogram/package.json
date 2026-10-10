@@ -38,6 +38,7 @@
     "verify:migration": "node scripts/verify-migration.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "test": "node --test scripts/*.test.mjs",
+    "test:mp-weixin": "npm run build:mp-weixin && node --test scripts/weixin/*.test.mjs",
     "lint": "eslint src --ext .ts,.vue && prettier --check ."
   },
   "dependencies": {

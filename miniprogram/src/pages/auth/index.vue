@@ -89,6 +89,7 @@ function switchMode(next: 'login' | 'register') {
 }
 
 async function onSubmit() {
+  if (submitting.value) return
   error.value = ''
   if (!email.value || !password.value) {
     error.value = '请填写邮箱与密码'
@@ -115,11 +116,14 @@ async function onSubmit() {
   }
 
   submitting.value = true
+  const action = isRegister.value ? 'register' : 'login'
+  console.info(`[auth-page] ${action}.submit`)
   try {
     const familyId = isRegister.value
       ? await auth.register(email.value, password.value, userName.value, familyName.value || `${userName.value}的猫宅`)
       : await auth.login(email.value, password.value)
 
+    console.info(`[auth-page] ${action}.navigate`, { hasFamily: Boolean(familyId) })
     if (!familyId) {
       navigate('/pages/onboarding/index')
       return
@@ -127,6 +131,7 @@ async function onSubmit() {
     navigate(redirect.value.startsWith('/pages/') ? redirect.value : '/pages/today/index')
   } catch (e) {
     const apiError = toApiError(e)
+    console.info(`[auth-page] ${action}.failed`, { code: apiError.code })
     if (apiError.code === 'CONFLICT') {
       error.value = '该邮箱已注册，请直接登录'
       mode.value = 'login'
@@ -137,6 +142,7 @@ async function onSubmit() {
     }
   } finally {
     submitting.value = false
+    console.info(`[auth-page] ${action}.finished`)
   }
 }
 </script>

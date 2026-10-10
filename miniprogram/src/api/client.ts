@@ -39,12 +39,16 @@ export function getStoredFamilyId(): string | null {
 }
 
 export function saveTokens(access: string, refresh?: string) {
+  console.info('[auth] session.save.start')
   uni.setStorageSync(TOKEN_KEY, access)
   if (refresh) uni.setStorageSync(REFRESH_KEY, refresh)
+  console.info('[auth] session.save.done')
 }
 
 export function saveFamilyId(id: string) {
+  console.info('[auth] family.save.start')
   uni.setStorageSync(FAMILY_KEY, id)
+  console.info('[auth] family.save.done')
 }
 
 export function clearAuthStorage() {
@@ -101,62 +105,124 @@ function buildQuery(params?: Record<string, unknown>): string {
   return parts.length ? `?${parts.join('&')}` : ''
 }
 
-function rawRequest(client: ApiClientOptions, config: RequestConfig, token: string | null): Promise<RawResponse> {
+/** 原生 timeout 之外独立结束 Promise，避免调试环境回调缺失时一直等待。 */
+function requestWithDeadline(options: UniApp.RequestOptions, timeout: number): Promise<RawResponse> {
+  const path = options.url.replace(/^https?:\/\/[^/]+/, '').split('?')[0]
+  const traceEnabled = /\/(?:auth\/(?:register|login|refresh)|me|families)$/.test(path)
+  const startedAt = Date.now()
+  // 只记录认证步骤与请求 ID；不得输出请求体、响应体或鉴权头。
+  function trace(phase: string, status?: number) {
+    if (!traceEnabled) return
+    console.info(`[api] ${phase}`, {
+      path,
+      requestId: options.header?.['X-Request-Id'],
+      elapsedMs: Date.now() - startedAt,
+      ...(status === undefined ? {} : { status })
+    })
+  }
   return new Promise((resolve, reject) => {
-    const header: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Request-Id': genRequestId()
+    let settled = false
+    let task: UniApp.RequestTask | undefined
+    const timer = setTimeout(() => {
+      if (settled) return
+      trace('request.timeout')
+      finish(() => reject(new ApiError('REQUEST_TIMEOUT', '连接服务超时，请检查网络后重试', 0)))
+      try {
+        task?.abort()
+      } catch {
+        // Promise 已超时结束；平台中止异常不能再次阻塞界面。
+      }
+    }, timeout)
+
+    function finish(callback: () => void) {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      callback()
     }
-    if (token) header.Authorization = `Bearer ${token}`
 
-    // ⚠️ 微信 wx.request 不支持 PATCH（合法值仅 GET/POST/PUT/DELETE/OPTIONS/HEAD/TRACE/CONNECT）。
-    // 降级为 POST + X-HTTP-Method-Override，需要后端识别该头并路由到 PATCH 处理器。
-    // 后端未实现前，涉及 PATCH 的接口（更新家庭 / 更新猫咪 / 完成提醒）会失败。
-    const isPatch = config.method === 'PATCH'
-    const method: UniMethod = isPatch ? 'POST' : (config.method as UniMethod)
-    if (isPatch) header['X-HTTP-Method-Override'] = 'PATCH'
+    try {
+      trace('request.start')
+      task = uni.request({
+        ...options,
+        timeout,
+        success: (res) =>
+          finish(() => {
+            trace('response.success', res.statusCode)
+            resolve({ statusCode: res.statusCode, data: res.data })
+          }),
+        fail: (err) =>
+          finish(() => {
+            const timedOut = /timeout/i.test(err?.errMsg || '')
+            trace(timedOut ? 'response.timeout' : 'response.failed')
+            reject(
+              new ApiError(
+                timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR',
+                timedOut ? '连接服务超时，请检查网络后重试' : '暂时无法连接服务，请检查网络后重试',
+                0
+              )
+            )
+          })
+      })
+      trace('request.dispatched')
+    } catch (error) {
+      trace('request.threw')
+      finish(() => reject(error))
+    }
+  })
+}
 
-    uni.request({
+function rawRequest(client: ApiClientOptions, config: RequestConfig, token: string | null): Promise<RawResponse> {
+  const header: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-Id': genRequestId()
+  }
+  if (token) header.Authorization = `Bearer ${token}`
+
+  // 微信 wx.request 不支持 PATCH，后端 MethodOverride 将此 POST 按 PATCH 路由。
+  const isPatch = config.method === 'PATCH'
+  const method: UniMethod = isPatch ? 'POST' : (config.method as UniMethod)
+  if (isPatch) header['X-HTTP-Method-Override'] = 'PATCH'
+
+  return requestWithDeadline(
+    {
       url: apiBase + config.url + buildQuery(config.params),
       method,
       data: config.data as string | AnyObject | ArrayBuffer | undefined,
-      header,
-      timeout: client.timeout,
-      success: (res) => resolve({ statusCode: res.statusCode, data: res.data }),
-      // uni.request 的失败对象是 { errMsg }，规范成 { message } 以便 toApiError 提取文案
-      fail: (err) => reject({ message: (err && err.errMsg) || '网络请求失败' })
-    })
-  })
+      header
+    },
+    client.timeout
+  )
 }
 
 // 401 自动刷新：并发请求共享同一次刷新，避免令牌被反复轮换。
 let refreshing: Promise<string | null> | null = null
 
-function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(): Promise<string | null> {
   const refresh = getRefreshToken()
-  if (!refresh) return Promise.resolve(null)
+  if (!refresh) return null
 
-  return new Promise((resolve) => {
-    // 直接调 uni.request，绕开本方封装，避免刷新失败时递归
-    uni.request({
-      url: `${apiBase}/auth/refresh`,
-      method: 'POST',
-      data: { refresh_token: refresh },
-      header: { 'Content-Type': 'application/json' },
-      timeout: 10000,
-      success: (res) => {
-        const body = res.data as Envelope<{ access_token: string; refresh_token: string }> | undefined
-        const data = body && body.data
-        if (res.statusCode === 200 && data && data.access_token) {
-          saveTokens(data.access_token, data.refresh_token)
-          resolve(data.access_token)
-        } else {
-          resolve(null)
-        }
+  try {
+    // 绕开 send，避免刷新失败时递归；刷新也必须独立超时结束。
+    const res = await requestWithDeadline(
+      {
+        url: `${apiBase}/auth/refresh`,
+        method: 'POST',
+        data: { refresh_token: refresh },
+        header: { 'Content-Type': 'application/json', 'X-Request-Id': genRequestId() }
       },
-      fail: () => resolve(null)
-    })
-  })
+      10000
+    )
+    const body = res.data as Envelope<{ access_token: string; refresh_token: string }> | undefined
+    const data = body && body.data
+    if (res.statusCode === 200 && data && data.access_token) {
+      saveTokens(data.access_token, data.refresh_token)
+      return data.access_token
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 /** 跳转登录页（等价于 Web 端的 location.hash 判断，避免重复跳转）。 */

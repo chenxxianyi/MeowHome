@@ -669,6 +669,97 @@ npm run build:mp-weixin
 
 配置模板同步 `MYSQL_TEST_ENV_FILE` 与唯一临时库行为，运行说明更新可复跑命令及实测结果。`backend/.env` 未修改，业务库未执行迁移、回滚或测试写入。AG-A01、AG-B04、V08/V09/V11 已按证据完成；其余规则/业务及阶段验收按各自复选框继续，真实 Provider 和微信开发者工具/真机未验证。模型部分使用 Fake 验证执行契约，不代表真实模型质量。
 
+### 2026-10-07 / Codex：小程序会话恢复编译故障修复
+
+- 状态：代码修复和自动验证完成；微信开发者工具交互待人工确认。
+- 根因：`miniprogram/src/stores/auth.ts` 的 6 处动态导入在当前 uni-app 小程序构建中生成为 `await "./agent.js"`，不是模块对象；无 token 启动、登录失效、家庭变化、创建家庭及退出均可能失败。
+- 修改：改用静态导入，仅在 action 内调用 Agent store；新增 `scripts/weixin/auth-store.test.mjs` 及 `npm.cmd run test:mp-weixin`，先构建再执行产物回归。同步小程序 README、迁移步骤及 Agent 运行说明。
+- 验证（`miniprogram/`）：旧产物 7 项全部失败，包含与截图一致的 `useAgentStore is not a function`；修复后微信构建及产物回归 7/7 通过，`npm.cmd test` 13/13、`npm.cmd run type-check`、`npm.cmd run verify:migration`、auth.ts 定向 ESLint 和修改文件 Prettier 全部通过。
+- 测试边界：Node 加载真实微信 CommonJS 模块和真实 Pinia，网络/存储使用测试替身；没有操作微信开发者工具或真机。构建保留上游 `finally` 循环引用警告，并新增 auth/agent chunk 循环提示，两种模块加载顺序均已回归通过。
+- 人工后续：开发者工具导入最新 `miniprogram/dist/build/mp-weixin` 并重新编译；必要时清缓存，验证首次进入、会话失效、家庭创建/变化和退出后重新登录。阶段 A/B/C 总体验收保持未完成。
+
+### 2026-10-07 / Codex：本地后端连接及旧编译包复核
+
+- 实测本机 8080 初始连接被拒绝；现有 `.env` 的 `APP_PORT=8080` 与小程序接口一致。用本机可运行的 Go 安装启动后端后，两项健康接口 HTTP 200；未认证 `/api/v1/me` HTTP 401 `AUTH_REQUIRED`。初次启动受 Go 缓存权限限制，授权缓存访问后启动成功；未修改数据库配置、未执行迁移。
+- 复核磁盘 `stores/auth.js` 已使用静态 Agent 导入、无旧 `await "./agent.js"`；重新构建及 7 项编译产物回归再次全部通过。日志中的 `_state.sent(...).useAgentStore` 对应旧动态导入调用，微信工具的实际项目目录/缓存需继续核对。
+- 已更新小程序 README 和运行说明中的启动、健康检查及缓存排查流程。实际微信交互与登录业务验收仍待人工确认。
+
+### 2026-10-07 / Codex：手机注册请求地址与等待超时修复
+
+- 手机调试目录已由项目方确认是 `miniprogram/dist/build/mp-weixin`。原 `API_ORIGIN=127.0.0.1:8080` 无法在手机上指向电脑；电脑 WLAN 地址为 `192.168.1.13`，已调整调试地址，电脑对该地址的健康检查 HTTP 200。后端日志有模拟器会话恢复成功记录，没有看到本次手机注册请求。
+- `client.ts` 为普通请求和令牌刷新加入独立计时器，回调缺失时分别在 15 秒/10 秒结束 Promise 并中止请求，成功/失败清理计时器，忽略迟到回调；页面保留 finally 恢复状态并增加重复提交保护。
+- 新增 5 项客户端编译产物测试，旧产物 2/5 通过，修复后 5/5；`test:mp-weixin` 合计 12/12，源码测试 13/13、类型检查、迁移静态检查通过。手机是否能访问电脑 LAN 及实际注册完成情况待用户验证，不能用电脑访问代替真机验收。
+- 同时观察到 `ai_agent_messages` 缺表造成 Agent 消息查询 HTTP 500；数据库结构需补齐后再验收猫管家接口。
+
+### 2026-10-07 / Codex：补齐本地开发库 Agent 结构
+
+- 状态：数据库结构升级和只读核验完成，手机注册及完整 Agent 交互仍待人工确认。
+- 只读检查确认三张 Agent 表均不存在，提醒缺少 scheduled_at/timezone/completed_at。首次元数据检查误用了 members，查询失败；按真实模型表名 family_members 修正后核对成功，没有该检查的数据库写入。
+- 审查并暂存 007–014 的 8 项 Up 脚本，`backend/` 中 `go run ./cmd/migrate -dir .agent-migrations-up -dry` 预演通过，再执行相同目录的正式 Up，8/8 成功；未执行 001–006 或 Down。临时目录与只读核验程序已清理。
+- 升级后 Agent 三表存在、提醒调度字段为 3，消息过滤 SQL 成功。users/families/family_members 均保持 1 行；cats/daily_records/reminders 均保持 0 行，升级前后业务行数一致。已有 .env 未修改。
+- 前端最新状态：13 项源码测试、12 项微信产物测试、类型/迁移检查及修改文件定向 ESLint/Prettier 通过；保持现有构建循环警告记录。电脑 LAN 健康请求成功，手机网络与注册结果仍需实际验证，阶段整体不据此勾选。
+
+### 2026-10-07 / Codex：真机注册成功证据、响应步骤与后端恢复
+
+- 状态：定位与诊断代码完成；手机完整登录/家庭创建仍待验证。
+- 实际证据：17:26:37 后端记录请求 `req-1791365198212-4a639a3a`，手机 `192.168.1.8` 注册返回 201，耗时约 25 毫秒，与截图请求 ID 完全一致。账号已创建，但未观察到家庭创建；更新之前“手机请求未到达”的历史结论，后续使用已有账号登录。
+- 用户随后报告网络超时；复查发现原后端进程已不在、LAN 健康接口失败。构建 `backend/bin/meowhome-debug.exe`，通过隐藏后台进程运行，日志保存在同目录的 `server-*.log`，恢复后 LAN 健康接口 HTTP 200。二进制/日志处于忽略目录，未修改 .env 或真实用户数据。
+- 修改：client.ts 记录认证请求发送/回调/超时与同步存储的开始、结束；auth.ts 与注册页记录响应、家庭创建、跳转及 finally；App.vue、env.d.ts、vite.config.ts 加入构建时间标记。日志不包含邮箱、密码、令牌或请求/响应正文。
+- 验证（miniprogram/）：`npm.cmd run type-check`、`npm.cmd test` 13/13、`npm.cmd run test:mp-weixin` 构建及 12/12、`npm.cmd run verify:migration`、修改源码定向 ESLint/Prettier 通过；保留已有构建警告。同步 README、迁移步骤、运行说明与执行日志。
+- 后续：项目方结束旧调试、重新编译扫码，取消“使用工具端的 Storage”并登录已有账号，依据最后的步骤日志判断响应回调或同步存储是否阻塞。Storage/调试桥接尚为待验证假设，未把真实手机完整流程标成通过。
+
+### 2026-10-07 / Codex：19:33 真机超时与持续启动方式
+
+- 状态：停止原因的时间证据、服务恢复及启动脚本完成；手机当前可达性/登录结果待验证。
+- 证据：新截图时间 19:33，旧后台日志在 19:29:26 记录 `server stopped`，进程已退出，LAN 健康请求连接失败，没有该时段实际手机注册/登录记录。停止的发起方未知；vConsole System 页只有系统/网络/UA，不能据 `Unknown` 断定鸿蒙兼容错误。
+- 修改：新增 `backend/scripts/start-local.ps1`，检测本机 Go 与 .env；`-Restart` 按完整路径匹配本项目 debug 二进制后重启，服务在执行脚本的终端持续运行。同步 README、迁移步骤、执行日志及运行说明；小程序代码和数据库未改。
+- 验证：PowerShell 语法解析通过；直接执行 ps1 受本机 Restricted 策略阻止；进程级 ExecutionPolicy 命令执行成功，验证已有实例提示分支，系统策略未修改。已用现有 debug 二进制恢复服务，LAN `/health/live`、`/health/ready` 均 200。没有为文档与本地启动脚本重复全量前端/数据库测试。
+- 后续：项目方在自己的终端运行脚本并保持窗口打开，手机浏览器验证健康地址，再登录已有账号；若仍超时提供同次业务步骤日志。没有证据将本次问题归因于广告、Storage 或系统兼容，完整真机验收保持待办。
+
+### 2026-10-07 / Codex：登录 200 与请求回调缺失诊断
+
+- 状态：范围缩小和诊断版本完成，实际手机探针结果与修复验证待执行。
+- 证据：项目方日志中 `req-1791373911756-b19d97e0` 发送后 15002 毫秒独立超时，未出现 response.success/failed，页面 finally 已恢复。项目方确认手机浏览器健康接口 SUCCESS/up、后端同 ID 登录 200；服务器 latency 仍待补充。电脑 localhost/LAN 健康均 200、当前新后端监听所有地址。
+- 只读网络检查：WLAN 为 Public，防火墙 BlockInbound/AllowOutbound；本地有匹配当前 server.exe 路径的公用 TCP Allow。NetFirewallPortFilter 查询被 Windows 权限拒绝，改用 netsh/注册表读取。没有修改规则；旧后台文件不包含新终端的请求，不能据旧文件判定当前登录未到达。
+- 修改：新增 `miniprogram/src/utils/network-diagnostics.ts`，App.vue 在本地 HTTP 配置下注册 `globalThis.__meowhomeProbe()`。四个只读健康请求比较 uni-json、uni-json-complete、wx-json、wx-text，6 秒结束并隔离迟到回调，仅输出名称/请求 ID/阶段/状态/耗时，无凭据、正文或业务写入。正式认证传输未改。
+- 验证（miniprogram/）：源码 13/13、微信构建和产物 12/12、类型/迁移检查及定向 ESLint/Prettier 通过；首次类型检查因可选回调被推断为 Promise 失败，明确必需 success/fail 类型后通过；格式检查失败后已格式化。构建原有循环警告保留。
+- 同步 README、迁移步骤、运行说明和执行日志。请求项目方重新编译扫码、在 AppService Console 运行探针，并提供 summary 与后端 latency；不把 framework/JSON/调试桥接任一假设写成已修复根因。
+
+### 2026-10-07 / Codex：替换不可用的 Console 诊断入口
+
+- 状态：诊断入口调整和构建完成，实际手机自动探针结果待收集，登录故障根因未确认。
+- 证据：项目方启动日志出现 ready，但 Console 执行 `globalThis.__meowhomeProbe()` 返回 is not a function。入口在当前 Console 上下文不可见，具体 SDK/上下文实现差异未确认；该错误不证明 HTTP 请求失效。
+- 修改：移除全局注册/手工执行提示，App.onLaunch 在本地 HTTP 地址自动启动一次只读健康诊断，输出 auto.start 和 summary；同一进程去重，正式 HTTPS 不运行。四种探针和凭据隔离保持原有行为；正式认证传输未改。
+- 验证：微信构建、12/12 产物回归、类型检查、迁移静态检查及修改源码定向 ESLint/Prettier 通过；原有构建警告保留。当前后端健康仍 200，未修改数据库、配置或防火墙。
+- 已同步 README、迁移步骤、运行说明、执行日志。项目方只需重新编译、重新扫码并提供约 6 秒后输出的 summary，不再运行旧全局命令；完整手机登录验收继续保留待办。
+
+### 2026-10-07 / Codex：修正自动诊断模块导致的启动异常
+
+- 状态：启动依赖修正和编译产物回归完成；真机诊断与登录超时根因待确认。
+- 证据：项目方手机报 `startLocalNetworkDiagnostics is not a function`，新登录请求 `req-1791375567033-35c00e1e` 发送后 15003 毫秒独立超时。磁盘原诊断模块有对应导出，实际微信加载差异未确认；上一轮后端状态 200 不能直接替代新请求的 status/latency 核对。
+- 修改：诊断直接内联 `miniprogram/src/App.vue`，删除独立诊断模块，使用既有 API_BASE 推导健康地址。先初始化应用网络查询/监听，再隔离执行只读探针；本地 HTTP 自动运行一次，正式 HTTPS 不运行。认证传输未改。
+- 验证：新增 `scripts/weixin/app-startup.test.mjs`，加载真实编译 App，模拟缺失导出的旧模块，旧产物 0/5；新产物 5/5，连同认证/请求回归共 17/17 通过。覆盖启动不中断、无回调超时、成功回调、平台同步抛错和 HTTPS 禁用诊断。平台/网络使用替身，不代表手机通过。
+- 检查（miniprogram/）：`npm.cmd run test:mp-weixin`、`npm.cmd run type-check`、`npm.cmd run verify:migration`、修改代码定向 ESLint/Prettier 通过。首次误用 `typecheck` 命令未运行检查，改用正确脚本通过；测试格式检查失败后格式化通过。原有构建循环警告保留；源码测试沿用上一轮 13/13，未重复运行。
+- 当前 LAN 健康 HTTP 200，后端仍由项目方终端运行，未重启后端或修改数据库、防火墙。同步 README、迁移步骤、运行说明及执行日志。
+- 后续：本轮 buildTime 为 `2026-10-07T12:26:55.333Z`，项目方结束旧真机调试、重新编译扫码，提供约 6 秒后的 summary 和新登录请求的后端 status/latency。入口异常修正与登录超时分别验收，完整手机登录保留待办。
+
+### 2026-10-07 / Codex：核对模拟器探针与手机登录日志
+
+- 状态：服务端耗时与测试环境核对完成；手机探针与登录修复待验收。
+- 新证据：项目方终端中 `req-1791375567033-35c00e1e` 状态 200、latency 0.019777 秒、client_ip `192.168.1.8`，与 15003 毫秒超时的手机请求一致；上一轮 ID 状态 200、0.0182501 秒。现有证据排除服务端处理慢，但不证明手机收到回调。
+- 20:27:59 四个健康探针均成功 200、101–108 毫秒；后端来源电脑 `192.168.1.13`，项目方确认来自电脑模拟器。内联启动在模拟器验证成功，不能用于勾选真机验收。
+- 微信工具仍读取删除后的诊断路径并报 ENOENT；搜索当前源码和微信编译目录均无旧模块路径引用，记录为工具持有旧引用，未将其直接判为手机登录超时根因。没有恢复旧诊断依赖或盲目更换认证传输。
+- 同步当前 README/运行说明与迁移/执行记录；请求结束旧真机调试，必要时清缓存重编，重新扫码并在独立真机窗口收集自动 summary。没有为只读核对和文档更新重复测试。
+
+### 2026-10-07 / Codex：修复微信工具持续读取已删除模块
+
+- 状态：实际微信构建/临时预览通过，手机登录与回调仍待验证。
+- 项目方重启后仍报 `ENOENT ...utils/network-diagnostics.js`，源码/产物没有该路径引用。通过当前安装 CLI 的帮助与实现核对 reset-fileutils 和 compile/file 缓存命令，限定当前微信工程处理。
+- 首次 CLI 沙箱执行因 .cli 文件访问权限失败；授权调用后服务端口关闭，操作未执行。项目方开启服务端口后，reset-fileutils 和 compile 清理返回成功，但实际 preview 仍复现 ENOENT；进一步 file 清理、close/open 当前工程后，preview 成功。
+- 预览操作最初被自动审批拒绝：上传构建产物到微信，目标账号归属及上传授权不明确。未绕过拒绝；项目方确认 AppID 属于其账号并明确同意临时预览上传后再执行，成功生成二维码。
+- 验证：微信实际 preview 返回成功，包体 694379 字节（678.1 KB），二维码 `miniprogram/dist/preview/meowhome-preview.png` 于 20:42:21 生成并查看。构建错误已排除，不能据此判定手机登录修复；原构建时间未变。
+- 本步未更改业务代码或数据库，未重复 Node 测试。已更新 README、运行说明、迁移步骤和执行日志；项目方扫码作普通预览登录对照，真实手机结果仍待反馈。
+
 每完成一个任务追加一条，不覆盖上一轮记录：
 
 ```text
