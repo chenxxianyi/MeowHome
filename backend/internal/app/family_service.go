@@ -353,6 +353,29 @@ func (s *CatService) UpdateCat(ctx context.Context, catID, userID string, name, 
 	return c, nil
 }
 
+// UpdateCatAvatar 更新猫咪头像存储键。
+func (s *CatService) UpdateCatAvatar(ctx context.Context, familyID, catID, userID, avatarKey string) (*model.Cat, error) {
+	c, err := s.catRepo.FindByID(ctx, catID)
+	if err != nil {
+		return nil, errors.NotFound(errors.CodeNotFound, "cat not found")
+	}
+	if c.FamilyID != familyID {
+		return nil, errors.Forbidden(errors.CodeFamilyForbidden, "access denied")
+	}
+	if err := s.enforceCatAccess(ctx, familyID, userID); err != nil {
+		return nil, err
+	}
+	c.AvatarKey = avatarKey
+	c.UpdatedAt = time.Now().UTC()
+	if err := s.catRepo.Update(ctx, c); err != nil {
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to update cat avatar", err)
+	}
+	if err := s.loadCatHealth(ctx, c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // ListCats 列出家庭所有猫咪。
 func (s *CatService) ListCats(ctx context.Context, familyID, userID string) ([]*model.Cat, error) {
 	if err := s.enforceCatAccess(ctx, familyID, userID); err != nil {

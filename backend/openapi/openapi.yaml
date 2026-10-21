@@ -255,6 +255,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CatEnvelope'
+  /families/{familyId}/cats/{catId}/avatar:
+    post:
+      tags: [cats]
+      summary: 上传猫咪头像
+      operationId: uploadCatAvatar
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/CatId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 头像上传并更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatEnvelope'
   /families/{familyId}/cats/{catId}:
     get:
       tags: [cats]

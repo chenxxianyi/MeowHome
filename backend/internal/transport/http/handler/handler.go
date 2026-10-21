@@ -2,25 +2,39 @@
 package handler
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/meowhome/backend/internal/app"
 	"github.com/meowhome/backend/internal/domain/model"
+	apperr "github.com/meowhome/backend/internal/platform/errors"
 	"github.com/meowhome/backend/internal/transport/http/response"
 )
 
 // Handler 聚合所有业务 handler。
 type Handler struct {
-	auth     *app.AuthService
-	family   *app.FamilyService
-	cat      *app.CatService
-	member   *app.MemberService
-	record   *app.RecordService
-	care     *app.CareService
-	reminder *app.ReminderService
-	asset    *app.AssetService
-	ai       *app.AIService
-	agent    *app.AgentService
+	auth           *app.AuthService
+	family         *app.FamilyService
+	cat            *app.CatService
+	member         *app.MemberService
+	record         *app.RecordService
+	care           *app.CareService
+	reminder       *app.ReminderService
+	asset          *app.AssetService
+	ai             *app.AIService
+	agent          *app.AgentService
+	storageDir     string
+	maxUploadBytes int64
 }
 
 // New 创建 handler 集合。
@@ -37,16 +51,25 @@ func New(
 	agent *app.AgentService,
 ) *Handler {
 	return &Handler{
-		auth:     auth,
-		family:   family,
-		cat:      cat,
-		member:   member,
-		record:   record,
-		care:     care,
-		reminder: reminder,
-		asset:    asset,
-		ai:       ai,
-		agent:    agent,
+		auth:           auth,
+		family:         family,
+		cat:            cat,
+		member:         member,
+		record:         record,
+		care:           care,
+		reminder:       reminder,
+		asset:          asset,
+		ai:             ai,
+		agent:          agent,
+		maxUploadBytes: 20 << 20,
+	}
+}
+
+// SetLocalStorage 配置头像本地存储目录和单文件大小上限。
+func (h *Handler) SetLocalStorage(dir string, maxUploadBytes int64) {
+	h.storageDir = dir
+	if maxUploadBytes > 0 {
+		h.maxUploadBytes = maxUploadBytes
 	}
 }
 
@@ -312,6 +335,110 @@ func (h *Handler) UpdateCat(c *gin.Context) {
 		return
 	}
 	response.OK(c, catToEnvelope(cat))
+}
+
+// UploadCatAvatar 上传猫咪头像并保存到猫咪档案。
+func (h *Handler) UploadCatAvatar(c *gin.Context) {
+	if h.storageDir == "" {
+		response.Err(c, apperr.New(apperr.TypeExternal, apperr.CodeStorageUnavailable, "头像存储暂不可用"))
+		return
+	}
+
+	familyID := c.Param("familyId")
+	catID := c.Param("catId")
+	userID := mustUserID(c)
+	cat, err := h.cat.GetCat(c.Request.Context(), catID, userID)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	if cat.FamilyID != familyID {
+		response.Err(c, apperr.Forbidden(apperr.CodeFamilyForbidden, "access denied"))
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.maxUploadBytes+(1<<20))
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			response.Err(c, apperr.InvalidRequest(apperr.CodeUploadTooLarge, "头像不能超过上传大小限制"))
+		} else {
+			response.Err(c, apperr.InvalidRequest(apperr.CodeInvalidRequest, "请选择一张图片后重试"))
+		}
+		return
+	}
+	if fileHeader.Size > h.maxUploadBytes {
+		response.Err(c, apperr.InvalidRequest(apperr.CodeUploadTooLarge, "头像不能超过上传大小限制"))
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		response.Err(c, apperr.InvalidRequest(apperr.CodeInvalidRequest, "无法读取所选图片"))
+		return
+	}
+	defer file.Close()
+	imageBytes, err := io.ReadAll(io.LimitReader(file, h.maxUploadBytes+1))
+	if err != nil {
+		response.Err(c, apperr.New(apperr.TypeExternal, apperr.CodeStorageUnavailable, "读取头像失败"))
+		return
+	}
+	if int64(len(imageBytes)) > h.maxUploadBytes {
+		response.Err(c, apperr.InvalidRequest(apperr.CodeUploadTooLarge, "头像不能超过上传大小限制"))
+		return
+	}
+	ext, ok := avatarExtension(imageBytes)
+	if !ok {
+		response.Err(c, apperr.InvalidRequest(apperr.CodeInvalidRequest, "头像仅支持 JPG、PNG、GIF 或 WebP 图片"))
+		return
+	}
+
+	randomName := make([]byte, 16)
+	if _, err := rand.Read(randomName); err != nil {
+		response.Err(c, apperr.New(apperr.TypeExternal, apperr.CodeStorageUnavailable, "生成头像文件名失败"))
+		return
+	}
+	fileName := hex.EncodeToString(randomName) + ext
+	key := path.Join("avatars", opaqueSegment(familyID), opaqueSegment(catID), fileName)
+	directory := filepath.Join(h.storageDir, "avatars", opaqueSegment(familyID), opaqueSegment(catID))
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		response.Err(c, apperr.New(apperr.TypeExternal, apperr.CodeStorageUnavailable, "创建头像存储目录失败"))
+		return
+	}
+	filePath := filepath.Join(directory, fileName)
+	if err := os.WriteFile(filePath, imageBytes, 0o644); err != nil {
+		response.Err(c, apperr.New(apperr.TypeExternal, apperr.CodeStorageUnavailable, "保存头像失败"))
+		return
+	}
+
+	updatedCat, err := h.cat.UpdateCatAvatar(c.Request.Context(), familyID, catID, userID, key)
+	if err != nil {
+		_ = os.Remove(filePath)
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, catToEnvelope(updatedCat))
+}
+
+func avatarExtension(data []byte) (string, bool) {
+	switch {
+	case len(data) >= 3 && bytes.Equal(data[:3], []byte{0xff, 0xd8, 0xff}):
+		return ".jpg", true
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}):
+		return ".png", true
+	case len(data) >= 6 && (string(data[:6]) == "GIF87a" || string(data[:6]) == "GIF89a"):
+		return ".gif", true
+	case len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		return ".webp", true
+	default:
+		return "", false
+	}
+}
+
+func opaqueSegment(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
 
 // CatUpdateRequest 更新猫咪请求体。

@@ -5,7 +5,7 @@
  *
  * 小程序**没有全局路由守卫**。Web 端在 `router.beforeEach` 里统一做了四件事：
  *   1. 首次会话恢复（`auth.bootstrap()`）
- *   2. 未登录 → 跳登录页（带 redirect）
+ *   2. 未登录 → 跳登录页（登录后进入“今日”首页）
  *   3. 已登录但无家庭 → 跳引导页
  *   4. 预载猫咪列表
  *
@@ -100,10 +100,10 @@ export function guardPage(path: string): boolean {
   const auth = useAuthStore()
   const target = path.startsWith('/') ? path : `/${path}`
 
-  // 未登录 → 登录页（携带原目标，登录后可回跳）
+  // 未登录 → 登录页；登录成功后统一进入“今日”首页。
   if (!auth.isAuthenticated) {
     if (!PUBLIC_PAGES.includes(target)) {
-      go(`/pages/auth/index?redirect=${encodeURIComponent(target)}`)
+      go('/pages/auth/index')
     }
     return false
   }

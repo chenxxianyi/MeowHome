@@ -370,7 +370,7 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
             <text>AT A GLANCE</text>
             <view>今日状态</view>
           </view>
-          <view>只突出需要处理的变化</view>
+          <text class="today-section-note">只突出需要处理的变化</text>
         </view>
 
         <view class="today-cat-deck" :class="{ 'is-single': statusGroups.length === 1 }">
@@ -385,11 +385,11 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
                 <image mode="aspectFill" v-if="group.avatar" :src="group.avatar" :alt="group.catName" />
                 <AppIcon v-else name="cat" :size="24" />
               </view>
-              <view>
-                <text>{{ group.catName }}</text>
-                <view>{{
+              <view class="today-cat-card-copy">
+                <text class="today-cat-name">{{ group.catName }}</text>
+                <text class="today-cat-status">{{
                   groupAttention(group).length ? `${groupAttention(group).length} 项需要留意` : '状态稳定'
-                }}</view>
+                }}</text>
               </view>
               <text class="today-cat-level" />
             </view>
@@ -414,9 +414,10 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
             </view>
 
             <view class="today-cat-signals">
-              <text v-for="row in groupNormal(group)" :key="row.icon" :title="row.value">
-                <text />{{ row.label }}
-              </text>
+              <view v-for="row in groupNormal(group)" :key="row.icon" class="today-cat-signal" :title="row.value">
+                <view class="today-cat-signal-dot" />
+                <text>{{ row.label }}</text>
+              </view>
             </view>
             <button type="button" class="today-cat-profile" @click="router.push(`/cats/${group.catId}`)">
               查看健康档案

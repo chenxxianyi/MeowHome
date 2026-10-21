@@ -4,6 +4,7 @@ package router
 import (
 	"errors"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -40,6 +41,9 @@ func New(
 	logCtx := &my.RequestContext{Logger: logger}
 	r.Use(logCtx.Handle(func(c *gin.Context) {}))
 	r.Use(my.CORS(cfg.App.AllowedOrigins))
+	if cfg.Storage.Driver == "local" && cfg.Storage.LocalDir != "" {
+		r.Static("/static/avatars", filepath.Join(cfg.Storage.LocalDir, "avatars"))
+	}
 
 	registerHealth(r, health)
 
@@ -100,6 +104,7 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimit
 	familyG.GET("/:familyId/members", h.ListMembers)
 	familyG.GET("/:familyId/cats", h.ListCats)
 	familyG.POST("/:familyId/cats", h.CreateCat)
+	familyG.POST("/:familyId/cats/:catId/avatar", h.UploadCatAvatar)
 	familyG.GET("/:familyId/cats/:catId", h.GetCat)
 	familyG.PATCH("/:familyId/cats/:catId", h.UpdateCat)
 	familyG.DELETE("/:familyId/cats/:catId", h.DeleteCat)

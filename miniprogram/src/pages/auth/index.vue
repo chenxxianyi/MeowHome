@@ -12,7 +12,7 @@
  * | `<input type="email">` | `<input type="text">` | 小程序 input 的 type 只支持 text/number/idcard/digit/nickname/safe-password，**无 email** |
  * | `<input type="password">` | `<input :password="!showPassword">` | 小程序用 **password 属性** 而非 type 控制掩码 |
  * | `autocomplete="..."` | 移除 | 小程序 input 不支持 autocomplete |
- * | `useRoute().query.redirect` | `onLoad(options)` 的 `options.redirect` | 无 vue-router |
+ * | 登录成功后的跳转 | `uni.switchTab` 到“今日”页 | tab 页必须使用 `switchTab` |
  * | `router.replace('/today')` | `uni.switchTab` / `uni.reLaunch` | 页面栈模型；**tab 页必须用 switchTab**，用 reLaunch 会静默失败 |
  * | `<h1>` `<h2>` `<p>` `<span>` | `<view>` `<text>` | WXSS 不支持 HTML 元素选择器，且 `<span>` 会被静默映射成 `<label>` |
  * | `::placeholder` | `placeholder-class` | 小程序不支持该伪元素 |
@@ -51,7 +51,6 @@ const userName = ref('')
 const familyName = ref('')
 const error = ref('')
 const submitting = ref(false)
-const redirect = ref('')
 
 function decodeRouteParam(value: string) {
   try {
@@ -90,8 +89,6 @@ onLoad((options) => {
   const rememberedCredentials = getRememberedCredentials()
   rememberPassword.value = Boolean(rememberedCredentials)
 
-  // 路由守卫跳转过来时携带的原目标（小程序页面路径）
-  if (options && typeof options.redirect === 'string') redirect.value = decodeRouteParam(options.redirect)
   if (options && typeof options.email === 'string') {
     email.value = decodeRouteParam(options.email)
     mode.value = 'login'
@@ -164,12 +161,8 @@ async function onSubmit() {
         familyName.value || `${userName.value}的猫宅`
       )
 
-      const query = [`email=${encodeURIComponent(registeredEmail)}`]
-      if (redirect.value.startsWith('/pages/')) {
-        query.push(`redirect=${encodeURIComponent(redirect.value)}`)
-      }
       uni.showToast({ title: '注册成功，请登录', icon: 'success' })
-      navigate(`/pages/auth/index?${query.join('&')}`)
+      navigate(`/pages/auth/index?email=${encodeURIComponent(registeredEmail)}`)
       return
     }
 
@@ -186,7 +179,7 @@ async function onSubmit() {
       navigate(`/pages/onboarding/index${familyQuery}`)
       return
     }
-    navigate(redirect.value.startsWith('/pages/') ? redirect.value : '/pages/today/index')
+    navigate('/pages/today/index')
   } catch (e) {
     const apiError = toApiError(e)
     console.info(`[auth-page] ${action}.failed`, { code: apiError.code })

@@ -2,7 +2,8 @@
 //
 // 每个函数返回前端既有的领域类型（types/index.ts），
 // 后端 DTO 与前端类型的差异（snake_case、派生字段）在这里收敛。
-import { aiHttp, http, request, requestEnvelope, apiBase } from './client'
+import { aiHttp, http, request, requestEnvelope, uploadFile, apiBase } from './client'
+import { API_ORIGIN } from './config'
 import type {
   AIParseSession,
   AIAnalysisReport,
@@ -202,13 +203,19 @@ export function toCat(dto: CatDTO): Cat {
     birthday,
     age: ageFrom(birthday),
     neutered: Boolean(dto.neutered),
-    avatar: dto.avatar_key ?? '',
+    avatar: toAvatarUrl(dto.avatar_key),
     diseases: dto.diseases ?? [],
     allergies: dto.allergies ?? [],
     currentMedication: null,
     nextVaccine: null,
     nextDeworm: null
   }
+}
+
+function toAvatarUrl(avatarKey?: string) {
+  if (!avatarKey) return ''
+  if (/^(?:https?:|data:|file:|wxfile:)/i.test(avatarKey)) return avatarKey
+  return `${API_ORIGIN}/static/${avatarKey.replace(/^\/+/, '')}`
 }
 
 export function toReminder(dto: ReminderDTO): Reminder {
@@ -373,6 +380,13 @@ export const catApi = {
     data: { name?: string; breed?: string; gender?: string; birth_date?: string; neutered?: boolean }
   ) {
     return request<CatDTO>(http, { method: 'PATCH', url: `/families/${familyId}/cats/${catId}`, data })
+  },
+  uploadAvatar(familyId: string, catId: string, filePath: string) {
+    return uploadFile<CatDTO>(http, {
+      url: `/families/${encodeURIComponent(familyId)}/cats/${encodeURIComponent(catId)}/avatar`,
+      filePath,
+      name: 'file'
+    })
   },
   remove(familyId: string, catId: string) {
     return request<void>(http, { method: 'DELETE', url: `/families/${familyId}/cats/${catId}` })

@@ -299,6 +299,73 @@ export async function request<T>(client: ApiClientOptions, config: RequestConfig
   }
 }
 
+/** 上传单个文件，并沿用普通请求的鉴权刷新与 Envelope 校验。 */
+export async function uploadFile<T>(
+  client: ApiClientOptions,
+  config: { url: string; filePath: string; name?: string }
+): Promise<T> {
+  async function sendUpload(token: string | null): Promise<RawResponse> {
+    const header: Record<string, string> = { 'X-Request-Id': genRequestId() }
+    if (token) header.Authorization = `Bearer ${token}`
+
+    return new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: apiBase + config.url,
+        filePath: config.filePath,
+        name: config.name || 'file',
+        header,
+        timeout: client.timeout,
+        success: (res) => {
+          let data: unknown = res.data
+          if (typeof data === 'string') {
+            try {
+              data = JSON.parse(data)
+            } catch {
+              data = null
+            }
+          }
+          resolve({ statusCode: res.statusCode, data })
+        },
+        fail: (err) => {
+          const timedOut = /timeout/i.test(err?.errMsg || '')
+          reject(
+            new ApiError(
+              timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR',
+              timedOut ? '上传超时，请检查网络后重试' : '上传失败，请检查网络后重试',
+              0
+            )
+          )
+        }
+      })
+    })
+  }
+
+  try {
+    let res = await sendUpload(getToken())
+    if (res.statusCode === 401) {
+      if (!refreshing) {
+        refreshing = refreshAccessToken().finally(() => {
+          refreshing = null
+        })
+      }
+      const token = await refreshing
+      if (token) res = await sendUpload(token)
+      else {
+        clearAuthStorage()
+        redirectToLogin()
+      }
+    }
+    if (res.statusCode === 204 || res.data == null) return undefined as T
+    const env = assertEnvelope<T>(res)
+    if (env.code !== 'SUCCESS') {
+      throw new ApiError(env.code, env.message || '上传失败', res.statusCode, env.request_id)
+    }
+    return env.data as T
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
 /** 同 request，但返回完整 APIResponse（供 service 层透传 success 标志）。 */
 export async function requestEnvelope<T>(
   client: ApiClientOptions,

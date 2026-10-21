@@ -96,6 +96,9 @@ func main() {
 
 	// 组装 HTTP 层
 	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc, agentSvc)
+	if cfg.Storage.Driver == "local" {
+		hdl.SetLocalStorage(cfg.Storage.LocalDir, cfg.Server.MaxUploadSizeMB*(1<<20))
+	}
 	health := &appHealth{db: db}
 	// MethodOverride 必须包在 gin engine 外层：Gin 在进入中间件链前就按
 	// (method, path) 完成路由匹配，engine.Use() 里改 Method 已经太晚（详见该中间件注释）。

@@ -1,16 +1,16 @@
 {
   "pages": [
     {
-      "path": "pages/cats/index",
+      "path": "pages/today/index",
       "style": {
-        "navigationBarTitleText": "猫咪",
+        "navigationBarTitleText": "今日",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/today/index",
+      "path": "pages/cats/index",
       "style": {
-        "navigationBarTitleText": "今日",
+        "navigationBarTitleText": "猫咪",
         "enablePullDownRefresh": true
       }
     },

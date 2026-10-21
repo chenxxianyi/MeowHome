@@ -114,7 +114,7 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
     <CatSwitcher @select="onCatSelect" />
   </view>
 
-  <view class="page-content">
+  <view class="page-content records-page-content">
     <!-- 常用记录：主路径，首屏直达 -->
     <view class="records-hero" aria-label="常用记录">
       <view class="records-section-title"> 常用 </view>
