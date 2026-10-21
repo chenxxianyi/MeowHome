@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useRouter } from '../../utils/navigation'
 import AppIcon from '../../components/app/AppIcon.vue'
 import { catApi, toCat } from '../../api/endpoints'
@@ -13,7 +14,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const catStore = useCatStore()
 const step = ref(1)
-const totalSteps = 5
 
 const family = reactive({ name: '' })
 type CatGender = 'female' | 'male' | 'unknown'
@@ -39,6 +39,12 @@ const genderLabels = ['母', '公', '未知']
 const genderValues: CatGender[] = ['female', 'male', 'unknown']
 
 const hasSecondCat = ref(false)
+const stepTitles = computed(() =>
+  hasSecondCat.value
+    ? ['欢迎与创建家庭', '添加第一只猫', '是否添加第二只猫', '添加第二只猫', '健康基础信息', '完成']
+    : ['欢迎与创建家庭', '添加第一只猫', '是否添加第二只猫', '健康基础信息', '完成']
+)
+const totalSteps = computed(() => stepTitles.value.length)
 const submitting = ref(false)
 const error = ref('')
 const saved = ref(false)
@@ -55,7 +61,12 @@ function next() {
     uni.showToast({ title: error.value, icon: 'none' })
     return
   }
-  step.value = Math.min(step.value + 1, totalSteps)
+  if (step.value === 4 && hasSecondCat.value && !cat2.name.trim()) {
+    error.value = '请填写第二只猫的名字'
+    uni.showToast({ title: error.value, icon: 'none' })
+    return
+  }
+  step.value = Math.min(step.value + 1, totalSteps.value)
 }
 function prev() {
   step.value = Math.max(step.value - 1, 1)
@@ -65,8 +76,8 @@ function prev() {
 // 否则路由守卫会因为 familyId 为空把用户反复弹回本页。
 async function finish() {
   if (submitting.value || saved.value) return
-  if (!cat1.name.trim()) {
-    error.value = '至少需要添加一只猫咪'
+  if (!cat1.name.trim() || (hasSecondCat.value && !cat2.name.trim())) {
+    error.value = cat1.name.trim() ? '请填写第二只猫的名字' : '至少需要添加一只猫咪'
     uni.showToast({ title: error.value, icon: 'none' })
     return
   }
@@ -94,7 +105,7 @@ async function finish() {
       catStore.setCats(created.map(toCat))
     }
     saved.value = true
-    step.value = 5
+    step.value = totalSteps.value
   } catch (e) {
     error.value = toApiError(e).message
   } finally {
@@ -107,17 +118,24 @@ function selectGender(target: typeof cat1, event: unknown) {
   target.gender = genderValues[Number(value)] || 'unknown'
 }
 
-function selectBirthday(event: unknown) {
-  cat1.birthday = (event as { detail: { value: string } }).detail.value
+function selectBirthday(target: typeof cat1, event: unknown) {
+  target.birthday = (event as { detail: { value: string } }).detail.value
 }
 
-function selectNeutered(event: unknown) {
-  cat1.neutered = (event as { detail: { value: boolean } }).detail.value
+function selectNeutered(target: typeof cat1, event: unknown) {
+  target.neutered = (event as { detail: { value: boolean } }).detail.value
 }
 
 function addSecondCat() {
   hasSecondCat.value = true
-  next()
+  error.value = ''
+  step.value = 4
+}
+
+function skipSecondCat() {
+  hasSecondCat.value = false
+  error.value = ''
+  step.value = 4
 }
 
 function splitHealthItems(value: string) {
@@ -131,7 +149,15 @@ function enterHome() {
   router.push('/today')
 }
 
-const stepTitles = ['欢迎与创建家庭', '添加第一只猫', '是否添加第二只猫', '健康基础信息', '完成']
+onLoad((options) => {
+  if (options && typeof options.familyName === 'string') {
+    try {
+      family.name = decodeURIComponent(options.familyName)
+    } catch {
+      family.name = options.familyName
+    }
+  }
+})
 
 useProtectedPage()
 </script>
@@ -199,13 +225,13 @@ useProtectedPage()
       </view>
       <view class="form-group">
         <label class="form-label" for="c1-birthday">生日</label>
-        <picker mode="date" :value="cat1.birthday" @change="selectBirthday">
+        <picker mode="date" :value="cat1.birthday" @change="selectBirthday(cat1, $event)">
           <view class="form-input">{{ cat1.birthday || '请选择生日' }}</view>
         </picker>
       </view>
       <view class="form-group">
         <label class="form-label" for="c1-neutered">
-          <switch :checked="cat1.neutered" color="#C87345" @change="selectNeutered" /> 已绝育
+          <switch :checked="cat1.neutered" color="#C87345" @change="selectNeutered(cat1, $event)" /> 已绝育
         </label>
       </view>
       <view class="form-actions-onboarding">
@@ -221,44 +247,85 @@ useProtectedPage()
       <view>多猫家庭可以更好地追踪每只猫的健康数据。</view>
       <view class="form-actions-onboarding" style="flex-direction: column; gap: 12px">
         <button class="btn-primary" @click="addSecondCat">添加第二只猫</button>
-        <button class="btn-secondary" @click="next()">暂时只有一只</button>
+        <button class="btn-secondary" @click="skipSecondCat">暂时只有一只</button>
       </view>
     </view>
 
-    <!-- Step 4 -->
-    <view v-if="step === 4" class="onboarding-step">
+    <!-- Step 4: second cat details (only when requested) -->
+    <view v-if="step === 4 && hasSecondCat" class="onboarding-step">
+      <view>添加第二只猫</view>
+      <view>填写第二只猫的基本资料，健康信息可以稍后补充。</view>
+      <view class="form-group">
+        <label class="form-label" for="c2-name">猫咪名称 *</label>
+        <input id="c2-name" v-model="cat2.name" class="form-input" placeholder="如：第二只猫咪" required />
+      </view>
+      <view class="form-row">
+        <view class="form-group">
+          <label class="form-label" for="c2-gender">性别</label>
+          <picker
+            mode="selector"
+            :range="genderLabels"
+            :value="genderValues.indexOf(cat2.gender)"
+            @change="selectGender(cat2, $event)"
+          >
+            <view class="form-select">{{ genderLabels[genderValues.indexOf(cat2.gender)] }}</view>
+          </picker>
+        </view>
+        <view class="form-group">
+          <label class="form-label" for="c2-breed">品种</label>
+          <input id="c2-breed" v-model="cat2.breed" class="form-input" placeholder="中华田园猫" />
+        </view>
+      </view>
+      <view class="form-group">
+        <label class="form-label" for="c2-birthday">生日</label>
+        <picker mode="date" :value="cat2.birthday" @change="selectBirthday(cat2, $event)">
+          <view class="form-input">{{ cat2.birthday || '请选择生日' }}</view>
+        </picker>
+      </view>
+      <view class="form-group">
+        <label class="form-label" for="c2-neutered">
+          <switch :checked="cat2.neutered" color="#C87345" @change="selectNeutered(cat2, $event)" /> 已绝育
+        </label>
+      </view>
+      <view class="form-actions-onboarding">
+        <button class="btn-secondary" @click="prev">上一步</button>
+        <button class="btn-primary" @click="next">下一步</button>
+      </view>
+      <view v-if="error" class="form-error">{{ error }}</view>
+    </view>
+
+    <!-- Health basics -->
+    <view v-if="(step === 4 && !hasSecondCat) || (step === 5 && hasSecondCat)" class="onboarding-step">
       <view>健康基础信息</view>
       <view>填写已知疾病与过敏，帮助 AI 管家提供更好的建议。</view>
-      <view class="form-group">
-        <label class="form-label" for="c1-diseases">已知疾病（逗号分隔）</label>
-        <input id="c1-diseases" v-model="cat1.diseases" class="form-input" placeholder="如：慢性肾病" />
-      </view>
-      <view class="form-group">
-        <label class="form-label" for="c1-allergies">过敏</label>
-        <input id="c1-allergies" v-model="cat1.allergies" class="form-input" placeholder="如：鸡肉" />
-      </view>
-      <view v-if="hasSecondCat">
-        <view style="margin-top: 16px"> 第二只猫 </view>
-        <view class="form-group">
-          <label class="form-label" for="c2-name">猫咪名称 *</label>
-          <input id="c2-name" v-model="cat2.name" class="form-input" placeholder="如：第二只猫咪" />
+      <view class="cat-health-section">
+        <view class="cat-health-heading">第一只猫 · {{ cat1.name }}</view>
+        <view class="cat-profile-summary">
+          {{ genderLabels[genderValues.indexOf(cat1.gender)] }} · {{ cat1.breed || '品种未填写' }} ·
+          {{ cat1.birthday || '生日未填写' }} · {{ cat1.neutered ? '已绝育' : '未绝育' }}
         </view>
-        <view class="form-row">
-          <view class="form-group">
-            <label class="form-label" for="c2-gender">性别</label>
-            <picker
-              mode="selector"
-              :range="genderLabels"
-              :value="genderValues.indexOf(cat2.gender)"
-              @change="selectGender(cat2, $event)"
-            >
-              <view class="form-select">{{ genderLabels[genderValues.indexOf(cat2.gender)] }}</view>
-            </picker>
-          </view>
-          <view class="form-group">
-            <label class="form-label" for="c2-breed">品种</label>
-            <input id="c2-breed" v-model="cat2.breed" class="form-input" placeholder="中华田园猫" />
-          </view>
+        <view class="form-group">
+          <label class="form-label" for="c1-diseases">已知疾病（逗号分隔）</label>
+          <input id="c1-diseases" v-model="cat1.diseases" class="form-input" placeholder="如：慢性肾病" />
+        </view>
+        <view class="form-group">
+          <label class="form-label" for="c1-allergies">过敏</label>
+          <input id="c1-allergies" v-model="cat1.allergies" class="form-input" placeholder="如：鸡肉" />
+        </view>
+      </view>
+      <view v-if="hasSecondCat" class="cat-health-section">
+        <view class="cat-health-heading">第二只猫 · {{ cat2.name }}</view>
+        <view class="cat-profile-summary">
+          {{ genderLabels[genderValues.indexOf(cat2.gender)] }} · {{ cat2.breed || '品种未填写' }} ·
+          {{ cat2.birthday || '生日未填写' }} · {{ cat2.neutered ? '已绝育' : '未绝育' }}
+        </view>
+        <view class="form-group">
+          <label class="form-label" for="c2-diseases">已知疾病（逗号分隔）</label>
+          <input id="c2-diseases" v-model="cat2.diseases" class="form-input" placeholder="如：慢性肾病" />
+        </view>
+        <view class="form-group">
+          <label class="form-label" for="c2-allergies">过敏</label>
+          <input id="c2-allergies" v-model="cat2.allergies" class="form-input" placeholder="如：鸡肉" />
         </view>
       </view>
       <view class="form-actions-onboarding">
@@ -267,21 +334,24 @@ useProtectedPage()
           {{ submitting ? '保存中…' : '完成' }}
         </button>
       </view>
+      <view v-if="error" class="form-error">{{ error }}</view>
     </view>
 
-    <!-- Step 5 -->
-    <view v-if="step === 5" class="onboarding-step">
+    <!-- Final step -->
+    <view v-if="step === totalSteps" class="onboarding-step">
       <view class="finish-icon">
         <AppIcon name="success" :size="48" />
       </view>
-      <view>设置完成</view>
-      <view>{{ family.name }} · {{ cat1.name }}</view>
-      <view v-if="hasSecondCat" style="color: var(--color-text-secondary)"> + {{ cat2.name }} </view>
-      <view style="color: var(--color-text-tertiary); font-size: var(--font-size-assist)">
-        欢迎使用猫宅 · 开启你的猫咪健康管理之旅
+      <view class="finish-title">猫宅准备就绪</view>
+      <view class="finish-family">家庭：{{ family.name }}</view>
+      <view class="finish-cats">
+        猫咪：{{ cat1.name }}<text v-if="hasSecondCat">、{{ cat2.name }}</text>
+      </view>
+      <view class="finish-description">
+        喂食、护理和健康变化，都可以在这里持续记录。
       </view>
       <button class="btn-primary" :disabled="submitting" @click="enterHome">
-        {{ submitting ? '保存中…' : '进入今日首页' }}
+        {{ submitting ? '正在进入…' : '开始使用' }}
       </button>
       <view v-if="error" style="color: #b4453a; font-size: var(--font-size-assist); margin-top: var(--space-12)">
         {{ error }}
@@ -364,6 +434,23 @@ useProtectedPage()
   margin-bottom: var(--space-16);
   line-height: 1.6;
 }
+.cat-health-section + .cat-health-section {
+  margin-top: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-divider);
+}
+.cat-health-heading {
+  margin-bottom: 4px;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.cat-profile-summary {
+  margin-bottom: var(--space-12);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+}
 .form-actions-onboarding {
   display: flex;
   gap: var(--space-12);
@@ -379,5 +466,23 @@ useProtectedPage()
 .finish-icon {
   text-align: center;
   margin-bottom: var(--space-16);
+}
+.onboarding-step > view.finish-title {
+  margin-bottom: var(--space-12);
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+.finish-family,
+.finish-cats {
+  margin-bottom: var(--space-8);
+  color: var(--color-text-secondary);
+}
+.finish-description {
+  margin: var(--space-8) 0 var(--space-16);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-assist);
+  line-height: 1.6;
 }
 </style>

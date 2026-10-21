@@ -137,8 +137,8 @@ usePageCapabilities(load, '猫宅 · 一起照顾，彼此放心')
             <AppIcon name="chevronRight" :size="14" />
           </button>
         </view>
-        <view>{{ family.name }}</view>
-        <view>{{ cats.length }} 只猫咪 · {{ family.members.length }} 位家人在共同照顾</view>
+        <view class="family-home-name">{{ family.name }}</view>
+        <view class="family-home-meta">{{ cats.length }} 只猫咪 · {{ family.members.length }} 位家人在共同照顾</view>
         <view class="family-home-bottom">
           <view class="family-home-cat-stack" aria-label="家庭猫咪">
             <view

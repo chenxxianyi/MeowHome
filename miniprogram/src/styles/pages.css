@@ -3415,7 +3415,7 @@
   font-size: 11px;
 }
 
-.family-home-card view {
+.family-home-name {
   position: relative;
   margin-top: var(--space-20);
   font-family: var(--font-display);
@@ -3425,7 +3425,7 @@
   line-height: 1.35;
 }
 
-.family-home-card > view {
+.family-home-meta {
   position: relative;
   margin-top: 3px;
   color: rgba(255, 250, 244, 0.66);
@@ -3444,6 +3444,7 @@
 .family-home-cat-avatar {
   width: 32px;
   height: 32px;
+  overflow: hidden;
   display: grid;
   place-items: center;
   margin-left: -4px;
@@ -3816,7 +3817,7 @@
     padding: var(--space-16);
   }
 
-  .family-home-card view {
+  .family-home-name {
     font-size: 22px;
   }
 

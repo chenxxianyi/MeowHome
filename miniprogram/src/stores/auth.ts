@@ -7,6 +7,55 @@ import { authApi, toUser } from '../api/endpoints'
 import { useAgentStore } from './agent'
 import type { User } from '../types'
 
+const PENDING_REGISTRATION_KEY = 'meowhome.pendingRegistration'
+const REMEMBERED_CREDENTIALS_KEY = 'meowhome.rememberedCredentials'
+const AUTO_LOGIN_KEY = 'meowhome.autoLogin'
+
+interface PendingRegistration {
+  email: string
+  familyName: string
+}
+
+interface RememberedCredentials {
+  email: string
+  password: string
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase()
+}
+
+export function getRememberedCredentials(): RememberedCredentials | null {
+  const value = uni.getStorageSync(REMEMBERED_CREDENTIALS_KEY) as Partial<RememberedCredentials> | undefined
+  if (typeof value?.email !== 'string' || typeof value.password !== 'string') return null
+  return { email: value.email, password: value.password }
+}
+
+export function saveRememberedCredentials(email: string, password: string) {
+  uni.setStorageSync(REMEMBERED_CREDENTIALS_KEY, { email: email.trim(), password } satisfies RememberedCredentials)
+}
+
+export function clearRememberedCredentials() {
+  uni.removeStorageSync(REMEMBERED_CREDENTIALS_KEY)
+}
+
+export function getAutoLoginPreference() {
+  const value = uni.getStorageSync(AUTO_LOGIN_KEY)
+  // 保持升级前已有令牌用户的自动恢复行为。
+  return typeof value === 'boolean' ? value : true
+}
+
+/** 手动登录成功后取出本次注册填写的家庭名，供首次使用引导页预填。 */
+export function takePendingRegistrationFamilyName(email: string): string | null {
+  const pending = uni.getStorageSync(PENDING_REGISTRATION_KEY) as Partial<PendingRegistration> | undefined
+  if (!pending || typeof pending.email !== 'string' || normalizeEmail(pending.email) !== normalizeEmail(email)) {
+    return null
+  }
+
+  uni.removeStorageSync(PENDING_REGISTRATION_KEY)
+  return typeof pending.familyName === 'string' && pending.familyName.trim() ? pending.familyName : null
+}
+
 interface AuthState {
   isAuthenticated: boolean
   user: User | null
@@ -32,8 +81,22 @@ export const useAuthStore = defineStore('auth', {
     /** 应用启动时恢复会话：有 token 就拉一次 /me 校准用户与家庭。 */
     async bootstrap() {
       console.info('[auth] bootstrap.start')
-      if (!getToken()) {
+      if (!getAutoLoginPreference() && !this.isAuthenticated) {
+        clearAuthStorage()
         useAgentStore().reset()
+        this.user = null
+        this.isAuthenticated = false
+        this.familyId = null
+        this.ready = true
+        console.info('[auth] bootstrap.auto-login-disabled')
+        return
+      }
+      if (!getToken()) {
+        clearAuthStorage()
+        useAgentStore().reset()
+        this.user = null
+        this.isAuthenticated = false
+        this.familyId = null
         this.ready = true
         console.info('[auth] bootstrap.no-session')
         return
@@ -79,10 +142,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async login(email: string, password: string) {
+    async login(email: string, password: string, autoLogin = getAutoLoginPreference()) {
       console.info('[auth] login.start')
       const res = await authApi.login(email, password)
       console.info('[auth] login.response')
+      uni.setStorageSync(AUTO_LOGIN_KEY, autoLogin)
       saveTokens(res.access_token, res.refresh_token)
       this.isAuthenticated = true
       this.ready = true
@@ -93,20 +157,13 @@ export const useAuthStore = defineStore('auth', {
 
     async register(email: string, password: string, userName: string, familyName?: string) {
       console.info('[auth] register.start')
-      const res = await authApi.register(email, password, userName)
+      await authApi.register(email, password, userName)
       console.info('[auth] register.response')
-      saveTokens(res.access_token, res.refresh_token)
-      this.isAuthenticated = true
-      this.ready = true
-      this.user = { id: res.user.id, name: res.user.name || userName, role: 'owner' }
-
-      if (familyName) {
-        await this.createFamily(familyName)
-      } else {
-        await this.resolveFamily()
-      }
+      uni.setStorageSync(PENDING_REGISTRATION_KEY, {
+        email: normalizeEmail(email),
+        familyName: familyName?.trim() || `${userName.trim()}的猫宅`
+      } satisfies PendingRegistration)
       console.info('[auth] register.done')
-      return this.familyId
     },
 
     async createFamily(name: string) {

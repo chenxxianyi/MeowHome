@@ -74,7 +74,7 @@ function onTap() {
       <view class="section-title"> D · 媒体、链接与嵌套限制 </view>
       <view class="section-hint"> 重点看编译产物：img / a 会被映射成什么；text 内嵌 view 是否报错。 </view>
       <img class="img" src="/static/logo.png" alt="img 标签" />
-      <a href="/pages/index/index">a 标签链接</a>
+      <a href="/pages/cats/index">a 标签链接</a>
       <text>
         <view>非法嵌套测试：text 内放 view</view>
       </text>

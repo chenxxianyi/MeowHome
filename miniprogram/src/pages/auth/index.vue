@@ -28,7 +28,14 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 
 import { toApiError } from '../../api/adapter'
 import AppIcon from '../../components/app/AppIcon.vue'
-import { useAuthStore } from '../../stores/auth'
+import {
+  clearRememberedCredentials,
+  getAutoLoginPreference,
+  getRememberedCredentials,
+  saveRememberedCredentials,
+  takePendingRegistrationFamilyName,
+  useAuthStore
+} from '../../stores/auth'
 import { guardOnShow, navigate } from '../../utils/guard'
 
 const auth = useAuthStore()
@@ -38,15 +45,25 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
+const rememberPassword = ref(false)
+const autoLogin = ref(getAutoLoginPreference())
 const userName = ref('')
 const familyName = ref('')
 const error = ref('')
 const submitting = ref(false)
 const redirect = ref('')
 
+function decodeRouteParam(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 const isRegister = computed(() => mode.value === 'register')
 const title = computed(() => (isRegister.value ? '创建账号' : '欢迎回来'))
-const submitLabel = computed(() => (isRegister.value ? '注册并进入' : '登录'))
+const submitLabel = computed(() => (isRegister.value ? '注册' : '登录'))
 
 /** 仅当用户已开始输入确认密码、且两次不一致时才提示，避免刚进页面就报错。 */
 const passwordMismatch = computed(
@@ -69,8 +86,21 @@ const canSubmit = computed(() => {
 })
 
 onLoad((options) => {
+  autoLogin.value = getAutoLoginPreference()
+  const rememberedCredentials = getRememberedCredentials()
+  rememberPassword.value = Boolean(rememberedCredentials)
+
   // 路由守卫跳转过来时携带的原目标（小程序页面路径）
-  if (options && typeof options.redirect === 'string') redirect.value = options.redirect
+  if (options && typeof options.redirect === 'string') redirect.value = decodeRouteParam(options.redirect)
+  if (options && typeof options.email === 'string') {
+    email.value = decodeRouteParam(options.email)
+    mode.value = 'login'
+    password.value = ''
+    confirmPassword.value = ''
+  } else if (rememberedCredentials) {
+    email.value = rememberedCredentials.email
+    password.value = rememberedCredentials.password
+  }
 })
 
 onShow(async () => {
@@ -83,9 +113,15 @@ function switchMode(next: 'login' | 'register') {
   error.value = ''
   // 切到登录时清掉仅注册相关的输入，避免把上一轮的密码带过去
   if (next === 'login') {
+    password.value = ''
     confirmPassword.value = ''
     showPassword.value = false
   }
+}
+
+function toggleRememberPassword() {
+  rememberPassword.value = !rememberPassword.value
+  if (!rememberPassword.value) clearRememberedCredentials()
 }
 
 async function onSubmit() {
@@ -119,13 +155,35 @@ async function onSubmit() {
   const action = isRegister.value ? 'register' : 'login'
   console.info(`[auth-page] ${action}.submit`)
   try {
-    const familyId = isRegister.value
-      ? await auth.register(email.value, password.value, userName.value, familyName.value || `${userName.value}的猫宅`)
-      : await auth.login(email.value, password.value)
+    if (isRegister.value) {
+      const registeredEmail = email.value.trim()
+      await auth.register(
+        registeredEmail,
+        password.value,
+        userName.value,
+        familyName.value || `${userName.value}的猫宅`
+      )
+
+      const query = [`email=${encodeURIComponent(registeredEmail)}`]
+      if (redirect.value.startsWith('/pages/')) {
+        query.push(`redirect=${encodeURIComponent(redirect.value)}`)
+      }
+      uni.showToast({ title: '注册成功，请登录', icon: 'success' })
+      navigate(`/pages/auth/index?${query.join('&')}`)
+      return
+    }
+
+    const loginEmail = email.value.trim()
+    const loginPassword = password.value
+    const familyId = await auth.login(loginEmail, loginPassword, autoLogin.value)
+    if (rememberPassword.value) saveRememberedCredentials(loginEmail, loginPassword)
+    else clearRememberedCredentials()
+    const pendingFamilyName = takePendingRegistrationFamilyName(loginEmail)
 
     console.info(`[auth-page] ${action}.navigate`, { hasFamily: Boolean(familyId) })
     if (!familyId) {
-      navigate('/pages/onboarding/index')
+      const familyQuery = pendingFamilyName ? `?familyName=${encodeURIComponent(pendingFamilyName)}` : ''
+      navigate(`/pages/onboarding/index${familyQuery}`)
       return
     }
     navigate(redirect.value.startsWith('/pages/') ? redirect.value : '/pages/today/index')
@@ -135,6 +193,8 @@ async function onSubmit() {
     if (apiError.code === 'CONFLICT') {
       error.value = '该邮箱已注册，请直接登录'
       mode.value = 'login'
+      password.value = ''
+      confirmPassword.value = ''
     } else if (apiError.code === 'AUTH_REQUIRED') {
       error.value = '邮箱或密码不正确'
     } else {
@@ -218,6 +278,32 @@ async function onSubmit() {
           />
         </label>
         <text v-if="passwordMismatch" class="hint hint-error"> 两次输入的密码不一致 </text>
+
+        <view v-if="!isRegister" class="login-options">
+          <view
+            class="login-option"
+            role="checkbox"
+            :aria-checked="rememberPassword"
+            @click="toggleRememberPassword"
+          >
+            <view class="option-checkbox" :class="{ checked: rememberPassword }">
+              <text v-if="rememberPassword">✓</text>
+            </view>
+            <text>记住密码</text>
+          </view>
+          <view
+            class="login-option"
+            role="checkbox"
+            :aria-checked="autoLogin"
+            @click="autoLogin = !autoLogin"
+          >
+            <view class="option-checkbox" :class="{ checked: autoLogin }">
+              <text v-if="autoLogin">✓</text>
+            </view>
+            <text>自动登录</text>
+          </view>
+        </view>
+        <text v-if="!isRegister && rememberPassword" class="credential-note">密码会保存在此设备</text>
 
         <label v-if="isRegister" class="field">
           <text class="field-label">家庭名称</text>
@@ -372,6 +458,47 @@ async function onSubmit() {
 
 .hint-error {
   color: #b4453a;
+}
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -2px 2px 12px;
+}
+
+.login-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #7a6f5d;
+}
+
+.option-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid #c9bdad;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.option-checkbox.checked {
+  border-color: #c87345;
+  background: #c87345;
+}
+
+.credential-note {
+  display: block;
+  margin: -7px 2px 12px;
+  font-size: 11px;
+  color: #9a8f7d;
 }
 
 .error {
