@@ -7,6 +7,7 @@ import { useCatStore } from '../../stores/cat'
 import { useRecordStore } from '../../stores/record'
 import { services } from '../../services'
 import { useProtectedPage } from '../../utils/page'
+import { localDateTimeStr } from '../../utils/date'
 
 const catStore = useCatStore()
 const recordStore = useRecordStore()
@@ -34,7 +35,7 @@ const fieldLabels: Record<string, string> = {
 }
 
 function init() {
-  formData.value = { time: new Date().toISOString().slice(0, 16), catId: catId.value }
+  formData.value = { time: localDateTimeStr(), catId: catId.value }
 }
 
 function toggleCollapse() {
