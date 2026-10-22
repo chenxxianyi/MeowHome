@@ -7,7 +7,7 @@ import { useCatStore } from '../../stores/cat'
 import { services } from '../../services'
 import { todayStr } from '../../utils/date'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
-import type { Expense, Family, InventoryItem } from '../../types'
+import type { Cat, Expense, Family, InventoryItem } from '../../types'
 
 const router = useRouter()
 const catStore = useCatStore()
@@ -24,6 +24,14 @@ const loading = ref(true)
 const loadError = ref('')
 
 const cats = computed(() => catStore.cats)
+const emptyHealthValues = new Set(['无', '无疾病', '无已知疾病', '暂无', '暂无疾病', '健康', '健康良好'])
+function catHealthConcern(cat: Cat) {
+  return cat.diseases.find((item) => {
+    const value = item.trim()
+    return value && !emptyHealthValues.has(value)
+  })
+}
+
 const lowCount = computed(
   () => inventory.value.filter((item) => item.status === 'low' || item.status === 'expired').length
 )
@@ -195,13 +203,16 @@ usePageCapabilities(load, '猫宅 · 一起照顾，彼此放心')
             :aria-label="`查看 ${cat.name} 的健康档案`"
             @click="go(`/cats/${cat.id}`)"
           >
-            <view class="family-cat-portrait">
-              <image mode="aspectFill" v-if="cat.avatar" :src="cat.avatar" :alt="cat.name" />
-              <AppIcon v-else name="cat" :size="32" />
+            <view class="family-cat-topline">
+              <view class="family-cat-portrait">
+                <image mode="aspectFill" v-if="cat.avatar" :src="cat.avatar" :alt="cat.name" />
+                <AppIcon v-else name="cat" :size="32" />
+              </view>
+              <view class="family-cat-health" :class="{ attention: catHealthConcern(cat) }">
+                <view class="family-cat-health-dot" />
+                <text>{{ catHealthConcern(cat) || '健康良好' }}</text>
+              </view>
             </view>
-            <text class="family-cat-health" :class="{ attention: cat.diseases.length }">
-              {{ cat.diseases.length ? cat.diseases[0] : '健康状态良好' }}
-            </text>
             <text>{{ cat.name }}</text>
             <view>{{ cat.breed }} · {{ cat.age }} 岁</view>
             <view class="family-cat-link">
@@ -229,12 +240,19 @@ usePageCapabilities(load, '猫宅 · 一起照顾，彼此放心')
             :class="`tone-${item.tone}`"
             @click="go(item.href)"
           >
-            <view class="family-care-icon">
-              <AppIcon :name="item.icon" :size="20" />
+            <view class="family-care-card-top">
+              <view class="family-care-icon">
+                <AppIcon :name="item.icon" :size="20" />
+              </view>
+              <view class="family-care-value">{{ item.value }}</view>
             </view>
-            <text class="family-care-value">{{ item.value }}</text>
-            <text>{{ item.title }}</text>
-            <view>{{ item.desc }}</view>
+            <view class="family-care-card-content">
+              <text class="family-care-title">{{ item.title }}</text>
+              <view class="family-care-card-summary">
+                <text class="family-care-desc">{{ item.desc }}</text>
+                <AppIcon class="family-care-arrow" name="chevronRight" :size="14" />
+              </view>
+            </view>
           </button>
         </view>
       </view>
