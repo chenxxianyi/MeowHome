@@ -10,7 +10,8 @@ import { useAppStore } from '../../stores/app'
 import { useCatStore } from '../../stores/cat'
 import { useAgentStore } from '../../stores/agent'
 import { services } from '../../services'
-import { dateAtTimezone, deviceTimezone, formatZonedDateTime, greeting, todayDateLabel } from '../../utils/date'
+import { dateAtTimezone, deviceTimezone, formatZonedDateTime, greeting, todayDateLabel, todayStr } from '../../utils/date'
+import { buildMonthGrid, shiftMonth } from '../../utils/recordCalendar'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
 import type { FocusItemData, Reminder, TodayStatusData } from '../../types'
 
@@ -42,16 +43,15 @@ const reminderList = ref<Reminder[]>([])
 const loading = ref(true)
 const loadError = ref('')
 const showEvidence = ref(false)
+const calendarToday = ref(todayStr())
+const reminderCalendarMonth = ref(calendarToday.value.slice(0, 7))
+const selectedReminderDate = ref(calendarToday.value)
+const reminderWeekdays = ['一', '二', '三', '四', '五', '六', '日']
 
 const currentCat = computed(() => catStore.currentCatId || 'all')
 const now = new Date()
 const todayNumber = now.getDate()
 const todayMonth = `${now.getMonth() + 1}月`
-
-const dayOfYear = computed(() => {
-  const start = new Date(now.getFullYear(), 0, 0)
-  return Math.floor((now.getTime() - start.getTime()) / 86400000)
-})
 
 const attentionRows = computed(() =>
   statusGroups.value.flatMap((group) =>
@@ -72,6 +72,34 @@ const visibleReminders = computed(() =>
     .slice()
     .sort((a, b) => reminderOrder(a) - reminderOrder(b) || reminderSortDate(a).localeCompare(reminderSortDate(b)))
 )
+const remindersByDate = computed(() => {
+  const reminders = new Map<string, Reminder[]>()
+  for (const item of visibleReminders.value) {
+    const date = reminderCalendarDate(item)
+    if (!date) continue
+    const items = reminders.get(date) || []
+    items.push(item)
+    reminders.set(date, items)
+  }
+  return reminders
+})
+const reminderCalendarCells = computed(() => buildMonthGrid(reminderCalendarMonth.value).map((cell) => {
+  if (!cell) return null
+  return {
+    ...cell,
+    count: remindersByDate.value.get(cell.date)?.length || 0
+  }
+}))
+const reminderCalendarMonthLabel = computed(() => {
+  const [year, month] = reminderCalendarMonth.value.split('-')
+  return `${year}年${Number(month)}月`
+})
+const selectedDateReminders = computed(() => remindersByDate.value.get(selectedReminderDate.value) || [])
+const unscheduledReminders = computed(() => visibleReminders.value.filter((item) => !item.scheduled_at))
+const selectedReminderDateLabel = computed(() => {
+  const [, month, day] = selectedReminderDate.value.split('-').map(Number)
+  return selectedReminderDate.value === calendarToday.value ? `今天 · ${month}月${day}日` : `${month}月${day}日`
+})
 
 const heroTitle = computed(() => {
   if (dangerCount.value)
@@ -102,6 +130,39 @@ function reminderSortDate(item: Reminder): string {
   return item.scheduled_at ? dateAtTimezone(item.scheduled_at, item.timezone || deviceTimezone()) : '9999-99-99'
 }
 
+function reminderCalendarDate(item: Reminder): string {
+  return item.scheduled_at ? dateAtTimezone(item.scheduled_at, item.timezone || deviceTimezone()) : ''
+}
+
+function reminderTimeLabel(item: Reminder): string {
+  return item.scheduled_at ? formatZonedDateTime(item.scheduled_at, item.timezone || deviceTimezone()).slice(11) : item.time || '未设时间'
+}
+
+function reminderDueLabel(item: Reminder): string {
+  if (!item.scheduled_at) return '未设置日期'
+  const [, month, day] = reminderCalendarDate(item).split('-').map(Number)
+  return `${month}月${day}日 ${reminderTimeLabel(item)}`
+}
+
+function moveReminderCalendarMonth(amount: number) {
+  const nextMonth = shiftMonth(reminderCalendarMonth.value, amount)
+  const [year, month] = nextMonth.split('-').map(Number)
+  const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const selectedDay = Number(selectedReminderDate.value.slice(-2))
+  reminderCalendarMonth.value = nextMonth
+  selectedReminderDate.value = `${nextMonth}-${String(Math.min(selectedDay, maxDay)).padStart(2, '0')}`
+}
+
+function selectReminderDate(date: string) {
+  selectedReminderDate.value = date
+}
+
+function goToReminderCalendarToday() {
+  calendarToday.value = todayStr()
+  reminderCalendarMonth.value = calendarToday.value.slice(0, 7)
+  selectedReminderDate.value = calendarToday.value
+}
+
 function reminderOrder(item: Reminder): number {
   if (!item.scheduled_at) return 3
   const due = reminderSortDate(item)
@@ -109,11 +170,6 @@ function reminderOrder(item: Reminder): number {
   if (due < today) return 0
   if (due === today) return 1
   return 2
-}
-
-function reminderDateLabel(item: Reminder): string {
-  if (!item.scheduled_at) return item.time || '未设置日期'
-  return formatZonedDateTime(item.scheduled_at, item.timezone || deviceTimezone())
 }
 
 function reminderStatusLabel(item: Reminder): string {
@@ -201,6 +257,12 @@ function groupLevel(group: StatusGroup) {
 }
 
 async function load() {
+  const latestToday = todayStr()
+  if (latestToday !== calendarToday.value) {
+    calendarToday.value = latestToday
+    reminderCalendarMonth.value = latestToday.slice(0, 7)
+    selectedReminderDate.value = latestToday
+  }
   void agentStore.load({ limit: 2 })
   loading.value = true
   loadError.value = ''
@@ -284,10 +346,6 @@ async function completeReminder(id: string) {
   showToast('已完成')
 }
 
-function laterReminder(id: string) {
-  showToast('稍后提醒功能暂未开放')
-}
-
 function showToast(message: string) {
   uni.showToast({ title: message, icon: 'none' })
 }
@@ -299,13 +357,6 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
 <template>
   <OfflineBanner />
   <view class="page-header today-page-header">
-    <view class="today-masthead">
-      <view class="today-masthead-brand">
-        <AppIcon name="catEar" :size="17" />
-        MEOWHOME DAILY
-      </view>
-      <text>NO. {{ dayOfYear }}</text>
-    </view>
     <view class="today-header-main">
       <view>
         <view class="greet-title">
@@ -315,10 +366,12 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
           {{ todayDateLabel() }}
         </view>
       </view>
-      <button type="button" class="today-reminder-button" aria-label="打开提醒中心" @click="router.push('/reminders')">
-        <AppIcon name="bell" :size="19" />
-        <text v-if="visibleReminders.length">{{ visibleReminders.length }}</text>
-      </button>
+      <view class="today-reminder-wrap">
+        <button type="button" class="today-reminder-button" aria-label="打开提醒中心" @click="router.push('/reminders')">
+          <AppIcon name="bell" :size="19" />
+        </button>
+        <text v-if="visibleReminders.length" class="today-reminder-badge" aria-hidden="true">{{ visibleReminders.length }}</text>
+      </view>
     </view>
     <CatSwitcher @select="onCatSelect" />
   </view>
@@ -369,6 +422,102 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
           </button>
         </view>
       </view>
+
+      <view class="today-section today-reminders-section" aria-label="待办日历">
+        <view class="today-section-heading">
+          <view>
+            <text>PLAN YOUR DAY</text>
+            <view>待办日历</view>
+          </view>
+          <button type="button" @click="router.push('/reminders')">
+            全部提醒（{{ visibleReminders.length }}）
+            <AppIcon name="chevronRight" :size="14" />
+          </button>
+        </view>
+        <view class="today-calendar-card">
+          <view class="today-calendar-toolbar">
+            <text class="today-calendar-month">{{ reminderCalendarMonthLabel }}</text>
+            <view class="today-calendar-controls">
+              <button type="button" class="today-calendar-today" @click="goToReminderCalendarToday">今天</button>
+              <button type="button" class="today-calendar-nav" aria-label="上个月" @click="moveReminderCalendarMonth(-1)">‹</button>
+              <button type="button" class="today-calendar-nav" aria-label="下个月" @click="moveReminderCalendarMonth(1)">›</button>
+            </view>
+          </view>
+
+          <view class="today-calendar-grid today-calendar-weekdays" aria-hidden="true">
+            <text v-for="weekday in reminderWeekdays" :key="weekday">{{ weekday }}</text>
+          </view>
+          <view class="today-calendar-grid today-calendar-days">
+            <template v-for="(cell, index) in reminderCalendarCells" :key="cell?.date || `blank-${index}`">
+              <button
+                v-if="cell"
+                type="button"
+                class="today-calendar-day"
+                :class="{
+                  'is-today': cell.date === calendarToday,
+                  'is-selected': cell.date === selectedReminderDate,
+                  'has-reminders': cell.count > 0
+                }"
+                :aria-label="`${cell.date}，${cell.count}项待办${cell.date === calendarToday ? '，今天' : ''}`"
+                :aria-pressed="cell.date === selectedReminderDate"
+                @click="selectReminderDate(cell.date)"
+              >
+                <text class="today-calendar-day-number">{{ cell.day }}</text>
+                <view v-if="cell.count" class="today-calendar-dot" />
+              </button>
+              <view v-else class="today-calendar-day today-calendar-day--blank" aria-hidden="true" />
+            </template>
+          </view>
+
+          <view class="today-calendar-selected-heading">
+            <text>{{ selectedReminderDateLabel }}</text>
+            <text>{{ selectedDateReminders.length }} 项待办</text>
+          </view>
+
+          <view v-if="selectedDateReminders.length || visibleReminders.length" class="today-calendar-task-list">
+            <text v-if="!selectedDateReminders.length" class="today-calendar-preview-label">
+              {{ selectedReminderDate === calendarToday ? '今天暂无安排，最近待办' : '所选日期暂无安排，待办预览' }}
+            </text>
+            <view
+              v-for="item in selectedDateReminders.length ? selectedDateReminders.slice(0, 4) : visibleReminders.slice(0, 2)"
+              :key="item.id"
+              class="today-calendar-task"
+            >
+              <text class="today-calendar-task-time">{{ selectedDateReminders.length ? reminderTimeLabel(item) : reminderDueLabel(item) }}</text>
+              <view class="today-reminder-icon">
+                <AppIcon :name="item.icon || item.type" :size="17" />
+              </view>
+              <view class="today-calendar-task-copy">
+                <text>{{ item.title }}</text>
+                <text>{{ item.subtitle }} · {{ reminderStatusLabel(item) }}</text>
+              </view>
+              <button
+                v-if="item.type === 'vaccine'"
+                type="button"
+                class="today-calendar-task-action is-primary"
+                @click="openVaccineRecord(item)"
+              >接种</button>
+              <button
+                v-else
+                type="button"
+                class="today-calendar-task-action is-primary"
+                @click="completeReminder(item.id)"
+              >完成</button>
+            </view>
+          </view>
+
+          <view v-else class="today-calendar-empty">
+            <AppIcon name="calendar" :size="19" />
+            <text>暂无待办事项，新的提醒会显示在这里</text>
+          </view>
+
+          <button v-if="unscheduledReminders.length" type="button" class="today-calendar-unscheduled" @click="router.push('/reminders')">
+            {{ unscheduledReminders.length }} 项待办未设置日期
+            <AppIcon name="chevronRight" :size="14" />
+          </button>
+        </view>
+      </view>
+
 
       <view class="today-quick-section" aria-label="快捷记录">
         <view class="today-quick-label">
@@ -514,43 +663,8 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
 
       <AIEvidencePanel v-if="showEvidence && aiSummary" :items="aiSummary.evidence" />
 
-      <view v-if="visibleReminders.length" class="today-section today-reminders-section" aria-label="今日提醒">
-        <view class="today-section-heading">
-          <view>
-            <text>TO-DO TODAY</text>
-            <view>今日提醒</view>
-          </view>
-          <button type="button" @click="router.push('/reminders')">
-            全部
-            <AppIcon name="chevronRight" :size="14" />
-          </button>
-        </view>
-        <view class="today-reminder-list">
-          <view v-for="item in visibleReminders.slice(0, 4)" :key="item.id" class="today-reminder-item">
-            <text class="today-reminder-time">{{ reminderDateLabel(item) }}</text>
-            <view class="today-reminder-icon">
-              <AppIcon :name="item.icon || item.type" :size="18" />
-            </view>
-            <view class="today-reminder-copy">
-              <text>{{ item.title }}</text>
-              <view>{{ item.subtitle }} · {{ reminderStatusLabel(item) }}</view>
-              <view v-if="item.type === 'vaccine' && reminderOrder(item) === 0" class="reminder-disclaimer">
-                逾期仅表示计划日期已过，不代表猫咪漏种。
-              </view>
-            </view>
-            <view class="today-reminder-actions">
-              <template v-if="item.type === 'vaccine'">
-                <button type="button" class="primary" @click="openVaccineRecord(item)">记录接种</button>
-                <button type="button" @click="router.push('/reminders')">调整</button>
-              </template>
-              <template v-else>
-                <button type="button" @click="laterReminder(item.id)">稍后</button>
-                <button type="button" class="primary" @click="completeReminder(item.id)">完成</button>
-              </template>
-            </view>
-          </view>
-        </view>
-      </view>
+
+
     </template>
   </view>
 </template>
@@ -563,5 +677,160 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
 }
 .empty-state .btn-secondary {
   margin-top: var(--space-16);
+}
+.today-calendar-card {
+  padding: 14px 12px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg-surface);
+  box-shadow: 0 7px 20px rgba(45, 41, 37, 0.05);
+}
+.today-calendar-toolbar,
+.today-calendar-controls,
+.today-calendar-selected-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.today-calendar-toolbar { margin-bottom: 10px; }
+.today-calendar-month { color: var(--color-text-primary); font-weight: 700; }
+.today-calendar-controls { flex: none; gap: 8px; }
+.today-calendar-today,
+.today-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  color: var(--color-text-secondary);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.today-calendar-today {
+  min-width: 44px;
+  padding: 0 4px;
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.today-calendar-nav {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  font-size: 22px;
+  line-height: 1;
+}
+.today-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.today-calendar-weekdays {
+  margin-bottom: 3px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 10px;
+}
+.today-calendar-weekdays text { padding: 5px 0; }
+.today-calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  min-width: 0;
+  padding: 4px 0 2px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  background: transparent;
+}
+.today-calendar-day-number { font-size: 12px; line-height: 17px; }
+.today-calendar-day.is-today { border-color: var(--color-brand); color: var(--color-brand); font-weight: 700; }
+.today-calendar-day.is-selected { border-color: var(--color-brand); color: #fff; background: var(--color-brand); }
+.today-calendar-day.is-selected.is-today { color: #fff; }
+.today-calendar-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--color-brand); }
+.today-calendar-day.is-selected .today-calendar-dot { background: #fff; }
+.today-calendar-day--blank { pointer-events: none; }
+.today-calendar-selected-heading {
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 0 8px;
+  border-top: 1px solid var(--color-divider);
+}
+.today-calendar-selected-heading text:first-child { color: var(--color-text-primary); font-weight: 700; }
+.today-calendar-selected-heading text:last-child { color: var(--color-text-tertiary); font-size: var(--font-size-caption); }
+.today-calendar-task-list { display: flex; flex-direction: column; }
+.today-calendar-preview-label {
+  padding: 4px 0 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.today-calendar-task {
+  display: grid;
+  grid-template-columns: 40px 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-divider);
+}
+.today-calendar-task-time { color: var(--color-text-tertiary); font-size: 10px; text-align: center; }
+.today-calendar-task-copy { display: flex; flex-direction: column; min-width: 0; }
+.today-calendar-task-copy text:first-child {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-assist);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.today-calendar-task-copy text:last-child {
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.today-calendar-task-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 46px;
+  height: 29px;
+  padding: 0 5px;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.today-calendar-task-action.is-primary { color: #fff; background: var(--color-brand); }
+.today-calendar-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.today-calendar-unscheduled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 0 2px;
+  border-top: 1px solid var(--color-divider);
+  color: var(--color-brand);
+  background: transparent;
+  font-size: var(--font-size-caption);
+  text-align: left;
 }
 </style>

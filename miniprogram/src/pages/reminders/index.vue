@@ -201,9 +201,11 @@ const todayDone = () => reminders.value.filter((r) => r.state === 'done')
           </view>
           <view v-else-if="item.type === 'vaccine'" class="reminder-actions">
             <button class="reminder-btn primary" @click="openVaccineRecord(item)">记录接种并完成</button>
-            <picker mode="date" :value="item.scheduled_at ? dateAtTimezone(item.scheduled_at, item.timezone) : todayStr()" @change="changeSchedule(item, $event)">
-              <button class="reminder-btn">调整日期</button>
-            </picker>
+            <view class="reminder-action-picker">
+              <picker mode="date" :value="item.scheduled_at ? dateAtTimezone(item.scheduled_at, item.timezone) : todayStr()" @change="changeSchedule(item, $event)">
+                <button class="reminder-btn">调整日期</button>
+              </picker>
+            </view>
             <button class="reminder-btn" @click="cancelVaccine(item)">取消</button>
           </view>
           <view v-else class="reminder-actions">
@@ -227,6 +229,30 @@ const todayDone = () => reminders.value.filter((r) => r.state === 'done')
 .reminder-title { font-weight: 600; }
 .reminder-subtitle, .reminder-disclaimer { color: var(--color-text-secondary); font-size: var(--font-size-assist); margin-top: 4px; }
 .reminder-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.reminder-actions > .reminder-btn,
+.reminder-action-picker .reminder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+.reminder-action-picker {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 44px;
+}
+.reminder-action-picker picker {
+  display: flex;
+  align-items: center;
+  height: 44px;
+}
 .due-badge { font-size: var(--font-size-assist); white-space: nowrap; }
 .due-overdue { color: var(--color-danger); }
 .due-today { color: var(--color-warning); }

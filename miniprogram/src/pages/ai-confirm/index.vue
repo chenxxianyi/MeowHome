@@ -34,6 +34,14 @@ const recordTypeLabel: Record<string, string> = {
   drinking: '饮水',
   elimination: '排便'
 }
+const fieldLabel: Record<string, string> = {
+  time: '时间',
+  notes: '备注',
+  consumed: '进食量',
+  amount: '数量',
+  count: '次数',
+  weight: '体重'
+}
 
 function removeRecord(id: string) {
   session.value = {
@@ -104,7 +112,7 @@ useProtectedPage(() => {
 
     <view class="ai-meta-row">
       <text>AI 解析为 {{ recordCount }} 条记录</text>
-      <text>{{ session.model }} · {{ session.parsedAt?.slice(11, 16) }}</text>
+      <text>{{ session.parsedAt?.slice(11, 16) }}</text>
     </view>
 
     <view class="warn-banner"> ⚠ 以下数据未确认，不会写入正式档案。请仔细检查每条记录。 </view>
@@ -121,7 +129,7 @@ useProtectedPage(() => {
       </view>
       <view class="ai-fields">
         <view v-for="f in rec.fields" :key="f.key" class="ai-field">
-          <text class="ai-field-label">{{ f.key }}</text>
+          <text class="ai-field-label">{{ fieldLabel[f.key] || f.key }}</text>
           <text class="ai-field-value" :class="f.confidence === 'high' ? 'confirmed' : 'unconfirmed'">
             {{ f.value || '—' }}
             <text v-if="f.note" class="ai-field-note">{{ f.note }}</text>

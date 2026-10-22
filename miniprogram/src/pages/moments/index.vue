@@ -180,8 +180,8 @@ usePageCapabilities(load, '猫宅 · 我们的时光')
           <AIResultBadge>AI 月度回顾</AIResultBadge>
           <text>{{ aiReview.evidenceCount }} 段回忆</text>
         </view>
-        <view>这个月，它们这样生活</view>
-        <view>{{ aiReview.body }}</view>
+        <view class="moments-ai-subtitle">这个月，它们这样生活</view>
+        <view class="moments-ai-body">{{ aiReview.body }}</view>
         <view class="moments-ai-footer">
           <view>整理于 {{ aiReview.generatedAt.slice(11, 16) }}</view>
           <button type="button" @click="showEvidence = !showEvidence">

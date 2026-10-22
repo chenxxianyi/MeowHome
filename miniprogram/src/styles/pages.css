@@ -69,33 +69,6 @@
   padding-bottom: var(--space-12);
 }
 
-.today-masthead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  padding-bottom: var(--space-8);
-  margin-bottom: var(--space-12);
-  border-bottom: var(--hairline);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-masthead);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-}
-
-.today-masthead-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-8);
-  color: var(--color-text-primary);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.today-masthead-brand .wxss-unsupported {
-  color: var(--color-brand);
-}
-
 .today-header-main {
   display: flex;
   align-items: center;
@@ -103,8 +76,14 @@
   gap: var(--space-16);
 }
 
-.today-reminder-button {
+.today-reminder-wrap {
   position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+}
+
+.today-reminder-button {
   width: 42px;
   height: 42px;
   flex: 0 0 42px;
@@ -116,10 +95,11 @@
   color: var(--color-text-secondary);
 }
 
-.today-reminder-button > text {
+.today-reminder-badge {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  z-index: 2;
+  top: -4px;
+  right: -4px;
   min-width: 18px;
   height: 18px;
   display: grid;
@@ -2781,7 +2761,7 @@
   font-size: 9px;
 }
 
-.moments-ai-note view {
+.moments-ai-subtitle {
   margin-top: var(--space-14, 14px);
   color: var(--color-text-primary);
   font-family: var(--font-display);
@@ -2789,7 +2769,7 @@
   font-weight: 700;
 }
 
-.moments-ai-note > view {
+.moments-ai-body {
   margin-top: 6px;
   color: var(--color-text-secondary);
   font-size: var(--font-size-assist);
@@ -2852,12 +2832,11 @@
 
 .moments-filter-bar {
   display: flex;
-  gap: 0;
-  margin: 0 calc(0px - var(--space-20)) var(--space-24);
-  padding: 0 var(--space-20);
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-24);
+  padding: 2px 0 4px;
   overflow-x: auto;
-  border-top: 1px solid var(--color-divider);
-  border-bottom: 1px solid var(--color-text-primary);
   scrollbar-width: none;
 }
 
@@ -2866,41 +2845,30 @@
 }
 
 .moments-filter-bar button {
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 44px;
   min-height: 44px;
   flex: 0 0 auto;
-  padding: 0 var(--space-16);
-  border: 0;
-  border-right: 1px solid var(--color-divider);
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-text-tertiary);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.moments-filter-bar button:first-child {
-  border-left: 1px solid var(--color-divider);
-}
-
-.moments-filter-bar button::after {
-  content: "";
-  position: absolute;
-  left: var(--space-12);
-  right: var(--space-12);
-  bottom: -1px;
-  height: 3px;
-  background: transparent;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .moments-filter-bar button.active {
-  background: rgba(45, 41, 37, 0.035);
-  color: var(--color-text-primary);
-  font-weight: 600;
-}
-
-.moments-filter-bar button.active::after {
+  border-color: var(--color-brand);
   background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 3px 9px rgba(193, 105, 60, 0.2);
 }
 
 .moments-month {
@@ -3164,6 +3132,7 @@
   display: flex;
   align-items: center;
   flex-direction: column;
+  justify-content: center;
   padding: var(--space-40) var(--space-16);
   border: 1px dashed var(--color-border);
   border-radius: 2px;
@@ -3188,14 +3157,23 @@
 }
 
 .moments-empty button {
-  min-height: 38px;
-  margin-top: var(--space-16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 120px;
+  min-height: 44px;
+  margin: var(--space-16) auto 0;
   padding: 0 var(--space-16);
-  border-radius: 2px;
+  gap: var(--space-8);
+  border-radius: 12px;
   background: var(--color-brand);
   color: #fff;
   font-size: var(--font-size-assist);
   font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 @media (hover: hover) {

@@ -121,10 +121,17 @@ function inferSeverity(type: string, payload: Record<string, unknown>): string {
 
 function normalizeCatIds(raw: Record<string, unknown>): string[] {
   const rawIds = raw.catIds ?? raw.cat_ids
-  if (Array.isArray(rawIds)) return rawIds.filter((x): x is string => typeof x === 'string')
-  if (typeof rawIds === 'string' && rawIds) return [rawIds]
-  if (typeof raw.catId === 'string' && raw.catId) return [raw.catId]
+  if (Array.isArray(rawIds)) return rawIds.filter((x): x is string => typeof x === 'string' && x !== 'all')
+  if (typeof rawIds === 'string' && rawIds && rawIds !== 'all') return [rawIds]
+  if (typeof raw.catId === 'string' && raw.catId && raw.catId !== 'all') return [raw.catId]
   return []
+}
+
+function defaultCatId(): string {
+  const store = useCatStore()
+  const selected = store.currentCatId
+  if (selected && selected !== 'all' && store.cats.some((cat) => cat.id === selected)) return selected
+  return store.cats[0]?.id || ''
 }
 
 function toISO(value: unknown): string | undefined {
@@ -308,7 +315,7 @@ export const services = {
 
       if (record.type === 'ai-confirmed') {
         const parsed = (record.records ?? []) as AIParseSession['records']
-        const fallbackCatId = useCatStore().currentCatId
+        const fallbackCatId = defaultCatId()
         const inputs = parsed.map((r) => parsedToInput(r, fallbackCatId)).filter((r) => r.cat_ids.length > 0)
         if (inputs.length === 0) throw new Error('没有可入库的记录')
         return recordApi.createBatch(fid, inputs)
@@ -316,7 +323,9 @@ export const services = {
 
       const input = buildRecordInput(record)
       if (input.cat_ids.length === 0) {
-        input.cat_ids = [useCatStore().currentCatId]
+        const fallbackCatId = defaultCatId()
+        if (!fallbackCatId) throw new Error('请选择猫咪')
+        input.cat_ids = [fallbackCatId]
       }
       return recordApi.create(fid, input)
     })

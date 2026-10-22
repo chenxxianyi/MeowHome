@@ -42,6 +42,12 @@ const monthLabel = computed(() => {
   const [year, month] = currentMonth.value.split('-')
   return `${year}年${Number(month)}月`
 })
+const selectedDateLabel = computed(() => {
+  const [year, month, day] = selectedDate.value.split('-').map(Number)
+  return selectedDate.value === todayDate.value
+    ? `今天 · ${month}月${day}日`
+    : `${year}年${month}月${day}日`
+})
 const weekDays = ['一', '二', '三', '四', '五', '六', '日']
 
 const recordGroups = computed(() => {
@@ -406,9 +412,17 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
     <view class="records-history">
       <view class="record-browser-heading">
         <view class="records-section-title">记录浏览</view>
-        <view class="record-view-toggle" role="tablist" aria-label="记录浏览方式">
-          <button type="button" :class="{ active: viewMode === 'calendar' }" :aria-pressed="viewMode === 'calendar'" @click="setView('calendar')">日历</button>
-          <button type="button" :class="{ active: viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="setView('list')">列表</button>
+        <view class="record-browser-actions">
+          <picker mode="selector" :range="recordTypeOptions.map((item) => item.label)" :value="selectedTypeIndex" @change="selectRecordType">
+            <view class="calendar-filter" aria-label="筛选记录类型">
+              <text>{{ selectedTypeLabel }}</text>
+              <AppIcon name="chevronDown" :size="14" />
+            </view>
+          </picker>
+          <view class="record-view-toggle" role="tablist" aria-label="记录浏览方式">
+            <button type="button" :class="{ active: viewMode === 'calendar' }" :aria-pressed="viewMode === 'calendar'" @click="setView('calendar')">日历</button>
+            <button type="button" :class="{ active: viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="setView('list')">列表</button>
+          </view>
         </view>
       </view>
 
@@ -421,16 +435,6 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
               <button type="button" class="calendar-nav-btn" aria-label="上个月" @click="moveMonth(-1)">‹</button>
               <button type="button" class="calendar-nav-btn" aria-label="下个月" @click="moveMonth(1)">›</button>
             </view>
-          </view>
-
-          <view class="calendar-controls">
-            <text class="calendar-selected-hint">选择日期查看当天记录</text>
-            <picker mode="selector" :range="recordTypeOptions.map((item) => item.label)" :value="selectedTypeIndex" @change="selectRecordType">
-              <view class="calendar-filter" aria-label="筛选记录类型">
-                <text>{{ selectedTypeLabel }}</text>
-                <AppIcon name="chevronDown" :size="14" />
-              </view>
-            </picker>
           </view>
 
           <view class="calendar-grid calendar-weekdays" aria-hidden="true">
@@ -452,7 +456,6 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
               >
                 <view class="calendar-day-top">
                   <text class="calendar-day-number">{{ cell.day }}</text>
-                  <text v-if="cell.count" class="calendar-count">{{ cell.count }}</text>
                 </view>
                 <view class="calendar-markers">
                   <AppIcon
@@ -471,48 +474,47 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
             </template>
           </view>
 
+          <view class="selected-day-panel">
+            <view class="selected-day-heading">
+              <view class="selected-day-title">{{ selectedDateLabel }}</view>
+              <view class="selected-day-heading-actions">
+                <text class="selected-day-count">{{ selectedDayRecords.length }} 条记录</text>
+                <button type="button" class="add-selected-day-btn" aria-label="记录这一天" @click="openRecordTypeSheet">
+                  <AppIcon name="plus" :size="16" />
+                </button>
+              </view>
+            </view>
+
+            <view v-if="recordsLoading" class="skeleton calendar-detail-skeleton" aria-label="正在加载当天记录" />
+            <view v-else-if="recordsError" class="calendar-feedback" role="alert">
+              <text>{{ recordsError }}</text>
+              <button type="button" class="calendar-retry-btn" @click="loadRecords">重新加载</button>
+            </view>
+            <view v-else-if="!selectedDayRecords.length" class="calendar-empty-day">
+              <AppIcon name="calendar" :size="19" />
+              <text>{{ calendarRecords.length ? '这一天还没有符合条件的记录' : selectedType === 'all' ? '暂无记录，新的记录会显示在这里' : '这一天没有符合筛选条件的记录' }}</text>
+            </view>
+            <view v-else class="calendar-record-list">
+              <view
+                v-for="item in selectedDayRecords"
+                :key="item.id"
+                class="records-history-item calendar-record-item"
+                @click="router.push(`/records/detail/${encodeURIComponent(item.id)}`)"
+              >
+                <AppIcon :name="recordIcon(item.type)" :size="18" :class="{ 'calendar-record-vaccine': item.type === 'vaccine' }" />
+                <view class="records-history-copy">
+                  <text>{{ item.title || recordLabel(item.type) }}</text>
+                  <view>{{ recordLabel(item.type) }} · {{ recordTimeLabel(item) }}<text v-if="recordCatLabel(item)"> · {{ recordCatLabel(item) }}</text></view>
+                </view>
+                <AppIcon name="chevronRight" :size="16" class="calendar-record-arrow" />
+              </view>
+            </view>
+          </view>
+
           <view class="calendar-legend">
             <view><AppIcon name="vaccine" :size="11" class="calendar-marker--vaccine" /> 疫苗</view>
             <view><AppIcon name="medical" :size="11" class="calendar-marker--health" /> 健康</view>
             <view><AppIcon name="calendar" :size="11" class="calendar-marker--life" /> 生活</view>
-          </view>
-        </view>
-
-        <view class="selected-day-panel">
-          <view class="selected-day-heading">
-            <view>
-              <view class="selected-day-title">{{ dateLabel(selectedDate) }}</view>
-              <view class="selected-day-subtitle">{{ selectedDayRecords.length }} 条记录</view>
-            </view>
-            <button type="button" class="add-selected-day-btn" @click="openRecordTypeSheet">
-              <AppIcon name="plus" :size="16" /> 记录这一天
-            </button>
-          </view>
-
-          <view v-if="recordsLoading" class="skeleton calendar-detail-skeleton" aria-label="正在加载当天记录" />
-          <view v-else-if="recordsError" class="calendar-feedback" role="alert">
-            <text>{{ recordsError }}</text>
-            <button type="button" class="calendar-retry-btn" @click="loadRecords">重新加载</button>
-          </view>
-          <view v-else-if="!selectedDayRecords.length" class="calendar-empty-day">
-            <AppIcon name="calendar" :size="24" />
-            <text>{{ calendarRecords.length ? '这一天还没有符合条件的记录' : selectedType === 'all' ? '本月还没有记录' : '本月没有符合筛选条件的记录' }}</text>
-            <button type="button" class="calendar-retry-btn" @click="openRecordTypeSheet">添加记录</button>
-          </view>
-          <view v-else class="calendar-record-list">
-            <view
-              v-for="item in selectedDayRecords"
-              :key="item.id"
-              class="records-history-item calendar-record-item"
-              @click="router.push(`/records/detail/${encodeURIComponent(item.id)}`)"
-            >
-              <AppIcon :name="recordIcon(item.type)" :size="18" :class="{ 'calendar-record-vaccine': item.type === 'vaccine' }" />
-              <view class="records-history-copy">
-                <text>{{ item.title || recordLabel(item.type) }}</text>
-                <view>{{ recordLabel(item.type) }} · {{ recordTimeLabel(item) }}<text v-if="recordCatLabel(item)"> · {{ recordCatLabel(item) }}</text></view>
-              </view>
-              <AppIcon name="chevronRight" :size="16" class="calendar-record-arrow" />
-            </view>
           </view>
         </view>
       </template>
@@ -568,7 +570,6 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
 }
 .record-browser-heading,
 .calendar-toolbar,
-.calendar-controls,
 .selected-day-heading,
 .record-type-sheet-heading {
   display: flex;
@@ -577,6 +578,11 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
 }
 .record-browser-heading {
   margin-bottom: var(--space-12);
+}
+.record-browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .record-view-toggle {
   display: flex;
@@ -598,7 +604,6 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   box-shadow: 0 1px 4px rgb(43 38 32 / 10%);
 }
 .calendar-card,
-.selected-day-panel,
 .records-list-panel {
   padding: var(--space-16);
   border: 1px solid var(--color-divider);
@@ -606,23 +611,20 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   background: var(--color-bg-surface);
 }
 .calendar-toolbar {
-  margin-bottom: var(--space-12);
+  margin-bottom: 10px;
 }
 .calendar-month-title,
 .selected-day-title {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-body-lg);
   font-weight: 700;
 }
 .calendar-toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
-.calendar-today-btn,
-.calendar-nav-btn,
-.calendar-filter,
-.add-selected-day-btn {
+.calendar-filter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -630,30 +632,38 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   color: var(--color-text-secondary);
   background: var(--color-bg-surface);
 }
+.calendar-today-btn,
+.calendar-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  box-shadow: none;
+}
 .calendar-today-btn {
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: var(--font-size-caption);
+  min-width: 40px;
+  padding: 0 4px;
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 .calendar-nav-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  font-size: 23px;
+  width: 36px;
+  min-width: 36px;
+  font-size: 22px;
   line-height: 1;
-}
-.calendar-controls {
-  gap: 8px;
-  margin-bottom: var(--space-12);
-}
-.calendar-selected-hint {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-caption);
 }
 .calendar-filter {
   gap: 5px;
-  min-height: 30px;
+  min-height: 34px;
   padding: 0 9px;
   border-radius: 999px;
   font-size: var(--font-size-caption);
@@ -665,7 +675,7 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   gap: 4px;
 }
 .calendar-weekdays {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   color: var(--color-text-tertiary);
   text-align: center;
   font-size: var(--font-size-caption);
@@ -676,18 +686,22 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
 .calendar-day {
   display: flex;
   min-width: 0;
-  min-height: 54px;
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
   flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 5px 4px 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: 10px;
   color: var(--color-text-primary);
   background: transparent;
 }
 .calendar-day-skeleton {
-  min-height: 54px;
+  height: 40px;
+  min-height: 40px;
   border-radius: 10px;
   background: #f4f1ed;
   animation: calendar-pulse 1.2s ease-in-out infinite alternate;
@@ -700,34 +714,36 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   pointer-events: none;
 }
 .calendar-day.is-today .calendar-day-number {
-  color: var(--color-primary);
+  color: var(--color-brand);
   font-weight: 700;
 }
 .calendar-day.is-selected {
-  border-color: var(--color-primary);
-  background: #f7f0eb;
+  border-color: var(--color-brand);
+  color: #fff;
+  background: var(--color-brand);
+  font-weight: 700;
+}
+.calendar-day.is-selected.is-today .calendar-day-number {
+  color: #fff;
 }
 .calendar-day-top {
   display: flex;
-  min-height: 19px;
-  align-items: flex-start;
-  justify-content: space-between;
+  width: 100%;
+  min-height: 17px;
+  align-items: center;
+  justify-content: center;
 }
 .calendar-day-number {
   font-size: var(--font-size-caption);
-  line-height: 18px;
-}
-.calendar-count {
-  max-width: 20px;
-  overflow: hidden;
-  color: var(--color-text-tertiary);
-  font-size: 9px;
-  line-height: 13px;
+  line-height: 17px;
 }
 .calendar-markers {
   display: flex;
-  min-height: 15px;
+  width: 100%;
+  height: 10px;
+  min-height: 10px;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   overflow: hidden;
 }
@@ -761,33 +777,55 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
   gap: 4px;
 }
 .selected-day-panel {
-  margin-top: var(--space-12);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-divider);
 }
 .selected-day-heading {
   gap: 8px;
-  margin-bottom: var(--space-8);
+  margin-bottom: 6px;
 }
-.selected-day-subtitle {
-  margin-top: 3px;
+.selected-day-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selected-day-count {
   color: var(--color-text-tertiary);
   font-size: var(--font-size-caption);
 }
 .add-selected-day-btn {
-  gap: 4px;
-  min-height: 34px;
-  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
   border-color: transparent;
-  border-radius: 999px;
-  color: var(--color-primary);
+  border-radius: 50%;
+  color: var(--color-brand);
   background: #f7f0eb;
-  font-size: var(--font-size-caption);
-  white-space: nowrap;
+  box-shadow: none;
 }
 .calendar-detail-skeleton {
   height: 70px;
   margin-top: var(--space-12);
 }
-.calendar-empty-day,
+.calendar-empty-day {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.calendar-empty-day text {
+  flex: 1;
+  min-width: 0;
+}
 .calendar-feedback {
   display: flex;
   min-height: 108px;
@@ -805,7 +843,7 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
 .calendar-retry-btn {
   padding: 5px 10px;
   border-radius: 999px;
-  color: var(--color-primary);
+  color: var(--color-brand);
   background: transparent;
   font-size: var(--font-size-caption);
 }

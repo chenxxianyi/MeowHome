@@ -8,7 +8,7 @@ import { useRecordStore } from '../../stores/record'
 import { services } from '../../services'
 import { useProtectedPage } from '../../utils/page'
 import { deviceTimezone, formatZonedDateTime, localDateTimeStr, todayStr } from '../../utils/date'
-import { isValidDateKey } from '../../utils/recordCalendar'
+import { buildMonthGrid, isValidDateKey, shiftMonth } from '../../utils/recordCalendar'
 import type { VaccineSuggestionDTO } from '../../api/endpoints'
 import type { Reminder } from '../../types'
 
@@ -17,7 +17,11 @@ const recordStore = useRecordStore()
 const route = useRoute()
 const router = useRouter()
 
-const catId = computed(() => (route.query.catId as string) || catStore.currentCatId || catStore.cats[0]?.id || '')
+const catId = computed(() => {
+  const candidates = [route.query.catId as string, catStore.currentCatId]
+  const selected = candidates.find((id) => id && id !== 'all' && catStore.cats.some((cat) => cat.id === id))
+  return selected || catStore.cats[0]?.id || ''
+})
 const recordType = computed(() => (route.params.type as string) || (route.query.type as string) || 'feeding')
 const cat = computed(() => catStore.cats.find((c) => c.id === (formData.value.catId || catId.value)) || catStore.cats[0])
 
@@ -35,6 +39,9 @@ const addVaccineReminder = ref(true)
 const reminderLinkError = ref('')
 const matchingVaccineReminders = ref<Reminder[]>([])
 const creatingVaccineReminder = ref(false)
+const datePickerOpen = ref(false)
+const datePickerMonth = ref('')
+const datePickerWeekdays = ['一', '二', '三', '四', '五', '六', '日']
 
 const vaccineTypes = [
   { value: 'fvrhcp', label: '猫三联' },
@@ -88,6 +95,11 @@ const ageWeeksFromProfile = computed(() => {
   return Math.floor((vaccinationUTC - birthUTC) / (7 * 24 * 60 * 60 * 1000))
 })
 const reminderId = computed(() => (route.query.reminderId as string) || '')
+const datePickerCells = computed(() => buildMonthGrid(datePickerMonth.value))
+const datePickerMonthLabel = computed(() => {
+  const [year, month] = datePickerMonth.value.split('-')
+  return `${year}年${Number(month)}月`
+})
 
 // Initialize form fields based on type
 const fieldLabels: Record<string, string> = {
@@ -194,9 +206,20 @@ function selectReminderDate(event: unknown) {
   if (vaccineSuggestion.value?.default_reminder_date !== value) nextReminderDateSource.value = 'user'
 }
 
-function selectVaccinationDate(event: unknown) {
-  const value = (event as { detail: { value: string } }).detail.value
-  if (typeof value === 'string') formData.value.vaccination_date = value
+function openDatePicker() {
+  const selectedDate = formData.value.vaccination_date || todayStr()
+  datePickerMonth.value = selectedDate.slice(0, 7)
+  datePickerOpen.value = true
+}
+
+function moveDatePickerMonth(amount: number) {
+  datePickerMonth.value = shiftMonth(datePickerMonth.value, amount)
+}
+
+function chooseVaccinationDate(date: string) {
+  if (!isValidDateKey(date)) return
+  formData.value.vaccination_date = date
+  datePickerOpen.value = false
 }
 
 function selectProvidedDueDate(event: unknown) {
@@ -232,7 +255,7 @@ function vaccineDateTime(date: string): string {
 
 function validateVaccine(): boolean {
   validationError.value = ''
-  if (!formData.value.catId || !cat.value) validationError.value = '请选择猫咪'
+  if (!formData.value.catId || !cat.value || cat.value.id !== formData.value.catId) validationError.value = '请选择猫咪'
   else if (!formData.value.vaccination_date) validationError.value = '请选择接种日期'
   else if (!formData.value.vaccine_code) validationError.value = '请选择疫苗类型'
   else if (!formData.value.vaccine_name.trim()) validationError.value = '请填写疫苗名称'
@@ -461,9 +484,11 @@ useProtectedPage(init)
         </view>
         <view class="form-group">
           <label class="form-label">接种日期 *</label>
-          <picker mode="date" :value="formData.vaccination_date" @change="selectVaccinationDate">
-            <view class="form-select">{{ formData.vaccination_date || '请选择日期' }}</view>
-          </picker>
+          <view class="form-select vaccine-date-field" role="button" aria-label="选择接种日期" @click="openDatePicker">
+            <AppIcon name="calendar" :size="20" class="vaccine-date-icon" />
+            <text class="vaccine-date-value">{{ formData.vaccination_date || '请选择日期' }}</text>
+            <AppIcon name="chevronRight" :size="17" class="vaccine-date-chevron" />
+          </view>
         </view>
         <view class="form-group">
           <label class="form-label">疫苗类型 *</label>
@@ -617,6 +642,50 @@ useProtectedPage(init)
       </view>
     </view>
   </view>
+
+  <view v-if="datePickerOpen" class="date-picker-backdrop" @click="datePickerOpen = false">
+    <view class="date-picker-sheet" role="dialog" aria-modal="true" aria-label="选择接种日期" @click.stop>
+      <view class="date-picker-heading">
+        <view>
+          <text class="date-picker-title">选择接种日期</text>
+          <text class="date-picker-subtitle">按实际接种时间记录</text>
+        </view>
+        <button type="button" class="date-picker-close" aria-label="关闭日历" @click="datePickerOpen = false">×</button>
+      </view>
+
+      <view class="date-picker-monthbar">
+        <button type="button" class="date-picker-nav" aria-label="上个月" @click="moveDatePickerMonth(-1)">‹</button>
+        <text class="date-picker-month">{{ datePickerMonthLabel }}</text>
+        <button type="button" class="date-picker-nav" aria-label="下个月" @click="moveDatePickerMonth(1)">›</button>
+      </view>
+
+      <view class="date-picker-grid date-picker-weekdays" aria-hidden="true">
+        <text v-for="weekday in datePickerWeekdays" :key="weekday">{{ weekday }}</text>
+      </view>
+      <view class="date-picker-grid date-picker-days">
+        <view v-for="(cell, index) in datePickerCells" :key="cell?.date || `empty-${index}`">
+          <button
+            v-if="cell"
+            type="button"
+            class="date-picker-day"
+            :class="{
+              'is-today': cell.date === todayStr(),
+              'is-selected': cell.date === formData.vaccination_date
+            }"
+            :aria-label="`${cell.date}${cell.date === formData.vaccination_date ? '，已选择' : ''}`"
+            :aria-pressed="cell.date === formData.vaccination_date"
+            @click="chooseVaccinationDate(cell.date)"
+          >{{ cell.day }}</button>
+          <view v-else class="date-picker-day date-picker-day--empty" aria-hidden="true" />
+        </view>
+      </view>
+
+      <view class="date-picker-footer">
+        <text class="date-picker-selected">已选 {{ formData.vaccination_date || '未选择' }}</text>
+        <button type="button" class="date-picker-today" @click="chooseVaccinationDate(todayStr())">选择今天</button>
+      </view>
+    </view>
+  </view>
 </template>
 
 <style scoped>
@@ -676,4 +745,117 @@ useProtectedPage(init)
 .vaccine-source { text-align: left; color: var(--color-primary); background: transparent; padding: 0; }
 .vaccine-existing-reminders { display: flex; flex-direction: column; gap: 8px; }
 .vaccine-existing-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-top: 1px solid var(--color-divider); }
+.vaccine-date-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  text-align: left;
+}
+.vaccine-date-icon { color: var(--color-brand); }
+.vaccine-date-value { flex: 1; }
+.vaccine-date-chevron { color: var(--color-text-tertiary); }
+.date-picker-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(37, 33, 30, 0.42);
+}
+.date-picker-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 22px 20px calc(18px + var(--safe-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--color-bg-surface);
+  box-shadow: 0 -8px 36px rgba(35, 30, 25, 0.12);
+}
+.date-picker-heading,
+.date-picker-monthbar,
+.date-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.date-picker-heading { margin-bottom: 18px; }
+.date-picker-title,
+.date-picker-subtitle { display: block; }
+.date-picker-title { color: var(--color-text-primary); font-size: 18px; font-weight: 700; }
+.date-picker-subtitle { margin-top: 4px; color: var(--color-text-tertiary); font-size: var(--font-size-caption); }
+.date-picker-close,
+.date-picker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-page);
+}
+.date-picker-close { width: 34px; height: 34px; border-radius: 50%; font-size: 24px; line-height: 1; }
+.date-picker-monthbar { margin-bottom: 10px; }
+.date-picker-month { color: var(--color-text-primary); font-size: 16px; font-weight: 700; }
+.date-picker-nav { width: 34px; height: 34px; border-radius: 50%; font-size: 24px; line-height: 1; }
+.date-picker-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.date-picker-weekdays { margin-bottom: 4px; color: var(--color-text-tertiary); text-align: center; font-size: var(--font-size-caption); }
+.date-picker-weekdays text { padding: 8px 0; }
+.date-picker-days > view { display: flex; justify-content: center; }
+.date-picker-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--color-text-primary);
+  background: transparent;
+  font-size: 14px;
+}
+.date-picker-sheet button::after { border: 0; }
+.date-picker-day.is-today { color: var(--color-brand); font-weight: 700; }
+.date-picker-day.is-today:not(.is-selected)::after {
+  position: absolute;
+  bottom: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  content: '';
+}
+.date-picker-day.is-selected { color: #fff; background: var(--color-brand); font-weight: 700; }
+.date-picker-day--empty { pointer-events: none; }
+.date-picker-footer {
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-divider);
+}
+.date-picker-selected { color: var(--color-text-secondary); font-size: var(--font-size-caption); }
+.date-picker-today {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 104px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--color-brand);
+  background: #f7f0eb;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
 </style>
