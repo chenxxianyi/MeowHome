@@ -30,6 +30,7 @@ export interface Family {
   id: ID
   name: string
   createdAt: string
+  timezone?: string
   members: FamilyMember[]
 }
 
@@ -203,6 +204,9 @@ export interface Reminder {
   scheduled_at?: string
   timezone?: string
   completed_at?: string
+  source_record_id?: string
+  completed_record_id?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface CareTask {

@@ -24,7 +24,7 @@ import {
   toReminder,
   toSummary
 } from '../api/endpoints'
-import type { RecordDTO, RecordInput } from '../api/endpoints'
+import type { RecordDTO, RecordInput, VaccineSuggestionDTO } from '../api/endpoints'
 import { recordTypes as recordTypeConfig } from '../data/recordTypes'
 import { useAuthStore } from '../stores/auth'
 import { useCatStore } from '../stores/cat'
@@ -273,8 +273,28 @@ export const services = {
     })
   },
 
-  async getRecords(catId?: string): Promise<APIResponse<RecordDTO[]>> {
-    return api<RecordDTO[]>([], () => recordApi.list(familyId(), catId && catId !== 'all' ? { cat_id: catId } : {}))
+  async getRecords(
+    catId?: string,
+    options: { from?: string; to?: string; type?: string; limit?: number; offset?: number } = {}
+  ): Promise<APIResponse<RecordDTO[]>> {
+    return api<RecordDTO[]>([], () => recordApi.list(familyId(), {
+      ...(catId && catId !== 'all' ? { cat_id: catId } : {}),
+      ...options
+    }))
+  },
+
+  async getVaccineSuggestion(recordId: string): Promise<APIResponse<VaccineSuggestionDTO>> {
+    return api<VaccineSuggestionDTO>({
+      status: 'needs_input', cat_id: '', prior_doses_recorded: 0, reason: '请手动核对疫苗信息并选择日期。', timezone: 'Asia/Shanghai'
+    }, () => recordApi.vaccineSuggestion(familyId(), recordId))
+  },
+
+  async createVaccineReminder(recordId: string, scheduledDate: string, dateSource: string, timezone: string): Promise<APIResponse<Reminder>> {
+    return api<Reminder>({
+      id: '', catId: '', type: 'vaccine', title: '', subtitle: '', time: '', state: 'todo'
+    }, async () => toReminder(await recordApi.createVaccineReminder(familyId(), recordId, {
+      scheduled_date: scheduledDate, date_source: dateSource, timezone
+    })))
   },
 
   async parseAI(text: string): Promise<APIResponse<AIParseSession>> {
@@ -306,6 +326,25 @@ export const services = {
     return api<{ id: string; state: string }>({ id, state: 'done' }, async () => {
       const res = await reminderApi.complete(familyId(), id)
       return { id, state: res.data?.state ?? 'done' }
+    })
+  },
+
+  async completeVaccineReminder(id: string, recordId: string): Promise<APIResponse<Reminder>> {
+    return api<Reminder>({ id, catId: '', type: 'vaccine', title: '', subtitle: '', time: '', state: 'todo' }, async () =>
+      toReminder(await reminderApi.completeWithRecord(familyId(), id, recordId))
+    )
+  },
+
+  async rescheduleVaccineReminder(id: string, scheduledDate: string, timezone: string): Promise<APIResponse<Reminder>> {
+    return api<Reminder>({ id, catId: '', type: 'vaccine', title: '', subtitle: '', time: '', state: 'todo' }, async () =>
+      toReminder(await reminderApi.updateVaccineSchedule(familyId(), id, { scheduled_date: scheduledDate, timezone }))
+    )
+  },
+
+  async cancelVaccineReminder(id: string): Promise<APIResponse<{ id: string }>> {
+    return api<{ id: string }>({ id }, async () => {
+      await reminderApi.cancelVaccine(familyId(), id)
+      return { id }
     })
   }
 }

@@ -132,7 +132,7 @@ test('expired authentication clears private chat during bootstrap', async () => 
     if (name === './agent') return { useAgentStore: () => f.store }
     throw new Error(`Unexpected import: ${name}`)
   }
-  vm.runInNewContext(output, { exports, require, console, Error })
+  vm.runInNewContext(output, { exports, require, console, Error, uni: { getStorageSync: () => true } })
   const authStore = exports.useAuthStore()
   await authStore.bootstrap()
   assert.equal(authStore.familyId, null)

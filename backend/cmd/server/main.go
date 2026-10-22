@@ -71,9 +71,11 @@ func main() {
 	familySvc := app.NewFamilyService(familyRepo, memberRepo, userRepo, auditRepo)
 	catSvc := app.NewCatService(catRepo, healthRepo, memberRepo, auditRepo, familyRepo)
 	memberSvc := app.NewMemberService(memberRepo, userRepo, familyRepo)
-	recordSvc := app.NewRecordService(recordRepo, memberRepo, auditRepo)
+	recordSvc := app.NewRecordService(recordRepo, memberRepo, auditRepo, catRepo)
 	careSvc := app.NewCareService(recordRepo, reminderRepo, catRepo, familyRepo, memberRepo)
 	reminderSvc := app.NewReminderServiceWithRepos(reminderRepo, memberRepo, catRepo, familyRepo)
+	reminderSvc.SetRecordRepo(recordRepo)
+	vaccineSvc := app.NewVaccineService(recordRepo, catRepo, memberRepo, familyRepo, reminderSvc)
 	assetSvc := app.NewAssetService(timelineRepo, inventoryRepo, expenseRepo, memberRepo)
 	aiSvc := app.NewAIService(recordRepo, reportRepo, aiRepo, catRepo, memberRepo)
 	agentRepo := mysql.NewAgentRepo(db)
@@ -96,6 +98,7 @@ func main() {
 
 	// 组装 HTTP 层
 	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc, agentSvc)
+	hdl.SetVaccineService(vaccineSvc)
 	if cfg.Storage.Driver == "local" {
 		hdl.SetLocalStorage(cfg.Storage.LocalDir, cfg.Server.MaxUploadSizeMB*(1<<20))
 	}

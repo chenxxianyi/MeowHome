@@ -108,6 +108,29 @@ export interface ReminderDTO {
   scheduled_at?: string
   timezone?: string
   completed_at?: string
+  source_record_id?: string
+  completed_record_id?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface VaccineSuggestionDTO {
+  status: 'suggested' | 'needs_input' | 'unsupported'
+  cat_id: string
+  vaccine_code?: string
+  vaccine_name?: string
+  dose_number?: string
+  age_weeks?: number
+  prior_doses_recorded: number
+  date_window_start?: string
+  date_window_end?: string
+  default_reminder_date?: string
+  title?: string
+  reason: string
+  rule_id?: string
+  rule_version?: string
+  source_url?: string
+  timezone: string
+  date_source?: string
 }
 
 export interface MomentDTO {
@@ -181,7 +204,7 @@ export function toUser(dto: MeDTO): User {
 }
 
 export function toFamily(dto: MyFamilyDTO, members: FamilyMember[] = []): Family {
-  return { id: dto.id, name: dto.name, createdAt: '', members }
+  return { id: dto.id, name: dto.name, createdAt: '', timezone: dto.timezone, members }
 }
 
 export function toMember(dto: MemberDTO): FamilyMember {
@@ -227,7 +250,14 @@ export function toReminder(dto: ReminderDTO): Reminder {
     subtitle: dto.subtitle,
     time: dto.time,
     state: dto.state === 'done' ? 'done' : 'todo',
-    icon: dto.icon
+    icon: dto.icon,
+    rule: dto.rule,
+    scheduled_at: dto.scheduled_at,
+    timezone: dto.timezone,
+    completed_at: dto.completed_at,
+    source_record_id: dto.source_record_id,
+    completed_record_id: dto.completed_record_id,
+    metadata: dto.metadata
   }
 }
 
@@ -410,7 +440,7 @@ export const recordApi = {
   get(familyId: string, recordId: string) {
     return request<RecordDTO>(http, { method: 'GET', url: `/families/${familyId}/records/${recordId}` })
   },
-  list(familyId: string, params: { cat_id?: string; type?: string; from?: string; to?: string; limit?: number } = {}) {
+  list(familyId: string, params: { cat_id?: string; type?: string; from?: string; to?: string; limit?: number; offset?: number } = {}) {
     return request<RecordDTO[]>(http, { method: 'GET', url: `/families/${familyId}/records`, params })
   },
   create(familyId: string, data: RecordInput) {
@@ -418,6 +448,23 @@ export const recordApi = {
   },
   createBatch(familyId: string, records: RecordInput[]) {
     return request<RecordDTO[]>(http, { method: 'POST', url: `/families/${familyId}/records/batch`, data: { records } })
+  },
+  vaccineSuggestion(familyId: string, recordId: string) {
+    return request<VaccineSuggestionDTO>(http, {
+      method: 'GET',
+      url: `/families/${familyId}/records/${recordId}/vaccine-suggestion`
+    })
+  },
+  createVaccineReminder(
+    familyId: string,
+    recordId: string,
+    data: { scheduled_date: string; date_source: string; timezone: string }
+  ) {
+    return request<ReminderDTO>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/records/${recordId}/vaccine-reminders`,
+      data
+    })
   }
 }
 
@@ -453,6 +500,23 @@ export const reminderApi = {
       method: 'PATCH',
       url: `/families/${familyId}/reminders/${reminderId}/complete`
     })
+  },
+  completeWithRecord(familyId: string, reminderId: string, recordId: string) {
+    return request<ReminderDTO>(http, {
+      method: 'PATCH',
+      url: `/families/${familyId}/reminders/${reminderId}/complete-with-record`,
+      data: { record_id: recordId }
+    })
+  },
+  updateVaccineSchedule(familyId: string, reminderId: string, data: { scheduled_date: string; timezone: string }) {
+    return request<ReminderDTO>(http, {
+      method: 'PATCH',
+      url: `/families/${familyId}/reminders/${reminderId}/schedule`,
+      data
+    })
+  },
+  cancelVaccine(familyId: string, reminderId: string) {
+    return request<void>(http, { method: 'DELETE', url: `/families/${familyId}/reminders/${reminderId}` })
   }
 }
 

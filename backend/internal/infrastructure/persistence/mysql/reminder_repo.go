@@ -40,6 +40,20 @@ func (r *ReminderRepo) FindByID(ctx context.Context, id string) (*model.Reminder
 	return &m, nil
 }
 
+// FindBySourceRecord 按疫苗来源记录读取唯一待办。
+func (r *ReminderRepo) FindBySourceRecord(ctx context.Context, familyID, recordID string) (*model.Reminder, error) {
+	var m model.Reminder
+	if err := r.db.WithContext(ctx).
+		Where("family_id = ? AND source_record_id = ?", familyID, recordID).
+		First(&m).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, repository.ErrNotFound
+		}
+		return nil, err
+	}
+	return &m, nil
+}
+
 // List 按家庭与状态查询提醒。
 func (r *ReminderRepo) List(ctx context.Context, q repository.ReminderQuery) ([]*model.Reminder, error) {
 	tx := r.db.WithContext(ctx).Model(&model.Reminder{}).Where("family_id = ? AND deleted_at IS NULL", q.FamilyID)

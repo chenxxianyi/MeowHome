@@ -15,11 +15,16 @@ type RecordService struct {
 	records repository.DailyRecordRepo
 	members repository.MemberRepo
 	audit   repository.AuditRepo
+	cats    repository.CatRepo
 }
 
 // NewRecordService 创建记录服务。
-func NewRecordService(records repository.DailyRecordRepo, members repository.MemberRepo, audit repository.AuditRepo) *RecordService {
-	return &RecordService{records: records, members: members, audit: audit}
+func NewRecordService(records repository.DailyRecordRepo, members repository.MemberRepo, audit repository.AuditRepo, cats ...repository.CatRepo) *RecordService {
+	var catRepo repository.CatRepo
+	if len(cats) > 0 {
+		catRepo = cats[0]
+	}
+	return &RecordService{records: records, members: members, audit: audit, cats: catRepo}
 }
 
 // RecordInput 创建记录的输入（类型专属字段放在 Payload）。
@@ -62,7 +67,7 @@ func (s *RecordService) Create(ctx context.Context, familyID, userID string, in 
 	if err := requireFamilyAccess(ctx, s.members, familyID, userID); err != nil {
 		return nil, err
 	}
-	rec, err := s.build(familyID, userID, in)
+	rec, err := s.build(ctx, familyID, userID, in)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +89,7 @@ func (s *RecordService) CreateBatch(ctx context.Context, familyID, userID string
 
 	out := make([]*RecordEnvelope, 0, len(in))
 	for _, item := range in {
-		rec, err := s.build(familyID, userID, item)
+		rec, err := s.build(ctx, familyID, userID, item)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +134,7 @@ func (s *RecordService) List(ctx context.Context, familyID, userID string, q rep
 	return out, nil
 }
 
-func (s *RecordService) build(familyID, userID string, in RecordInput) (*model.DailyRecord, error) {
+func (s *RecordService) build(ctx context.Context, familyID, userID string, in RecordInput) (*model.DailyRecord, error) {
 	if in.Type == "" {
 		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "type is required")
 	}
@@ -138,6 +143,18 @@ func (s *RecordService) build(familyID, userID string, in RecordInput) (*model.D
 	}
 	if len(in.CatIDs) == 0 {
 		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "cat_ids is required")
+	}
+	if in.Type == "vaccine" {
+		if len(in.CatIDs) != 1 {
+			return nil, errors.InvalidRequest(errors.CodeValidationFailed, "vaccine records must belong to exactly one cat")
+		}
+		if s.cats == nil {
+			return nil, errors.New(errors.TypeInternal, errors.CodeInvalidRequest, "cat repository is unavailable")
+		}
+		cat, catErr := s.cats.FindByID(ctx, in.CatIDs[0])
+		if catErr != nil || cat == nil || cat.DeletedAt != nil || cat.FamilyID != familyID {
+			return nil, errors.Forbidden(errors.CodeFamilyForbidden, "cat does not belong to family")
+		}
 	}
 
 	occurred := time.Now().UTC()

@@ -9,6 +9,8 @@ import { useCatStore } from '../../stores/cat'
 import { services } from '../../services'
 import { recordTypes } from '../../data/recordTypes'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
+import { deviceTimezone, formatZonedDateTime } from '../../utils/date'
+import { buildMonthGrid, dateKeyInTimezone, monthRange, recordCalendarDate, shiftMonth } from '../../utils/recordCalendar'
 import type { RecordDTO } from '../../api/endpoints'
 
 const router = useRouter()
@@ -19,13 +21,33 @@ const catStore = useCatStore()
 const aiInput = ref(app.aiInput || '')
 const aiLoading = ref(false)
 const aiError = ref('')
-const records = ref<RecordDTO[]>([])
+const viewMode = ref<'calendar' | 'list'>('calendar')
+const timezone = ref(deviceTimezone())
+const timezoneLoaded = ref(false)
+const todayDate = ref(dateKeyInTimezone(new Date().toISOString(), timezone.value))
+const currentMonth = ref(todayDate.value.slice(0, 7))
+const selectedDate = ref(todayDate.value)
+const selectedType = ref('all')
+const calendarRecords = ref<RecordDTO[]>([])
+const listRecords = ref<RecordDTO[]>([])
 const recordsLoading = ref(true)
+const recordsError = ref('')
+let activeRequest = 0
+
+const allRecordTypes = [...recordTypes.high, ...recordTypes.health, ...recordTypes.life]
+const recordTypeOptions = [{ id: 'all', label: '全部类型', icon: 'record' }, ...allRecordTypes]
+const selectedTypeIndex = computed(() => Math.max(0, recordTypeOptions.findIndex((item) => item.id === selectedType.value)))
+const selectedTypeLabel = computed(() => recordTypeOptions[selectedTypeIndex.value]?.label || '全部类型')
+const monthLabel = computed(() => {
+  const [year, month] = currentMonth.value.split('-')
+  return `${year}年${Number(month)}月`
+})
+const weekDays = ['一', '二', '三', '四', '五', '六', '日']
 
 const recordGroups = computed(() => {
   const groups = new Map<string, RecordDTO[]>()
-  for (const record of records.value) {
-    const date = (record.occurred_at || '').slice(0, 10) || '未知日期'
+  for (const record of listRecords.value) {
+    const date = recordCalendarDate(record, timezone.value) || '未知日期'
     const items = groups.get(date) || []
     items.push(record)
     groups.set(date, items)
@@ -35,20 +57,179 @@ const recordGroups = computed(() => {
     .map(([date, items]) => ({ date, items }))
 })
 
+const calendarCells = computed(() => buildMonthGrid(currentMonth.value).map((cell) => {
+  if (!cell) return null
+  const items = calendarRecords.value.filter((record) => recordCalendarDate(record, timezone.value) === cell.date)
+  const types = [...new Set(items.map((record) => record.type))].map((type) => {
+    const option = allRecordTypes.find((item) => item.id === type)
+    return {
+      id: type,
+      icon: option?.icon || 'record',
+      label: option?.label || type,
+      group: type === 'vaccine' ? 'vaccine' : [...recordTypes.health, ...recordTypes.high].some((item) => item.id === type) ? 'health' : 'life'
+    }
+  })
+  return {
+    ...cell,
+    count: items.length,
+    markers: types.slice(0, 3),
+    extraTypes: Math.max(0, types.length - 3),
+    ariaLabel: `${dateLabel(cell.date)}，${items.length}条记录${types.length ? `，${types.map((item) => item.label).join('、')}` : ''}`
+  }
+}))
+
+const selectedDayRecords = computed(() => calendarRecords.value
+  .filter((record) => recordCalendarDate(record, timezone.value) === selectedDate.value)
+  .sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()))
+
 function recordLabel(type: string) {
-  const all = [...recordTypes.high, ...recordTypes.health, ...recordTypes.life]
-  return all.find((item) => item.id === type)?.label || type
+  return allRecordTypes.find((item) => item.id === type)?.label || type
+}
+
+function recordIcon(type: string) {
+  return allRecordTypes.find((item) => item.id === type)?.icon || 'record'
+}
+
+function recordTimeLabel(record: RecordDTO): string {
+  if (record.type === 'vaccine') return '接种记录'
+  return formatZonedDateTime(record.occurred_at, timezone.value).slice(11, 16)
+}
+
+function recordCatLabel(record: RecordDTO): string {
+  const names = (record.cat_ids || []).map((id) => catStore.cats.find((cat) => cat.id === id)?.name).filter(Boolean)
+  return names.join('、')
+}
+
+function dateLabel(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return `${year}年${month}月${day}日`
+}
+
+async function ensureTimezone() {
+  if (timezoneLoaded.value) return
+  const family = await services.getFamily()
+  timezone.value = family.success && family.data.timezone ? family.data.timezone : deviceTimezone()
+  timezoneLoaded.value = family.success
+  todayDate.value = dateKeyInTimezone(new Date().toISOString(), timezone.value)
+  currentMonth.value = todayDate.value.slice(0, 7)
+  selectedDate.value = todayDate.value
+}
+
+async function fetchRecords(options: { from?: string; to?: string; type?: string; limit: number }) {
+  const records: RecordDTO[] = []
+  let offset = 0
+  const limit = options.limit
+  while (true) {
+    const result = await services.getRecords(catStore.currentCatId, { ...options, offset })
+    if (!result.success) throw new Error('记录暂时无法加载')
+    records.push(...result.data)
+    if (result.data.length < limit) break
+    offset += result.data.length
+    if (offset > 100000) throw new Error('记录数量过多，暂时无法完整加载')
+  }
+  return records
+}
+
+async function loadCalendarRecords(selectLatestDate = false) {
+  const requestId = ++activeRequest
+  recordsLoading.value = true
+  recordsError.value = ''
+  try {
+    const range = monthRange(currentMonth.value, timezone.value)
+    // Records can be stored from a device timezone different from the family timezone.
+    // Fetch a small buffer, then assign every row by its actual calendar date.
+    const boundaryBuffer = 36 * 60 * 60 * 1000
+    const items = await fetchRecords({
+      from: new Date(Date.parse(range.from) - boundaryBuffer).toISOString(),
+      to: new Date(Date.parse(range.to) + boundaryBuffer).toISOString(),
+      type: selectedType.value === 'all' ? undefined : selectedType.value,
+      limit: 500
+    })
+    if (requestId !== activeRequest) return
+    const monthItems = items.filter((record) => recordCalendarDate(record, timezone.value).startsWith(`${currentMonth.value}-`))
+    calendarRecords.value = monthItems
+    if (selectLatestDate) {
+      const dates = [...new Set(monthItems.map((record) => recordCalendarDate(record, timezone.value)))].sort().reverse()
+      selectedDate.value = dates[0] || `${currentMonth.value}-01`
+    }
+  } catch {
+    if (requestId !== activeRequest) return
+    calendarRecords.value = []
+    recordsError.value = '记录暂时无法加载，请检查网络后重试。'
+  } finally {
+    if (requestId === activeRequest) recordsLoading.value = false
+  }
+}
+
+async function loadListRecords() {
+  const requestId = ++activeRequest
+  recordsLoading.value = true
+  recordsError.value = ''
+  try {
+    const result = await services.getRecords(catStore.currentCatId, {
+      type: selectedType.value === 'all' ? undefined : selectedType.value,
+      limit: 500,
+      offset: 0
+    })
+    if (!result.success) throw new Error('记录暂时无法加载')
+    if (requestId !== activeRequest) return
+    listRecords.value = result.data
+  } catch {
+    if (requestId !== activeRequest) return
+    listRecords.value = []
+    recordsError.value = '记录暂时无法加载，请检查网络后重试。'
+  } finally {
+    if (requestId === activeRequest) recordsLoading.value = false
+  }
 }
 
 async function loadRecords() {
-  recordsLoading.value = true
-  const result = await services.getRecords(catStore.currentCatId)
-  records.value = [...result.data].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
-  recordsLoading.value = false
+  await ensureTimezone()
+  if (viewMode.value === 'calendar') await loadCalendarRecords()
+  else await loadListRecords()
 }
 
-function onCatSelect() {
+async function onCatSelect() {
+  await loadRecords()
+}
+
+async function setView(mode: 'calendar' | 'list') {
+  if (viewMode.value === mode) return
+  viewMode.value = mode
+  await loadRecords()
+}
+
+async function moveMonth(amount: number) {
+  currentMonth.value = shiftMonth(currentMonth.value, amount)
+  await loadCalendarRecords(true)
+}
+
+async function goToToday() {
+  todayDate.value = dateKeyInTimezone(new Date().toISOString(), timezone.value)
+  const month = todayDate.value.slice(0, 7)
+  const changedMonth = currentMonth.value !== month
+  currentMonth.value = month
+  selectedDate.value = todayDate.value
+  if (changedMonth || viewMode.value === 'calendar') await loadCalendarRecords()
+}
+
+function selectRecordType(event: unknown) {
+  const index = Number((event as { detail: { value: string } }).detail.value)
+  selectedType.value = recordTypeOptions[index]?.id || 'all'
   loadRecords()
+}
+
+const showRecordTypeSheet = ref(false)
+function openRecordTypeSheet() {
+  showRecordTypeSheet.value = true
+}
+
+function createRecord(type: string) {
+  showRecordTypeSheet.value = false
+  const selectedCatId = catStore.currentCatId === 'all' ? catStore.cats[0]?.id : catStore.currentCatId
+  const query = [`date=${encodeURIComponent(selectedDate.value)}`]
+  if (selectedCatId) query.push(`catId=${encodeURIComponent(selectedCatId)}`)
+  router.push(`/records/quick/${encodeURIComponent(type)}?${query.join('&')}`)
 }
 
 const aiExamples = ['今天没怎么吃饭', '晚上吐了一次黄色的水', '精神状态很好，玩了一整天']
@@ -223,17 +404,158 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
     </view>
 
     <view class="records-history">
-      <view class="records-section-title">最近记录</view>
-      <view v-if="recordsLoading" class="skeleton" style="height: 96px" />
-      <view v-else-if="!recordGroups.length" class="empty-state">还没有记录，从上方选择一种开始吧。</view>
-      <view v-for="group in recordGroups" v-else :key="group.date" class="records-day-group">
-        <view class="records-day-title">{{ group.date }}</view>
-        <view v-for="item in group.items" :key="item.id" class="records-history-item">
-          <AppIcon :name="recordTypes.high.find((type) => type.id === item.type)?.icon || 'record'" :size="18" />
-          <view class="records-history-copy">
-            <text>{{ item.title || recordLabel(item.type) }}</text>
-            <view>{{ item.note || recordLabel(item.type) }} · {{ item.occurred_at.slice(11, 16) }}</view>
+      <view class="record-browser-heading">
+        <view class="records-section-title">记录浏览</view>
+        <view class="record-view-toggle" role="tablist" aria-label="记录浏览方式">
+          <button type="button" :class="{ active: viewMode === 'calendar' }" :aria-pressed="viewMode === 'calendar'" @click="setView('calendar')">日历</button>
+          <button type="button" :class="{ active: viewMode === 'list' }" :aria-pressed="viewMode === 'list'" @click="setView('list')">列表</button>
+        </view>
+      </view>
+
+      <template v-if="viewMode === 'calendar'">
+        <view class="calendar-card">
+          <view class="calendar-toolbar">
+            <view class="calendar-month-title">{{ monthLabel }}</view>
+            <view class="calendar-toolbar-actions">
+              <button type="button" class="calendar-today-btn" @click="goToToday">今天</button>
+              <button type="button" class="calendar-nav-btn" aria-label="上个月" @click="moveMonth(-1)">‹</button>
+              <button type="button" class="calendar-nav-btn" aria-label="下个月" @click="moveMonth(1)">›</button>
+            </view>
           </view>
+
+          <view class="calendar-controls">
+            <text class="calendar-selected-hint">选择日期查看当天记录</text>
+            <picker mode="selector" :range="recordTypeOptions.map((item) => item.label)" :value="selectedTypeIndex" @change="selectRecordType">
+              <view class="calendar-filter" aria-label="筛选记录类型">
+                <text>{{ selectedTypeLabel }}</text>
+                <AppIcon name="chevronDown" :size="14" />
+              </view>
+            </picker>
+          </view>
+
+          <view class="calendar-grid calendar-weekdays" aria-hidden="true">
+            <text v-for="day in weekDays" :key="day">{{ day }}</text>
+          </view>
+          <view v-if="recordsLoading" class="calendar-grid calendar-days calendar-skeleton-grid" aria-label="正在加载月历" aria-busy="true">
+            <view v-for="index in 42" :key="index" class="calendar-day-skeleton" />
+          </view>
+          <view v-else class="calendar-grid calendar-days">
+            <template v-for="(cell, index) in calendarCells" :key="cell?.date || `blank-${index}`">
+              <button
+                v-if="cell"
+                type="button"
+                class="calendar-day"
+                :class="{ 'is-today': cell.date === todayDate, 'is-selected': cell.date === selectedDate, 'has-records': cell.count > 0 }"
+                :aria-label="cell.ariaLabel"
+                :aria-pressed="cell.date === selectedDate"
+                @click="selectedDate = cell.date"
+              >
+                <view class="calendar-day-top">
+                  <text class="calendar-day-number">{{ cell.day }}</text>
+                  <text v-if="cell.count" class="calendar-count">{{ cell.count }}</text>
+                </view>
+                <view class="calendar-markers">
+                  <AppIcon
+                    v-for="marker in cell.markers"
+                    :key="marker.id"
+                    :name="marker.icon"
+                    :size="10"
+                    class="calendar-marker"
+                    :class="`calendar-marker--${marker.group}`"
+                    :aria-label="marker.label"
+                  />
+                  <text v-if="cell.extraTypes" class="calendar-extra-types">+{{ cell.extraTypes }}</text>
+                </view>
+              </button>
+              <view v-else class="calendar-day calendar-day--blank" aria-hidden="true" />
+            </template>
+          </view>
+
+          <view class="calendar-legend">
+            <view><AppIcon name="vaccine" :size="11" class="calendar-marker--vaccine" /> 疫苗</view>
+            <view><AppIcon name="medical" :size="11" class="calendar-marker--health" /> 健康</view>
+            <view><AppIcon name="calendar" :size="11" class="calendar-marker--life" /> 生活</view>
+          </view>
+        </view>
+
+        <view class="selected-day-panel">
+          <view class="selected-day-heading">
+            <view>
+              <view class="selected-day-title">{{ dateLabel(selectedDate) }}</view>
+              <view class="selected-day-subtitle">{{ selectedDayRecords.length }} 条记录</view>
+            </view>
+            <button type="button" class="add-selected-day-btn" @click="openRecordTypeSheet">
+              <AppIcon name="plus" :size="16" /> 记录这一天
+            </button>
+          </view>
+
+          <view v-if="recordsLoading" class="skeleton calendar-detail-skeleton" aria-label="正在加载当天记录" />
+          <view v-else-if="recordsError" class="calendar-feedback" role="alert">
+            <text>{{ recordsError }}</text>
+            <button type="button" class="calendar-retry-btn" @click="loadRecords">重新加载</button>
+          </view>
+          <view v-else-if="!selectedDayRecords.length" class="calendar-empty-day">
+            <AppIcon name="calendar" :size="24" />
+            <text>{{ calendarRecords.length ? '这一天还没有符合条件的记录' : selectedType === 'all' ? '本月还没有记录' : '本月没有符合筛选条件的记录' }}</text>
+            <button type="button" class="calendar-retry-btn" @click="openRecordTypeSheet">添加记录</button>
+          </view>
+          <view v-else class="calendar-record-list">
+            <view
+              v-for="item in selectedDayRecords"
+              :key="item.id"
+              class="records-history-item calendar-record-item"
+              @click="router.push(`/records/detail/${encodeURIComponent(item.id)}`)"
+            >
+              <AppIcon :name="recordIcon(item.type)" :size="18" :class="{ 'calendar-record-vaccine': item.type === 'vaccine' }" />
+              <view class="records-history-copy">
+                <text>{{ item.title || recordLabel(item.type) }}</text>
+                <view>{{ recordLabel(item.type) }} · {{ recordTimeLabel(item) }}<text v-if="recordCatLabel(item)"> · {{ recordCatLabel(item) }}</text></view>
+              </view>
+              <AppIcon name="chevronRight" :size="16" class="calendar-record-arrow" />
+            </view>
+          </view>
+        </view>
+      </template>
+
+      <view v-else class="records-list-panel">
+        <view v-if="recordsLoading" class="skeleton" style="height: 96px" />
+        <view v-else-if="recordsError" class="calendar-feedback" role="alert">
+          <text>{{ recordsError }}</text>
+          <button type="button" class="calendar-retry-btn" @click="loadRecords">重新加载</button>
+        </view>
+        <view v-else-if="!recordGroups.length" class="empty-state">还没有记录，从上方选择一种开始吧。</view>
+        <view v-for="group in recordGroups" v-else :key="group.date" class="records-day-group">
+          <view class="records-day-title">{{ group.date }}</view>
+          <view
+            v-for="item in group.items"
+            :key="item.id"
+            class="records-history-item"
+            @click="router.push(`/records/detail/${encodeURIComponent(item.id)}`)"
+          >
+            <AppIcon :name="recordIcon(item.type)" :size="18" :class="{ 'calendar-record-vaccine': item.type === 'vaccine' }" />
+            <view class="records-history-copy">
+              <text>{{ item.title || recordLabel(item.type) }}</text>
+              <view>{{ item.note || recordLabel(item.type) }} · {{ recordTimeLabel(item) }}<text v-if="recordCatLabel(item)"> · {{ recordCatLabel(item) }}</text></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="showRecordTypeSheet" class="record-type-sheet-mask" @click="showRecordTypeSheet = false">
+      <view class="record-type-sheet" @click.stop>
+        <view class="record-type-sheet-heading">
+          <view>
+            <text>记录这一天</text>
+            <view>{{ dateLabel(selectedDate) }}</view>
+          </view>
+          <button type="button" aria-label="关闭" @click="showRecordTypeSheet = false">×</button>
+        </view>
+        <view class="record-type-sheet-grid">
+          <button v-for="item in allRecordTypes" :key="item.id" type="button" @click="createRecord(item.id)">
+            <AppIcon :name="item.icon" :size="19" />
+            <text>{{ item.label }}</text>
+          </button>
         </view>
       </view>
     </view>
@@ -243,6 +565,315 @@ usePageCapabilities(loadRecords, '猫宅 · 记录猫咪的每一天')
 <style scoped>
 .records-history {
   margin-top: var(--space-24);
+}
+.record-browser-heading,
+.calendar-toolbar,
+.calendar-controls,
+.selected-day-heading,
+.record-type-sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.record-browser-heading {
+  margin-bottom: var(--space-12);
+}
+.record-view-toggle {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--color-bg-muted, #f2efeb);
+}
+.record-view-toggle button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: var(--font-size-caption);
+}
+.record-view-toggle button.active {
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  box-shadow: 0 1px 4px rgb(43 38 32 / 10%);
+}
+.calendar-card,
+.selected-day-panel,
+.records-list-panel {
+  padding: var(--space-16);
+  border: 1px solid var(--color-divider);
+  border-radius: 18px;
+  background: var(--color-bg-surface);
+}
+.calendar-toolbar {
+  margin-bottom: var(--space-12);
+}
+.calendar-month-title,
+.selected-day-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: 700;
+}
+.calendar-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.calendar-today-btn,
+.calendar-nav-btn,
+.calendar-filter,
+.add-selected-day-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+}
+.calendar-today-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: var(--font-size-caption);
+}
+.calendar-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 23px;
+  line-height: 1;
+}
+.calendar-controls {
+  gap: 8px;
+  margin-bottom: var(--space-12);
+}
+.calendar-selected-hint {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.calendar-filter {
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.calendar-weekdays {
+  margin-bottom: 4px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: var(--font-size-caption);
+}
+.calendar-weekdays text {
+  padding: 5px 0;
+}
+.calendar-day {
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 5px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  background: transparent;
+}
+.calendar-day-skeleton {
+  min-height: 54px;
+  border-radius: 10px;
+  background: #f4f1ed;
+  animation: calendar-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes calendar-pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+.calendar-day--blank {
+  pointer-events: none;
+}
+.calendar-day.is-today .calendar-day-number {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.calendar-day.is-selected {
+  border-color: var(--color-primary);
+  background: #f7f0eb;
+}
+.calendar-day-top {
+  display: flex;
+  min-height: 19px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.calendar-day-number {
+  font-size: var(--font-size-caption);
+  line-height: 18px;
+}
+.calendar-count {
+  max-width: 20px;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: 9px;
+  line-height: 13px;
+}
+.calendar-markers {
+  display: flex;
+  min-height: 15px;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+.calendar-marker--vaccine {
+  color: #b75d78;
+}
+.calendar-marker--health {
+  color: #6b8da2;
+}
+.calendar-marker--life {
+  color: #83a27d;
+}
+.calendar-extra-types {
+  color: var(--color-text-tertiary);
+  font-size: 8px;
+  line-height: 10px;
+}
+.calendar-legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-16);
+  margin-top: var(--space-12);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-divider);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.calendar-legend view {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.selected-day-panel {
+  margin-top: var(--space-12);
+}
+.selected-day-heading {
+  gap: 8px;
+  margin-bottom: var(--space-8);
+}
+.selected-day-subtitle {
+  margin-top: 3px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+}
+.add-selected-day-btn {
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: #f7f0eb;
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.calendar-detail-skeleton {
+  height: 70px;
+  margin-top: var(--space-12);
+}
+.calendar-empty-day,
+.calendar-feedback {
+  display: flex;
+  min-height: 108px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: var(--font-size-caption);
+}
+.calendar-feedback {
+  color: var(--color-text-secondary);
+}
+.calendar-retry-btn {
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: var(--font-size-caption);
+}
+.calendar-record-item {
+  min-height: 60px;
+  padding-right: 0;
+  padding-left: 0;
+}
+.calendar-record-vaccine {
+  color: #b75d78;
+}
+.calendar-record-arrow {
+  color: var(--color-text-tertiary);
+}
+.records-list-panel {
+  padding-top: 0;
+}
+.record-type-sheet-mask {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(23 21 19 / 40%);
+}
+.record-type-sheet {
+  width: 100%;
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: var(--space-20) var(--space-16) calc(var(--space-24) + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+  background: var(--color-bg-surface);
+}
+.record-type-sheet-heading {
+  margin-bottom: var(--space-16);
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+.record-type-sheet-heading view view {
+  margin-top: 4px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+}
+.record-type-sheet-heading button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-muted, #f2efeb);
+  font-size: 22px;
+}
+.record-type-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.record-type-sheet-grid button {
+  display: flex;
+  min-height: 70px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 14px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-muted, #f6f3ef);
+  font-size: var(--font-size-caption);
 }
 .records-day-title {
   margin: var(--space-16) 0 var(--space-8);

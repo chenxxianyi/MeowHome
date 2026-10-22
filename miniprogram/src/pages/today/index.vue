@@ -10,7 +10,7 @@ import { useAppStore } from '../../stores/app'
 import { useCatStore } from '../../stores/cat'
 import { useAgentStore } from '../../stores/agent'
 import { services } from '../../services'
-import { greeting, todayDateLabel } from '../../utils/date'
+import { dateAtTimezone, deviceTimezone, formatZonedDateTime, greeting, todayDateLabel } from '../../utils/date'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
 import type { FocusItemData, Reminder, TodayStatusData } from '../../types'
 
@@ -66,9 +66,11 @@ const visibleFocusItems = computed(() =>
   currentCat.value === 'all' ? focusItems.value : focusItems.value.filter((item) => item.catId === currentCat.value)
 )
 const visibleReminders = computed(() =>
-  currentCat.value === 'all'
+  (currentCat.value === 'all'
     ? reminderList.value
-    : reminderList.value.filter((item) => item.catId === currentCat.value || item.catId === 'both')
+    : reminderList.value.filter((item) => item.catId === currentCat.value || item.catId === 'both'))
+    .slice()
+    .sort((a, b) => reminderOrder(a) - reminderOrder(b) || reminderSortDate(a).localeCompare(reminderSortDate(b)))
 )
 
 const heroTitle = computed(() => {
@@ -92,8 +94,40 @@ const quickRecords = [
   { id: 'elimination', label: '排便', icon: 'elimination' },
   { id: 'vomit', label: '呕吐', icon: 'vomit' },
   { id: 'weight', label: '体重', icon: 'weight' },
+  { id: 'vaccine', label: '疫苗', icon: 'vaccine' },
   { id: 'more', label: '更多', icon: 'more' }
 ]
+
+function reminderSortDate(item: Reminder): string {
+  return item.scheduled_at ? dateAtTimezone(item.scheduled_at, item.timezone || deviceTimezone()) : '9999-99-99'
+}
+
+function reminderOrder(item: Reminder): number {
+  if (!item.scheduled_at) return 3
+  const due = reminderSortDate(item)
+  const today = dateAtTimezone(new Date().toISOString(), item.timezone || deviceTimezone())
+  if (due < today) return 0
+  if (due === today) return 1
+  return 2
+}
+
+function reminderDateLabel(item: Reminder): string {
+  if (!item.scheduled_at) return item.time || '未设置日期'
+  return formatZonedDateTime(item.scheduled_at, item.timezone || deviceTimezone())
+}
+
+function reminderStatusLabel(item: Reminder): string {
+  if (!item.scheduled_at) return '未设置日期'
+  const due = reminderSortDate(item)
+  const today = dateAtTimezone(new Date().toISOString(), item.timezone || deviceTimezone())
+  if (due < today) return '计划日期已过'
+  if (due === today) return '今天到期'
+  return '即将到期'
+}
+
+function openVaccineRecord(item: Reminder) {
+  router.push(`/records/quick/vaccine?catId=${encodeURIComponent(item.catId || '')}&reminderId=${encodeURIComponent(item.id)}`)
+}
 
 function badgeOf(state: string, warnText: string): string {
   if (state === 'normal') return '正常'
@@ -493,17 +527,26 @@ usePageCapabilities(load, '猫宅 · 今日照顾简报')
         </view>
         <view class="today-reminder-list">
           <view v-for="item in visibleReminders.slice(0, 4)" :key="item.id" class="today-reminder-item">
-            <text class="today-reminder-time">{{ item.time }}</text>
+            <text class="today-reminder-time">{{ reminderDateLabel(item) }}</text>
             <view class="today-reminder-icon">
               <AppIcon :name="item.icon || item.type" :size="18" />
             </view>
             <view class="today-reminder-copy">
               <text>{{ item.title }}</text>
-              <view>{{ item.subtitle }}</view>
+              <view>{{ item.subtitle }} · {{ reminderStatusLabel(item) }}</view>
+              <view v-if="item.type === 'vaccine' && reminderOrder(item) === 0" class="reminder-disclaimer">
+                逾期仅表示计划日期已过，不代表猫咪漏种。
+              </view>
             </view>
             <view class="today-reminder-actions">
-              <button type="button" @click="laterReminder(item.id)">稍后</button>
-              <button type="button" class="primary" @click="completeReminder(item.id)">完成</button>
+              <template v-if="item.type === 'vaccine'">
+                <button type="button" class="primary" @click="openVaccineRecord(item)">记录接种</button>
+                <button type="button" @click="router.push('/reminders')">调整</button>
+              </template>
+              <template v-else>
+                <button type="button" @click="laterReminder(item.id)">稍后</button>
+                <button type="button" class="primary" @click="completeReminder(item.id)">完成</button>
+              </template>
             </view>
           </view>
         </view>

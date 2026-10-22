@@ -34,8 +34,13 @@ function fixture({ token = 'valid', familyId = 'family', entry = 'auth' } = {}) 
     },
     clearAuthStorage: () => storage.clear()
   }
+  const uni = {
+    getStorageSync: (key) => storage.get(key),
+    setStorageSync: (key, value) => storage.set(key, value),
+    removeStorageSync: (key) => storage.delete(key)
+  }
   const dependencies = new Map([
-    [resolve(buildRoot, 'common/vendor.js'), { defineStore }],
+    [resolve(buildRoot, 'common/vendor.js'), { defineStore, index: uni }],
     [resolve(buildRoot, 'api/client.js'), client],
     [
       resolve(buildRoot, 'api/endpoints.js'),
@@ -54,7 +59,7 @@ function fixture({ token = 'valid', familyId = 'family', entry = 'auth' } = {}) 
     modules.set(path, module)
     const source = readFileSync(path, 'utf8')
     const require = (name) => load(resolve(dirname(path), name))
-    vm.runInNewContext(source, { module, exports: module.exports, require, console }, { filename: path })
+    vm.runInNewContext(source, { module, exports: module.exports, require, console, uni }, { filename: path })
     return module.exports
   }
 

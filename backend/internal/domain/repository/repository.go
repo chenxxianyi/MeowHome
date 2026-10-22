@@ -93,6 +93,7 @@ type DailyRecordQuery struct {
 	BeforeOccurredAt *time.Time // 与 BeforeID 组成稳定倒序游标
 	BeforeID         string
 	Limit            int
+	Offset           int
 }
 
 // CreatedRecordQuery 以创建时间和 ID 正序扫描记录，不依赖业务发生时间。
@@ -157,6 +158,11 @@ type ReminderRepo interface {
 	ListScheduled(ctx context.Context, q ReminderScheduleQuery) ([]*model.Reminder, error)
 	Update(ctx context.Context, r *model.Reminder) error
 	Delete(ctx context.Context, id string) error
+}
+
+// ReminderSourceRepo 为有来源记录的待办提供可选查询能力；普通提醒仓储不必实现该扩展。
+type ReminderSourceRepo interface {
+	FindBySourceRecord(ctx context.Context, familyID, recordID string) (*model.Reminder, error)
 }
 
 // ReminderQuery 提醒查询条件。

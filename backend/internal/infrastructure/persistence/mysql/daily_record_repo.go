@@ -64,6 +64,9 @@ func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRe
 	if q.BeforeOccurredAt != nil && q.BeforeID != "" {
 		tx = tx.Where("(occurred_at, id) < (?, ?)", *q.BeforeOccurredAt, q.BeforeID)
 	}
+	if q.Offset > 0 {
+		tx = tx.Offset(q.Offset)
+	}
 
 	limit := q.Limit
 	if limit <= 0 || limit > 1000 {

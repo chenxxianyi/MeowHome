@@ -33,8 +33,14 @@ type Handler struct {
 	asset          *app.AssetService
 	ai             *app.AIService
 	agent          *app.AgentService
+	vaccine        *app.VaccineService
 	storageDir     string
 	maxUploadBytes int64
+}
+
+// SetVaccineService installs the vaccine recommendation and reminder workflow.
+func (h *Handler) SetVaccineService(service *app.VaccineService) {
+	h.vaccine = service
 }
 
 // New 创建 handler 集合。

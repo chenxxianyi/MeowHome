@@ -8,6 +8,7 @@ import (
 
 	"github.com/meowhome/backend/internal/app"
 	"github.com/meowhome/backend/internal/domain/repository"
+	apperr "github.com/meowhome/backend/internal/platform/errors"
 	"github.com/meowhome/backend/internal/transport/http/response"
 )
 
@@ -19,6 +20,14 @@ func (h *Handler) ListRecords(c *gin.Context) {
 		CatID: c.Query("cat_id"),
 		From:  c.Query("from"),
 		To:    c.Query("to"),
+	}
+	if raw := c.Query("offset"); raw != "" {
+		offset, err := strconv.Atoi(raw)
+		if err != nil || offset < 0 {
+			response.Err(c, apperr.InvalidRequest(apperr.CodeValidationFailed, "offset must be a non-negative integer"))
+			return
+		}
+		q.Offset = offset
 	}
 	if raw := c.Query("type"); raw != "" {
 		for _, t := range strings.Split(raw, ",") {
@@ -62,6 +71,105 @@ func (h *Handler) CreateRecord(c *gin.Context) {
 		return
 	}
 	response.Created(c, rec)
+}
+
+// SuggestNextVaccine returns a rule-backed, non-binding follow-up date suggestion.
+func (h *Handler) SuggestNextVaccine(c *gin.Context) {
+	if h.vaccine == nil {
+		response.Err(c, apperr.New(apperr.TypeInternal, apperr.CodeInvalidRequest, "vaccine service is unavailable"))
+		return
+	}
+	suggestion, err := h.vaccine.SuggestNext(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId"))
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, suggestion)
+}
+
+type CreateVaccineReminderRequest struct {
+	ScheduledDate string `json:"scheduled_date" binding:"required"`
+	DateSource    string `json:"date_source" binding:"required"`
+	Timezone      string `json:"timezone" binding:"required"`
+}
+
+// CreateVaccineReminder creates one user-confirmed, source-linked reminder.
+func (h *Handler) CreateVaccineReminder(c *gin.Context) {
+	if h.vaccine == nil {
+		response.Err(c, apperr.New(apperr.TypeInternal, apperr.CodeInvalidRequest, "vaccine service is unavailable"))
+		return
+	}
+	var in CreateVaccineReminderRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Err(c, err)
+		return
+	}
+	reminder, err := h.vaccine.CreateReminder(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId"), app.VaccineReminderInput{
+		ScheduledDate: in.ScheduledDate, DateSource: in.DateSource, Timezone: in.Timezone,
+	})
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.Created(c, reminder)
+}
+
+type CompleteVaccineReminderRequest struct {
+	RecordID string `json:"record_id" binding:"required"`
+}
+
+// CompleteVaccineReminder links the newly recorded vaccination to the due reminder.
+func (h *Handler) CompleteVaccineReminder(c *gin.Context) {
+	if h.vaccine == nil {
+		response.Err(c, apperr.New(apperr.TypeInternal, apperr.CodeInvalidRequest, "vaccine service is unavailable"))
+		return
+	}
+	var in CompleteVaccineReminderRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Err(c, err)
+		return
+	}
+	reminder, err := h.vaccine.CompleteReminderWithRecord(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("reminderId"), in.RecordID)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, reminder)
+}
+
+type UpdateVaccineReminderRequest struct {
+	ScheduledDate string `json:"scheduled_date" binding:"required"`
+	Timezone      string `json:"timezone" binding:"required"`
+}
+
+func (h *Handler) UpdateVaccineReminder(c *gin.Context) {
+	if h.vaccine == nil {
+		response.Err(c, apperr.New(apperr.TypeInternal, apperr.CodeInvalidRequest, "vaccine service is unavailable"))
+		return
+	}
+	var in UpdateVaccineReminderRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Err(c, err)
+		return
+	}
+	reminder, err := h.vaccine.UpdateReminderDate(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("reminderId"), in.ScheduledDate, in.Timezone)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, reminder)
+}
+
+func (h *Handler) CancelVaccineReminder(c *gin.Context) {
+	if h.vaccine == nil {
+		response.Err(c, apperr.New(apperr.TypeInternal, apperr.CodeInvalidRequest, "vaccine service is unavailable"))
+		return
+	}
+	if err := h.vaccine.CancelReminder(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("reminderId")); err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.NoContent(c)
 }
 
 // CreateRecordBatchRequest 批量创建请求体。

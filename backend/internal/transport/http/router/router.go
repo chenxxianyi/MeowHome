@@ -112,6 +112,8 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimit
 	// 日常记录
 	familyG.GET("/:familyId/records", h.ListRecords)
 	familyG.GET("/:familyId/records/:recordId", h.GetRecord)
+	familyG.GET("/:familyId/records/:recordId/vaccine-suggestion", h.SuggestNextVaccine)
+	familyG.POST("/:familyId/records/:recordId/vaccine-reminders", h.CreateVaccineReminder)
 	familyG.POST("/:familyId/records", h.CreateRecord)
 	familyG.POST("/:familyId/records/batch", h.CreateRecordBatch)
 
@@ -124,6 +126,9 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimit
 	familyG.GET("/:familyId/reminders", h.ListReminders)
 	familyG.POST("/:familyId/reminders", h.CreateReminder)
 	familyG.PATCH("/:familyId/reminders/:reminderId/complete", h.CompleteReminder)
+	familyG.PATCH("/:familyId/reminders/:reminderId/complete-with-record", h.CompleteVaccineReminder)
+	familyG.PATCH("/:familyId/reminders/:reminderId/schedule", h.UpdateVaccineReminder)
+	familyG.DELETE("/:familyId/reminders/:reminderId", h.CancelVaccineReminder)
 
 	// 时光
 	familyG.GET("/:familyId/moments", h.ListMoments)

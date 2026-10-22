@@ -13,6 +13,35 @@ export function localDateTimeStr(date = new Date()): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+export function deviceTimezone(): string {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return zone || 'Asia/Shanghai'
+  } catch {
+    return 'Asia/Shanghai'
+  }
+}
+
+/** Formats an absolute timestamp in the reminder's stored IANA timezone. */
+export function formatZonedDateTime(value: string, timezone?: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || deviceTimezone(),
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(date)
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`
+  } catch {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+}
+
+export function dateAtTimezone(value: string, timezone?: string): string {
+  return formatZonedDateTime(value, timezone).slice(0, 10)
+}
+
 export function dateStr(daysAgo: number): string {
   const d = new Date()
   d.setDate(d.getDate() - daysAgo)

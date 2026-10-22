@@ -17,6 +17,8 @@ tags:
     description: 家庭与成员
   - name: cats
     description: 猫咪档案
+  - name: vaccines
+    description: 疫苗记录建议与日期待办
   - name: agent
     description: 猫管家 Agent（主动巡检 + 智能问答）
 paths:
@@ -347,6 +349,151 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: 记录不存在、已删除或不属于当前家庭
+  /families/{familyId}/records/{recordId}/vaccine-suggestion:
+    get:
+      tags: [vaccines]
+      summary: 根据已保存的接种记录生成下一针日期建议
+      operationId: suggestNextVaccineDate
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: 建议结果；信息不足时返回 needs_input，未覆盖类型返回 unsupported
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VaccineSuggestion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /families/{familyId}/records/{recordId}/vaccine-reminders:
+    post:
+      tags: [vaccines]
+      summary: 确认并创建与接种记录关联的疫苗待办
+      operationId: createVaccineReminder
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVaccineReminderRequest'
+      responses:
+        '201':
+          description: 创建成功或返回该接种记录已有的待办（幂等）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Reminder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /families/{familyId}/reminders/{reminderId}/complete-with-record:
+    patch:
+      tags: [vaccines]
+      summary: 关联接种记录并完成疫苗待办
+      operationId: completeVaccineReminderWithRecord
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: reminderId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [record_id]
+              properties:
+                record_id: { type: string }
+      responses:
+        '200':
+          description: 待办完成并记录关联
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Reminder'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /families/{familyId}/reminders/{reminderId}/schedule:
+    patch:
+      tags: [vaccines]
+      summary: 调整疫苗待办的本地计划日期
+      operationId: rescheduleVaccineReminder
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: reminderId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheduled_date, timezone]
+              properties:
+                scheduled_date: { type: string, format: date }
+                timezone: { type: string, example: Asia/Shanghai }
+      responses:
+        '200':
+          description: 日期已调整
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Reminder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /families/{familyId}/reminders/{reminderId}:
+    delete:
+      tags: [vaccines]
+      summary: 取消未完成的疫苗待办
+      operationId: cancelVaccineReminder
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: reminderId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: 待办已取消
+        '404':
+          $ref: '#/components/responses/NotFound'
   /families/{familyId}/agent/messages:
     get:
       tags: [agent]
@@ -603,6 +750,12 @@ components:
       required: true
       schema:
         type: string
+    RecordId:
+      name: recordId
+      in: path
+      required: true
+      schema:
+        type: string
   responses:
     BadRequest:
       description: 请求参数错误
@@ -668,6 +821,59 @@ components:
           type: string
         request_id:
           type: string
+    VaccineSuggestion:
+      type: object
+      required: [status, cat_id, prior_doses_recorded, reason, timezone]
+      properties:
+        status:
+          type: string
+          enum: [suggested, needs_input, unsupported]
+        cat_id: { type: string }
+        vaccine_code: { type: string }
+        vaccine_name: { type: string }
+        dose_number: { type: string }
+        age_weeks: { type: integer }
+        prior_doses_recorded: { type: integer }
+        date_window_start: { type: string, format: date }
+        date_window_end: { type: string, format: date }
+        default_reminder_date: { type: string, format: date }
+        title: { type: string }
+        reason: { type: string }
+        rule_id: { type: string }
+        rule_version: { type: string }
+        source_url: { type: string, format: uri }
+        timezone: { type: string }
+        date_source: { type: string }
+    CreateVaccineReminderRequest:
+      type: object
+      required: [scheduled_date, date_source, timezone]
+      properties:
+        scheduled_date: { type: string, format: date }
+        date_source:
+          type: string
+          enum: [rule_suggestion, user, veterinarian, product_label]
+        timezone: { type: string, example: Asia/Shanghai }
+    Reminder:
+      type: object
+      required: [id, catId, type, title, subtitle, time, state, icon]
+      properties:
+        id: { type: string }
+        catId: { type: string }
+        type: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        time: { type: string }
+        state: { type: string, enum: [todo, done] }
+        icon: { type: string }
+        rule: { type: string }
+        scheduled_at: { type: string, format: date-time }
+        timezone: { type: string }
+        completed_at: { type: string, format: date-time }
+        source_record_id: { type: string }
+        completed_record_id: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
     RegisterRequest:
       type: object
       required: [email, password, user_name]
