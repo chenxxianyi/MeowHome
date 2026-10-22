@@ -80,6 +80,21 @@ func (r *DailyRecordRepo) ListByFamily(ctx context.Context, q repository.DailyRe
 	return out, nil
 }
 
+// Update changes a record only while it is active and still belongs to the supplied family.
+func (r *DailyRecordRepo) Update(ctx context.Context, rec *model.DailyRecord, expectedUpdatedAt time.Time) error {
+	result := r.db.WithContext(ctx).Model(&model.DailyRecord{}).
+		Where("id = ? AND family_id = ? AND deleted_at IS NULL AND updated_at = ?", rec.ID, rec.FamilyID, expectedUpdatedAt).
+		Select([]string{"cat_ids", "record_type", "occurred_at", "source", "severity", "title", "note", "payload", "updated_at"}).
+		Updates(rec)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return repository.ErrConflict
+	}
+	return nil
+}
+
 var _ repository.AgentEventRecordRepo = (*DailyRecordRepo)(nil)
 
 func (r *DailyRecordRepo) ListCreatedAfter(ctx context.Context, q repository.CreatedRecordQuery) ([]*model.DailyRecord, error) {
@@ -96,9 +111,17 @@ func (r *DailyRecordRepo) ListCreatedAfter(ctx context.Context, q repository.Cre
 }
 
 // Delete 软删除记录。
-func (r *DailyRecordRepo) Delete(ctx context.Context, id string) error {
-	return r.db.WithContext(ctx).Model(&model.DailyRecord{}).
-		Where("id = ?", id).Update("deleted_at", time.Now().UTC()).Error
+func (r *DailyRecordRepo) Delete(ctx context.Context, familyID, id string) error {
+	result := r.db.WithContext(ctx).Model(&model.DailyRecord{}).
+		Where("id = ? AND family_id = ? AND deleted_at IS NULL", id, familyID).
+		Update("deleted_at", time.Now().UTC())
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 // parseTimeBound 解析查询边界：接受 RFC3339 或 YYYY-MM-DD。

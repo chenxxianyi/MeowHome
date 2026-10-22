@@ -85,6 +85,9 @@ export interface MemberDTO {
 export interface RecordDTO {
   id: string
   family_id: string
+  created_by?: string
+  created_at?: string
+  updated_at?: string
   cat_ids: string[]
   type: string
   occurred_at: string
@@ -436,6 +439,10 @@ export interface RecordInput {
   payload?: Record<string, unknown>
 }
 
+export interface RecordUpdateRequest extends RecordInput {
+  expected_updated_at: string
+}
+
 export const recordApi = {
   get(familyId: string, recordId: string) {
     return request<RecordDTO>(http, { method: 'GET', url: `/families/${familyId}/records/${recordId}` })
@@ -445,6 +452,12 @@ export const recordApi = {
   },
   create(familyId: string, data: RecordInput) {
     return request<RecordDTO>(http, { method: 'POST', url: `/families/${familyId}/records`, data })
+  },
+  update(familyId: string, recordId: string, data: RecordUpdateRequest) {
+    return request<RecordDTO>(http, { method: 'PATCH', url: `/families/${familyId}/records/${recordId}`, data })
+  },
+  delete(familyId: string, recordId: string) {
+    return request<void>(http, { method: 'DELETE', url: `/families/${familyId}/records/${recordId}` })
   },
   createBatch(familyId: string, records: RecordInput[]) {
     return request<RecordDTO[]>(http, { method: 'POST', url: `/families/${familyId}/records/batch`, data: { records } })

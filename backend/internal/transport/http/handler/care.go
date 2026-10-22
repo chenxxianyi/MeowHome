@@ -48,7 +48,7 @@ func (h *Handler) ListRecords(c *gin.Context) {
 	response.OK(c, list)
 }
 
-// CreateRecord 创建单条记录。
+// GetRecord 按 ID 获取家庭内未删除的记录。
 func (h *Handler) GetRecord(c *gin.Context) {
 	record, err := h.record.Get(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId"))
 	if err != nil {
@@ -56,6 +56,30 @@ func (h *Handler) GetRecord(c *gin.Context) {
 		return
 	}
 	response.OK(c, record)
+}
+
+// UpdateRecord 完整更正记录字段，创建者与创建时间由服务端保留。
+func (h *Handler) UpdateRecord(c *gin.Context) {
+	var in app.RecordInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Err(c, err)
+		return
+	}
+	rec, err := h.record.Update(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId"), in)
+	if err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.OK(c, rec)
+}
+
+// DeleteRecord soft-deletes one record from active queries.
+func (h *Handler) DeleteRecord(c *gin.Context) {
+	if err := h.record.Delete(c.Request.Context(), c.Param("familyId"), mustUserID(c), c.Param("recordId")); err != nil {
+		response.Err(c, err)
+		return
+	}
+	response.NoContent(c)
 }
 
 // CreateRecord 创建单条记录。

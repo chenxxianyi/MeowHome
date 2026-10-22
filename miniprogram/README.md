@@ -24,6 +24,8 @@ npm.cmd run build:mp-weixin
 
 看到 `DONE  Build complete.` 即成功，产物在 `dist/build/mp-weixin`。
 
+记录详情支持撤销记录（服务端软删除并保留审计）；记录更正 API 已提供，但小程序更正表单尚未接入。
+
 > 本机 PowerShell 执行策略为 Restricted，所以用 `npm.cmd` 而不是 `npm`（后者会走 `npm.ps1` 被拦）。
 
 开发时可用增量编译（改源码自动重新产出，开发者工具里会自动刷新）：

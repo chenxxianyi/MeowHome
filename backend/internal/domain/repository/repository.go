@@ -80,7 +80,8 @@ type DailyRecordRepo interface {
 	Create(ctx context.Context, r *model.DailyRecord) error
 	FindByID(ctx context.Context, id string) (*model.DailyRecord, error)
 	ListByFamily(ctx context.Context, q DailyRecordQuery) ([]*model.DailyRecord, error)
-	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, r *model.DailyRecord, expectedUpdatedAt time.Time) error
+	Delete(ctx context.Context, familyID, id string) error
 }
 
 // DailyRecordQuery 记录查询条件。

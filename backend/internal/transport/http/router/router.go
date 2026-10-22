@@ -112,6 +112,8 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimit
 	// 日常记录
 	familyG.GET("/:familyId/records", h.ListRecords)
 	familyG.GET("/:familyId/records/:recordId", h.GetRecord)
+	familyG.PATCH("/:familyId/records/:recordId", h.UpdateRecord)
+	familyG.DELETE("/:familyId/records/:recordId", h.DeleteRecord)
 	familyG.GET("/:familyId/records/:recordId/vaccine-suggestion", h.SuggestNextVaccine)
 	familyG.POST("/:familyId/records/:recordId/vaccine-reminders", h.CreateVaccineReminder)
 	familyG.POST("/:familyId/records", h.CreateRecord)

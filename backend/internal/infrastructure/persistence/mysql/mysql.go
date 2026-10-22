@@ -3,7 +3,6 @@ package mysql
 
 import (
 	"fmt"
-	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/meowhome/backend/internal/platform/config"
 )
+
+const RequiredSchemaVersion = 15
 
 // New 创建 GORM 连接。
 func New(cfg config.MySQL) (*gorm.DB, error) {
@@ -55,4 +56,15 @@ func Healthy(db *gorm.DB) error {
 	return sqlDB.PingContext(ctx)
 }
 
-var _ = time.Second // 保留导入
+// CheckSchemaVersion reports a clear readiness error when migrations have not reached this build's schema.
+func CheckSchemaVersion(db *gorm.DB) error {
+	var current int
+	err := db.Raw("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(version, '_', 1) AS UNSIGNED)), 0) FROM schema_migrations").Scan(&current).Error
+	if err != nil {
+		return fmt.Errorf("migration history unavailable; run `go run ./cmd/migrate`: %w", err)
+	}
+	if current < RequiredSchemaVersion {
+		return fmt.Errorf("database schema version %03d is behind required version %03d; run `go run ./cmd/migrate`", current, RequiredSchemaVersion)
+	}
+	return nil
+}

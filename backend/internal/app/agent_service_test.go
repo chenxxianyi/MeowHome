@@ -360,7 +360,8 @@ func (recordMemory) FindByID(context.Context, string) (*model.DailyRecord, error
 func (recordMemory) ListByFamily(context.Context, repository.DailyRecordQuery) ([]*model.DailyRecord, error) {
 	return nil, nil
 }
-func (recordMemory) Delete(context.Context, string) error { return nil }
+func (recordMemory) Update(context.Context, *model.DailyRecord, time.Time) error { return nil }
+func (recordMemory) Delete(context.Context, string, string) error                { return nil }
 
 type eventRecordForTest struct {
 	recordMemory

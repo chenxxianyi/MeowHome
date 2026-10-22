@@ -4,12 +4,14 @@ import { recordApi } from '../../api/endpoints'
 import type { RecordDTO } from '../../api/endpoints'
 import { useAuthStore } from '../../stores/auth'
 import { useProtectedPage } from '../../utils/page'
-import { useRoute } from '../../utils/navigation'
+import { useRoute, useRouter } from '../../utils/navigation'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const record = ref<RecordDTO | null>(null)
 const loading = ref(true)
+const deleting = ref(false)
 const error = ref('')
 const recordDateLabel = computed(() => {
   if (record.value?.type === 'vaccine' && typeof record.value.payload?.vaccination_date === 'string') {
@@ -59,6 +61,31 @@ async function load() {
   }
 }
 
+function deleteRecord() {
+  const familyId = auth.familyId
+  const recordId = record.value?.id
+  if (!familyId || !recordId || deleting.value) return
+  uni.showModal({
+    title: '撤销这条记录？',
+    content: '记录会从家庭日常记录中隐藏，历史数据仍会保留。',
+    confirmText: '撤销记录',
+    confirmColor: '#B5473A',
+    success: async ({ confirm }) => {
+      if (!confirm) return
+      deleting.value = true
+      try {
+        await recordApi.delete(familyId, recordId)
+        uni.showToast({ title: '记录已撤销', icon: 'success' })
+        await router.back()
+      } catch {
+        uni.showToast({ title: '撤销失败，请重试', icon: 'none' })
+      } finally {
+        deleting.value = false
+      }
+    }
+  })
+}
+
 useProtectedPage(load)
 </script>
 
@@ -77,6 +104,9 @@ useProtectedPage(load)
         </view>
         <view class="page-subtitle">记录用于追溯接种信息；具体安排以兽医意见和产品说明为准。</view>
       </view>
+      <button v-if="record.type !== 'vaccine'" class="record-delete" :disabled="deleting" @click="deleteRecord">
+        {{ deleting ? '正在撤销…' : '撤销记录' }}
+      </button>
       <view class="page-subtitle">记录编号：{{ record.id }}</view>
     </view>
   </view>
@@ -85,4 +115,5 @@ useProtectedPage(load)
 <style scoped>
 .vaccine-details { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
 .vaccine-detail-row { display: flex; justify-content: space-between; gap: 12px; }
+.record-delete { margin: 18px 0 8px; border: 1px solid #d9aaa4; background: #fff; color: #a63c31; font-size: 14px; }
 </style>

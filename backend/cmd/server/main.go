@@ -173,10 +173,14 @@ func (h *appHealth) Liveness() (any, error) {
 }
 
 func (h *appHealth) Readiness() (any, error) {
-	if h.db != nil {
-		if err := mysql.Healthy(h.db); err != nil {
-			return nil, err
-		}
+	if h.db == nil {
+		return nil, fmt.Errorf("mysql unavailable")
+	}
+	if err := mysql.Healthy(h.db); err != nil {
+		return nil, err
+	}
+	if err := mysql.CheckSchemaVersion(h.db); err != nil {
+		return nil, err
 	}
 	return gin.H{"status": "up"}, nil
 }

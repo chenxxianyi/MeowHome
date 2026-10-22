@@ -29,20 +29,24 @@ func NewRecordService(records repository.DailyRecordRepo, members repository.Mem
 
 // RecordInput 创建记录的输入（类型专属字段放在 Payload）。
 type RecordInput struct {
-	Type       string         `json:"type"`
-	CatIDs     []string       `json:"cat_ids"`
-	OccurredAt string         `json:"occurred_at"`
-	Severity   string         `json:"severity"`
-	Title      string         `json:"title"`
-	Note       string         `json:"note"`
-	Source     string         `json:"source"`
-	Payload    map[string]any `json:"payload"`
+	Type              string         `json:"type"`
+	CatIDs            []string       `json:"cat_ids"`
+	ExpectedUpdatedAt string         `json:"expected_updated_at,omitempty"`
+	OccurredAt        string         `json:"occurred_at"`
+	Severity          string         `json:"severity"`
+	Title             string         `json:"title"`
+	Note              string         `json:"note"`
+	Source            string         `json:"source"`
+	Payload           map[string]any `json:"payload"`
 }
 
 // RecordEnvelope 记录响应。
 type RecordEnvelope struct {
 	ID         string         `json:"id"`
 	FamilyID   string         `json:"family_id"`
+	CreatedBy  string         `json:"created_by"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
 	CatIDs     []string       `json:"cat_ids"`
 	Type       string         `json:"type"`
 	OccurredAt string         `json:"occurred_at"`
@@ -74,7 +78,7 @@ func (s *RecordService) Create(ctx context.Context, familyID, userID string, in 
 	if err := s.records.Create(ctx, rec); err != nil {
 		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to create record", err)
 	}
-	s.writeAudit(ctx, familyID, userID, rec.ID)
+	s.writeAudit(ctx, familyID, userID, rec.ID, "record.create")
 	return toRecordEnvelope(rec), nil
 }
 
@@ -96,7 +100,7 @@ func (s *RecordService) CreateBatch(ctx context.Context, familyID, userID string
 		if err := s.records.Create(ctx, rec); err != nil {
 			return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to create record", err)
 		}
-		s.writeAudit(ctx, familyID, userID, rec.ID)
+		s.writeAudit(ctx, familyID, userID, rec.ID, "record.create")
 		out = append(out, toRecordEnvelope(rec))
 	}
 	return out, nil
@@ -115,6 +119,76 @@ func (s *RecordService) Get(ctx context.Context, familyID, userID, recordID stri
 		return nil, errors.NotFound(errors.CodeNotFound, "record not found")
 	}
 	return toRecordEnvelope(r), nil
+}
+
+// Update replaces a record's editable fields while preserving its identity and creation metadata.
+func (s *RecordService) Update(ctx context.Context, familyID, userID, recordID string, in RecordInput) (*RecordEnvelope, error) {
+	if err := requireFamilyAccess(ctx, s.members, familyID, userID); err != nil {
+		return nil, err
+	}
+	existing, err := s.records.FindByID(ctx, recordID)
+	if err != nil && err != repository.ErrNotFound {
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to read record", err)
+	}
+	if err != nil || existing == nil || existing.FamilyID != familyID || existing.DeletedAt != nil {
+		return nil, errors.NotFound(errors.CodeNotFound, "record not found")
+	}
+	if existing.RecordType == "vaccine" || in.Type == "vaccine" {
+		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "vaccine records require the vaccine-specific correction flow")
+	}
+	if in.ExpectedUpdatedAt == "" {
+		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "expected_updated_at is required")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, in.ExpectedUpdatedAt); err != nil {
+		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "expected_updated_at must be RFC3339")
+	}
+	if in.ExpectedUpdatedAt != existing.UpdatedAt.UTC().Format(time.RFC3339Nano) {
+		return nil, errors.Conflict(errors.CodeConflict, "record changed since it was loaded; reload before editing")
+	}
+	updated, err := s.build(ctx, familyID, userID, in)
+	if err != nil {
+		return nil, err
+	}
+	updated.ID = existing.ID
+	updated.CreatedBy = existing.CreatedBy
+	updated.CreatedAt = existing.CreatedAt
+	updated.UpdatedAt = time.Now().UTC()
+	if !updated.UpdatedAt.After(existing.UpdatedAt) {
+		updated.UpdatedAt = existing.UpdatedAt.Add(time.Millisecond)
+	}
+	if err := s.records.Update(ctx, updated, existing.UpdatedAt); err != nil {
+		if err == repository.ErrConflict {
+			return nil, errors.Conflict(errors.CodeConflict, "record changed since it was loaded; reload before editing")
+		}
+		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to update record", err)
+	}
+	s.writeAudit(ctx, familyID, userID, updated.ID, "record.update")
+	return toRecordEnvelope(updated), nil
+}
+
+// Delete soft-deletes a record so it disappears from all active queries while preserving history.
+func (s *RecordService) Delete(ctx context.Context, familyID, userID, recordID string) error {
+	if err := requireFamilyAccess(ctx, s.members, familyID, userID); err != nil {
+		return err
+	}
+	existing, err := s.records.FindByID(ctx, recordID)
+	if err != nil && err != repository.ErrNotFound {
+		return errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to read record", err)
+	}
+	if err != nil || existing == nil || existing.FamilyID != familyID || existing.DeletedAt != nil {
+		return errors.NotFound(errors.CodeNotFound, "record not found")
+	}
+	if existing.RecordType == "vaccine" {
+		return errors.InvalidRequest(errors.CodeValidationFailed, "vaccine records require the vaccine-specific correction flow")
+	}
+	if err := s.records.Delete(ctx, familyID, recordID); err != nil {
+		if err == repository.ErrNotFound {
+			return errors.NotFound(errors.CodeNotFound, "record not found")
+		}
+		return errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to delete record", err)
+	}
+	s.writeAudit(ctx, familyID, userID, recordID, "record.delete")
+	return nil
 }
 
 // List 查询家庭记录。
@@ -144,14 +218,22 @@ func (s *RecordService) build(ctx context.Context, familyID, userID string, in R
 	if len(in.CatIDs) == 0 {
 		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "cat_ids is required")
 	}
-	if in.Type == "vaccine" {
-		if len(in.CatIDs) != 1 {
-			return nil, errors.InvalidRequest(errors.CodeValidationFailed, "vaccine records must belong to exactly one cat")
+	if in.Type == "vaccine" && len(in.CatIDs) != 1 {
+		return nil, errors.InvalidRequest(errors.CodeValidationFailed, "vaccine records must belong to exactly one cat")
+	}
+	if s.cats == nil {
+		return nil, errors.New(errors.TypeInternal, errors.CodeInvalidRequest, "cat repository is unavailable")
+	}
+	seenCats := make(map[string]struct{}, len(in.CatIDs))
+	for _, catID := range in.CatIDs {
+		if catID == "" {
+			return nil, errors.InvalidRequest(errors.CodeValidationFailed, "cat_ids cannot contain an empty id")
 		}
-		if s.cats == nil {
-			return nil, errors.New(errors.TypeInternal, errors.CodeInvalidRequest, "cat repository is unavailable")
+		if _, exists := seenCats[catID]; exists {
+			return nil, errors.InvalidRequest(errors.CodeValidationFailed, "cat_ids cannot contain duplicate ids")
 		}
-		cat, catErr := s.cats.FindByID(ctx, in.CatIDs[0])
+		seenCats[catID] = struct{}{}
+		cat, catErr := s.cats.FindByID(ctx, catID)
 		if catErr != nil || cat == nil || cat.DeletedAt != nil || cat.FamilyID != familyID {
 			return nil, errors.Forbidden(errors.CodeFamilyForbidden, "cat does not belong to family")
 		}
@@ -203,7 +285,7 @@ func (s *RecordService) build(ctx context.Context, familyID, userID string, in R
 	}, nil
 }
 
-func (s *RecordService) writeAudit(ctx context.Context, familyID, userID, resource string) {
+func (s *RecordService) writeAudit(ctx context.Context, familyID, userID, resource, action string) {
 	if s.audit == nil {
 		return
 	}
@@ -212,7 +294,7 @@ func (s *RecordService) writeAudit(ctx context.Context, familyID, userID, resour
 		Base:     model.Base{ID: model.NewBase(familyID, userID).ID, CreatedBy: userID, CreatedAt: now, UpdatedAt: now},
 		FamilyID: familyID,
 		UserID:   userID,
-		Action:   "record.create",
+		Action:   action,
 		Resource: resource,
 	})
 }
@@ -221,6 +303,9 @@ func toRecordEnvelope(r *model.DailyRecord) *RecordEnvelope {
 	env := &RecordEnvelope{
 		ID:         r.ID,
 		FamilyID:   r.FamilyID,
+		CreatedBy:  r.CreatedBy,
+		CreatedAt:  r.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:  r.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		CatIDs:     r.CatIDs,
 		Type:       r.RecordType,
 		OccurredAt: r.OccurredAt.UTC().Format(time.RFC3339),
