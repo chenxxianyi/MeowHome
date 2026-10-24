@@ -849,6 +849,455 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           description: RATE_LIMITED；每来源 IP 每分钟最多 3 次
+  /families/{familyId}/shopping-list:
+    get:
+      tags: [shopping]
+      summary: 查询待购买项
+      description: status 为空表示全部；未完成项优先展示，其余按创建时间倒序。
+      operationId: listShoppingList
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [todo, purchased, dismissed]
+      responses:
+        '200':
+          description: 待购买项列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShoppingItem'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [shopping]
+      summary: 创建待购买项（不改变库存数量）
+      operationId: createShoppingItem
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShoppingInput'
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/shopping-list/{itemId}:
+    patch:
+      tags: [shopping]
+      summary: 修改、完成或驳回待购买项
+      description: status 置为 purchased 即完成（completed_at 同时写入），dismissed 为驳回，todo 为恢复。
+      operationId: updateShoppingItem
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShoppingUpdateInput'
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [shopping]
+      summary: 移除待购买项
+      operationId: deleteShoppingItem
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: 已移除
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /families/{familyId}/inventory/{itemId}/adjustments:
+    post:
+      tags: [inventory]
+      summary: 手动调整库存数量（数量与流水同事务）
+      description: delta 为正入库、负出库；调整后数量不得为负，否则返回 409 CONFLICT。
+      operationId: adjustInventoryItem
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryAdjustRequest'
+      responses:
+        '201':
+          description: 已调整
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryAdjustment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CONFLICT；调整后数量将为负数
+  /families/{familyId}/inventory/transactions:
+    get:
+      tags: [inventory]
+      summary: 库存流水（可按库存项过滤）
+      operationId: listInventoryTransactions
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: item_id
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: 流水列表（创建时间倒序）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryTransaction'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/purchase-media:
+    post:
+      tags: [purchasing]
+      summary: 上传单张订单截图，返回私有媒体键
+      description: |
+        微信小程序 wx.uploadFile 只支持单文件：逐张上传到本接口取得 media_key，
+        再以 JSON `{"media_keys": [...]}` 调用 POST /purchase-imports 建单。
+        截图仅写入私有媒体存储，不写库存或支出。
+      operationId: uploadPurchaseMedia
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: 已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [media_key]
+                properties:
+                  media_key: { type: string }
+        '400':
+          description: 图片格式/大小不合法（VALIDATION_FAILED 或 UPLOAD_TOO_LARGE）
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/purchase-imports:
+    post:
+      tags: [purchasing]
+      summary: 上传订单截图并创建导入草稿
+      description: |
+        两种请求体：multipart/form-data（文件字段名 files，单次 1–5 张 JPG/PNG/GIF/WebP）
+        或 application/json `{"media_keys": [...]}`（逐张上传 purchase-media 后使用）。
+        截图仅写入私有媒体存储，不写库存或支出；需家庭成员身份才能上传与查看。
+      operationId: createPurchaseImport
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: string
+                    format: binary
+          application/json:
+            schema:
+              type: object
+              required: [media_keys]
+              properties:
+                media_keys:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items: { type: string }
+      responses:
+        '201':
+          description: 已创建（status=uploaded）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseImport'
+        '400':
+          description: 截图数量/格式/大小不合法（VALIDATION_FAILED 或 UPLOAD_TOO_LARGE）
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      tags: [purchasing]
+      summary: 采购导入历史
+      operationId: listPurchaseImports
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        '200':
+          description: 导入列表（创建时间倒序，不含商品行）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchaseImport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /families/{familyId}/purchase-imports/{importId}:
+    get:
+      tags: [purchasing]
+      summary: 查询识别状态、草稿与商品行
+      operationId: getPurchaseImport
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 导入详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseImport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [purchasing]
+      summary: 保存用户修订后的订单草稿
+      description: |
+        expected_version 与当前 recognition_version 不一致时返回 409 CONFLICT。
+        processing/confirmed/cancelled 状态下拒绝编辑。
+      operationId: updatePurchaseDraft
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseDraftRequest'
+      responses:
+        '200':
+          description: 已保存
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseImport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CONFLICT；草稿版本冲突或状态不允许编辑
+  /families/{familyId}/purchase-imports/{importId}/recognize:
+    post:
+      tags: [purchasing]
+      summary: 启动或重试订单截图识别
+      description: |
+        uploaded/failed/parsed/partial 可识别或重试；processing 返回 409。
+        识别失败（OCR 未配置、超时、输出无法解析）时导入保留为 failed，
+        返回 200 与 error_summary，可继续手动填写草稿后确认。
+      operationId: recognizePurchaseImport
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 识别结果（status=parsed/partial/failed）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseRecognizeResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CONFLICT；识别进行中或导入已终结
+  /families/{familyId}/purchase-imports/{importId}/confirm:
+    post:
+      tags: [purchasing]
+      summary: 幂等确认采购并落账
+      description: |
+        支出、库存流水、库存数量与待购完成在同一事务内落账；同一导入重复确认
+        返回 created=false 且不重复写入。expected_version 提供时做草稿版本校验。
+      operationId: confirmPurchaseImport
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseConfirmRequest'
+      responses:
+        '200':
+          description: 落账摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseConfirmSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: NOT_FOUND；导入或关联资源不属于当前家庭
+        '409':
+          description: CONFLICT；识别中、已取消或草稿版本冲突
+  /families/{familyId}/purchase-imports/{importId}/cancel:
+    post:
+      tags: [purchasing]
+      summary: 取消未确认的导入草稿
+      description: 已确认的采购不可取消（应通过冲正流程更正）；重复取消返回 cancelled。
+      operationId: cancelPurchaseImport
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 已取消
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseImport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CONFLICT；已确认或识别进行中
+  /families/{familyId}/purchase-imports/{importId}/media/{index}:
+    get:
+      tags: [purchasing]
+      summary: 读取原始订单截图（家庭成员限定）
+      operationId: getPurchaseImportMedia
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: index
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: 图片二进制
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [purchasing]
+      summary: 删除一张原始截图（隐私：允许用户立即删除原图）
+      description: 删除后返回更新后的导入记录；媒体引用同步移除。
+      operationId: deletePurchaseImportMedia
+      parameters:
+        - $ref: '#/components/parameters/FamilyId'
+        - name: importId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: index
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: 已删除并返回导入记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseImport'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   parameters:
     FamilyId:
@@ -1545,6 +1994,190 @@ components:
                   items:
                     $ref: '#/components/schemas/AgentMessage'
                 next_cursor: { type: string }
+    # ---- 待购买清单 ----
+    ShoppingItem:
+      type: object
+      required: [id, name, quantity, priority, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        specification: { type: string }
+        category: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        unit: { type: string }
+        note: { type: string }
+        priority: { type: string, enum: [low, normal, high] }
+        status: { type: string, enum: [todo, purchased, dismissed] }
+        matched_inventory_item_id: { type: string }
+        completed_at: { type: string, format: date-time }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    ShoppingInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        brand: { type: string, maxLength: 120 }
+        specification: { type: string, maxLength: 120 }
+        category: { type: string, maxLength: 64 }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        unit: { type: string, maxLength: 32 }
+        note: { type: string }
+        priority: { type: string, enum: [low, normal, high], default: normal }
+    ShoppingUpdateInput:
+      type: object
+      description: 未提供的字段保持原值；status 置为 purchased 即完成。
+      properties:
+        name: { type: string, minLength: 1 }
+        brand: { type: string }
+        specification: { type: string }
+        category: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        unit: { type: string }
+        note: { type: string }
+        priority: { type: string, enum: [low, normal, high] }
+        status: { type: string, enum: [todo, purchased, dismissed] }
+        matched_inventory_item_id: { type: string }
+    # ---- 库存调整与流水 ----
+    InventoryItem:
+      type: object
+      required: [id, name, quantity, unit, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        specification: { type: string }
+        category: { type: string }
+        quantity: { type: integer }
+        unit: { type: string }
+        estimatedDays: { type: integer }
+        status: { type: string, enum: [ok, low, expired] }
+        expiry: { type: string }
+    InventoryAdjustRequest:
+      type: object
+      required: [delta]
+      properties:
+        delta: { type: integer, description: 正入库、负出库；不得为 0 }
+        reason: { type: string, maxLength: 120, description: 缺省为 manual_adjustment }
+    InventoryTransaction:
+      type: object
+      required: [id, item_id, change, reason]
+      properties:
+        id: { type: string }
+        item_id: { type: string }
+        change: { type: integer }
+        reason: { type: string }
+        source_type: { type: string, enum: [opening_balance, manual_adjustment, purchase_import] }
+        source_id: { type: string }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+    InventoryAdjustment:
+      type: object
+      required: [item, transaction]
+      properties:
+        item:
+          $ref: '#/components/schemas/InventoryItem'
+        transaction:
+          $ref: '#/components/schemas/InventoryTransaction'
+    # ---- 采购导入 ----
+    PurchaseLine:
+      type: object
+      required: [id, name, quantity, confidence]
+      properties:
+        id: { type: string }
+        raw_title: { type: string }
+        name: { type: string }
+        specification: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        unit: { type: string }
+        line_amount: { type: number, format: double, description: 元；未识别到时为 null }
+        confidence: { type: string, enum: [high, medium, low, none] }
+        evidence: { type: string }
+        include_in_stock: { type: boolean }
+        matched_inventory_item_id: { type: string }
+        matched_shopping_item_id: { type: string }
+    PurchaseImport:
+      type: object
+      required: [id, status, total_amount, currency, recognition_version]
+      properties:
+        id: { type: string }
+        status:
+          type: string
+          enum: [uploaded, processing, parsed, partial, failed, confirmed, cancelled]
+        platform: { type: string, enum: [taobao, jd, pdd, other] }
+        order_date: { type: string, description: YYYY-MM-DD }
+        order_no: { type: string }
+        total_amount: { type: number, format: double, description: 实付总额（元） }
+        currency: { type: string, default: CNY }
+        media_keys: { type: array, items: { type: string } }
+        recognition_version: { type: integer }
+        error_summary: { type: string }
+        confirmed_at: { type: string, format: date-time }
+        expense_id: { type: string }
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseLine'
+        created_at: { type: string, format: date-time }
+    PurchaseRecognizeResult:
+      type: object
+      required: [import, success]
+      properties:
+        import:
+          $ref: '#/components/schemas/PurchaseImport'
+        success: { type: boolean, description: false 表示识别失败但导入记录保留 }
+        issues:
+          type: array
+          items: { type: string }
+    PurchaseDraftLineInput:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string, description: 沿用已有行 ID 可保持行标识稳定 }
+        name: { type: string, minLength: 1 }
+        specification: { type: string }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        unit: { type: string }
+        line_amount: { type: number, description: 元 }
+        confidence: { type: string, enum: [high, medium, low, none] }
+        evidence: { type: string }
+        include_in_stock: { type: boolean, description: 是否在确认时入库 }
+        matched_inventory_item_id: { type: string }
+        matched_shopping_item_id: { type: string }
+    PurchaseDraftRequest:
+      type: object
+      properties:
+        expected_version: { type: integer, description: 与 recognition_version 不一致时 409 }
+        platform: { type: string }
+        order_date: { type: string }
+        total_amount: { type: number }
+        currency: { type: string }
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseDraftLineInput'
+    PurchaseConfirmRequest:
+      type: object
+      properties:
+        expected_version: { type: integer }
+        include_expense: { type: boolean, default: true, description: false 时只更新库存与待购状态 }
+    PurchaseConfirmSummary:
+      type: object
+      required: [import, created]
+      properties:
+        import:
+          $ref: '#/components/schemas/PurchaseImport'
+        created: { type: boolean, description: false 表示幂等重放，未重复落账 }
+        expense_id: { type: string }
+        expense_amount: { type: number }
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryTransaction'
+        shopping_completed:
+          type: array
+          items: { type: string }
   securitySchemes:
     bearerAuth:
       type: http

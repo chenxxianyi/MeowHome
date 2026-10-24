@@ -14,3 +14,13 @@ dist/
 .env
 *.local
 *.log
+
+# 本地工具缓存与端到端验证产物（不入库）
+.gocache/
+.gotmp/
+.npm-cache/
+.e2e-storage/
+.e2e-screenshot.png
+.dsh-e2e/
+.dsh-acl-recovery/
+.dsh-restart/

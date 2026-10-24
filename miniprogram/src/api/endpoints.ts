@@ -13,7 +13,13 @@ import type {
   FamilyMember,
   FocusItemData,
   InventoryItem,
+  InventoryTransaction,
+  PurchaseConfirmSummary,
+  PurchaseImport,
+  PurchaseLine,
+  PurchaseRecognizeResult,
   Reminder,
+  ShoppingItem,
   TimelineEvent,
   TodayStatusData,
   TrendDataPoint,
@@ -149,12 +155,74 @@ export interface MomentDTO {
 export interface InventoryDTO {
   id: string
   name: string
+  brand?: string
+  specification?: string
   category: string
   quantity: number
   unit: string
   estimatedDays?: number
   status: string
   expiry: string
+}
+
+export interface ShoppingItemDTO {
+  id: string
+  name: string
+  brand?: string
+  specification?: string
+  category?: string
+  quantity: number
+  unit?: string
+  note?: string
+  priority: string
+  status: string
+  matched_inventory_item_id?: string
+  completed_at?: string
+  created_by?: string
+  created_at?: string
+}
+
+export interface InventoryTxDTO {
+  id: string
+  item_id: string
+  change: number
+  reason: string
+  source_type?: string
+  source_id?: string
+  created_by?: string
+  created_at?: string
+}
+
+export interface PurchaseLineDTO {
+  id: string
+  raw_title?: string
+  name: string
+  specification?: string
+  quantity: number
+  unit?: string
+  line_amount?: number | null
+  confidence: string
+  evidence?: string
+  include_in_stock: boolean
+  matched_inventory_item_id?: string
+  matched_shopping_item_id?: string
+}
+
+export interface PurchaseImportDTO {
+  id: string
+  status: string
+  platform?: string
+  order_date?: string
+  order_no?: string
+  total_amount: number
+  currency: string
+  media_keys?: string[]
+  recognition_version: number
+  error_summary?: string
+  confirmed_at?: string
+  expense_id?: string
+  lines?: PurchaseLineDTO[]
+  created_at?: string
 }
 
 export interface ExpenseDTO {
@@ -280,12 +348,81 @@ export function toInventory(dto: InventoryDTO): InventoryItem {
   return {
     id: dto.id,
     name: dto.name,
+    brand: dto.brand,
+    specification: dto.specification,
     category: dto.category,
     quantity: dto.quantity,
     unit: dto.unit,
     estimatedDays: dto.estimatedDays,
     status: (dto.status || 'ok') as InventoryItem['status'],
     expiry: dto.expiry || null
+  }
+}
+
+export function toShoppingItem(dto: ShoppingItemDTO): ShoppingItem {
+  return {
+    id: dto.id,
+    name: dto.name,
+    brand: dto.brand,
+    specification: dto.specification,
+    category: dto.category,
+    quantity: dto.quantity,
+    unit: dto.unit,
+    note: dto.note,
+    priority: (dto.priority || 'normal') as ShoppingItem['priority'],
+    status: (dto.status || 'todo') as ShoppingItem['status'],
+    matchedInventoryItemId: dto.matched_inventory_item_id,
+    completedAt: dto.completed_at,
+    createdBy: dto.created_by,
+    createdAt: dto.created_at
+  }
+}
+
+export function toInventoryTransaction(dto: InventoryTxDTO): InventoryTransaction {
+  return {
+    id: dto.id,
+    itemId: dto.item_id,
+    change: dto.change,
+    reason: dto.reason,
+    sourceType: dto.source_type,
+    sourceId: dto.source_id,
+    createdAt: dto.created_at
+  }
+}
+
+export function toPurchaseLine(dto: PurchaseLineDTO): PurchaseLine {
+  return {
+    id: dto.id,
+    rawTitle: dto.raw_title,
+    name: dto.name,
+    specification: dto.specification,
+    quantity: dto.quantity,
+    unit: dto.unit,
+    lineAmount: dto.line_amount ?? null,
+    confidence: (dto.confidence || 'none') as PurchaseLine['confidence'],
+    evidence: dto.evidence,
+    includeInStock: Boolean(dto.include_in_stock),
+    matchedInventoryItemId: dto.matched_inventory_item_id,
+    matchedShoppingItemId: dto.matched_shopping_item_id
+  }
+}
+
+export function toPurchaseImport(dto: PurchaseImportDTO): PurchaseImport {
+  return {
+    id: dto.id,
+    status: (dto.status || 'uploaded') as PurchaseImport['status'],
+    platform: dto.platform,
+    orderDate: dto.order_date,
+    orderNo: dto.order_no,
+    totalAmount: dto.total_amount,
+    currency: dto.currency,
+    mediaKeys: dto.media_keys ?? [],
+    recognitionVersion: dto.recognition_version,
+    errorSummary: dto.error_summary,
+    confirmedAt: dto.confirmed_at,
+    expenseId: dto.expense_id,
+    lines: (dto.lines ?? []).map(toPurchaseLine),
+    createdAt: dto.created_at
   }
 }
 
@@ -553,6 +690,8 @@ export const inventoryApi = {
     familyId: string,
     data: {
       name: string
+      brand?: string
+      specification?: string
       category?: string
       quantity?: number
       unit?: string
@@ -561,6 +700,137 @@ export const inventoryApi = {
     }
   ) {
     return request<InventoryDTO>(http, { method: 'POST', url: `/families/${familyId}/inventory`, data })
+  },
+  adjust(familyId: string, itemId: string, data: { delta: number; reason?: string }) {
+    return request<{ item: InventoryDTO; transaction: InventoryTxDTO }>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/inventory/${itemId}/adjustments`,
+      data
+    })
+  },
+  transactions(familyId: string, params: { item_id?: string; limit?: number } = {}) {
+    return request<InventoryTxDTO[]>(http, { method: 'GET', url: `/families/${familyId}/inventory/transactions`, params })
+  }
+}
+
+export const shoppingApi = {
+  list(familyId: string, status?: string) {
+    return request<ShoppingItemDTO[]>(http, {
+      method: 'GET',
+      url: `/families/${familyId}/shopping-list`,
+      params: { status }
+    })
+  },
+  create(
+    familyId: string,
+    data: {
+      name: string
+      brand?: string
+      specification?: string
+      category?: string
+      quantity?: number
+      unit?: string
+      note?: string
+      priority?: string
+    }
+  ) {
+    return request<ShoppingItemDTO>(http, { method: 'POST', url: `/families/${familyId}/shopping-list`, data })
+  },
+  update(familyId: string, itemId: string, patch: Record<string, unknown>) {
+    return request<ShoppingItemDTO>(http, {
+      method: 'PATCH',
+      url: `/families/${familyId}/shopping-list/${itemId}`,
+      data: patch
+    })
+  },
+  remove(familyId: string, itemId: string) {
+    return request<void>(http, { method: 'DELETE', url: `/families/${familyId}/shopping-list/${itemId}` })
+  }
+}
+
+export const purchaseApi = {
+  /** 微信小程序逐张上传：返回私有媒体键。 */
+  uploadMedia(familyId: string, filePath: string) {
+    return uploadFile<{ media_key: string }>(http, {
+      url: `/families/${encodeURIComponent(familyId)}/purchase-media`,
+      filePath,
+      name: 'file'
+    })
+  },
+  create(familyId: string, mediaKeys: string[]) {
+    return request<PurchaseImportDTO>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/purchase-imports`,
+      data: { media_keys: mediaKeys }
+    })
+  },
+  list(familyId: string, params: { limit?: number } = {}) {
+    return request<PurchaseImportDTO[]>(http, { method: 'GET', url: `/families/${familyId}/purchase-imports`, params })
+  },
+  get(familyId: string, importId: string) {
+    return request<PurchaseImportDTO>(http, { method: 'GET', url: `/families/${familyId}/purchase-imports/${importId}` })
+  },
+  recognize(familyId: string, importId: string) {
+    return request<{ import: PurchaseImportDTO; success: boolean; issues?: string[] }>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/purchase-imports/${importId}/recognize`
+    })
+  },
+  saveDraft(
+    familyId: string,
+    importId: string,
+    data: {
+      expected_version?: number
+      platform?: string
+      order_date?: string
+      total_amount?: number
+      currency?: string
+      lines?: {
+        id?: string
+        name: string
+        specification?: string
+        quantity?: number
+        unit?: string
+        line_amount?: number
+        confidence?: string
+        evidence?: string
+        include_in_stock?: boolean
+        matched_inventory_item_id?: string
+        matched_shopping_item_id?: string
+      }[]
+    }
+  ) {
+    return request<PurchaseImportDTO>(http, {
+      method: 'PATCH',
+      url: `/families/${familyId}/purchase-imports/${importId}`,
+      data
+    })
+  },
+  confirm(familyId: string, importId: string, data: { expected_version?: number; include_expense?: boolean }) {
+    return request<{
+      import: PurchaseImportDTO
+      created: boolean
+      expense_id?: string
+      expense_amount?: number
+      transactions?: InventoryTxDTO[]
+      shopping_completed?: string[]
+    }>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/purchase-imports/${importId}/confirm`,
+      data
+    })
+  },
+  cancel(familyId: string, importId: string) {
+    return request<PurchaseImportDTO>(http, {
+      method: 'POST',
+      url: `/families/${familyId}/purchase-imports/${importId}/cancel`
+    })
+  },
+  removeMedia(familyId: string, importId: string, index: number) {
+    return request<PurchaseImportDTO>(http, {
+      method: 'DELETE',
+      url: `/families/${familyId}/purchase-imports/${importId}/media/${index}`
+    })
   }
 }
 

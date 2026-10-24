@@ -42,12 +42,29 @@ type MomentEnvelope struct {
 type InventoryEnvelope struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
+	Brand         string `json:"brand,omitempty"`
+	Specification string `json:"specification,omitempty"`
 	Category      string `json:"category"`
 	Quantity      int    `json:"quantity"`
 	Unit          string `json:"unit"`
 	EstimatedDays int    `json:"estimatedDays,omitempty"`
 	Status        string `json:"status"`
 	Expiry        string `json:"expiry"`
+}
+
+// inventoryEnvelope 把库存模型转成响应，并按当天推导 status。
+func inventoryEnvelope(it *model.InventoryItem) *InventoryEnvelope {
+	return &InventoryEnvelope{
+		ID:            it.ID,
+		Name:          it.Name,
+		Brand:         it.Brand,
+		Specification: it.Specification,
+		Category:      it.Category,
+		Quantity:      it.Quantity,
+		Unit:          it.Unit,
+		Expiry:        it.Expiry,
+		Status:        inventoryStatus(it, time.Now().Format("2006-01-02")),
+	}
 }
 
 // ExpenseEnvelope 支出响应（与前端 Expense 对齐）。
@@ -150,15 +167,8 @@ func (s *AssetService) Inventory(ctx context.Context, familyID, userID string) (
 	today := time.Now().Format("2006-01-02")
 	out := make([]*InventoryEnvelope, 0, len(rows))
 	for _, it := range rows {
-		env := &InventoryEnvelope{
-			ID:       it.ID,
-			Name:     it.Name,
-			Category: it.Category,
-			Quantity: it.Quantity,
-			Unit:     it.Unit,
-			Expiry:   it.Expiry,
-			Status:   inventoryStatus(it, today),
-		}
+		env := inventoryEnvelope(it)
+		env.Status = inventoryStatus(it, today)
 		out = append(out, env)
 	}
 	return out, nil
@@ -181,6 +191,8 @@ func inventoryStatus(it *model.InventoryItem, today string) string {
 // InventoryInput 创建库存项的输入。
 type InventoryInput struct {
 	Name              string `json:"name"`
+	Brand             string `json:"brand"`
+	Specification     string `json:"specification"`
 	Category          string `json:"category"`
 	Quantity          int    `json:"quantity"`
 	Unit              string `json:"unit"`
@@ -201,6 +213,8 @@ func (s *AssetService) CreateInventory(ctx context.Context, familyID, userID str
 		Base:              model.Base{ID: model.NewBase(familyID, userID).ID, CreatedBy: userID, CreatedAt: now, UpdatedAt: now},
 		FamilyID:          familyID,
 		Name:              in.Name,
+		Brand:             in.Brand,
+		Specification:     in.Specification,
 		Category:          in.Category,
 		Unit:              in.Unit,
 		Quantity:          in.Quantity,
@@ -210,10 +224,7 @@ func (s *AssetService) CreateInventory(ctx context.Context, familyID, userID str
 	if err := s.inventory.Create(ctx, it); err != nil {
 		return nil, errors.Wrap(errors.TypeInternal, errors.CodeInvalidRequest, "failed to create inventory item", err)
 	}
-	return &InventoryEnvelope{
-		ID: it.ID, Name: it.Name, Category: it.Category, Quantity: it.Quantity,
-		Unit: it.Unit, Expiry: it.Expiry, Status: inventoryStatus(it, time.Now().Format("2006-01-02")),
-	}, nil
+	return inventoryEnvelope(it), nil
 }
 
 // --- 账目 ---

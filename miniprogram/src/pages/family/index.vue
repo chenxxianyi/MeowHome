@@ -7,7 +7,7 @@ import { useCatStore } from '../../stores/cat'
 import { services } from '../../services'
 import { todayStr } from '../../utils/date'
 import { usePageCapabilities, useProtectedPage } from '../../utils/page'
-import type { Cat, Expense, Family, InventoryItem } from '../../types'
+import type { Cat, Expense, Family, InventoryItem, ShoppingItem } from '../../types'
 
 const router = useRouter()
 const catStore = useCatStore()
@@ -19,6 +19,7 @@ const family = ref<Family>({
   members: []
 })
 const inventory = ref<InventoryItem[]>([])
+const shopping = ref<ShoppingItem[]>([])
 const expenses = ref<Expense[]>([])
 const loading = ref(true)
 const loadError = ref('')
@@ -35,6 +36,7 @@ function catHealthConcern(cat: Cat) {
 const lowCount = computed(
   () => inventory.value.filter((item) => item.status === 'low' || item.status === 'expired').length
 )
+const todoShoppingCount = computed(() => shopping.value.filter((item) => item.status === 'todo').length)
 const currentMonth = todayStr().slice(0, 7)
 const monthExpense = computed(() =>
   expenses.value
@@ -47,10 +49,15 @@ const careEntries = computed(() => [
   {
     icon: 'inbox',
     title: '物资库存',
-    desc: lowCount.value ? `${lowCount.value} 项需要补充或处理` : '常用物资都很充足',
-    value: `${inventory.value.length} 项`,
+    // 待购非空时展示待买数量，否则展示库存总数（避免空清单看起来像异常）。
+    desc: lowCount.value
+      ? `${lowCount.value} 项库存不足`
+      : todoShoppingCount.value
+        ? '待买物品已加入清单'
+        : '常用物资都很充足',
+    value: todoShoppingCount.value ? `待买 ${todoShoppingCount.value} 项` : `${inventory.value.length} 项`,
     href: '/family/inventory',
-    tone: lowCount.value ? 'warning' : 'sage'
+    tone: lowCount.value || todoShoppingCount.value ? 'warning' : 'sage'
   },
   {
     icon: 'wallet',
@@ -88,15 +95,17 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const [famRes, invRes, expRes] = await Promise.all([
+    const [famRes, invRes, shopRes, expRes] = await Promise.all([
       services.getFamily(),
       services.getInventory(),
+      services.getShoppingList(),
       services.getExpenses()
     ])
     family.value = famRes.data
     inventory.value = invRes.data
+    shopping.value = shopRes.data
     expenses.value = expRes.data
-    if (!famRes.success && !invRes.success && !expRes.success) {
+    if (!famRes.success && !invRes.success && !shopRes.success && !expRes.success) {
       loadError.value = '家庭数据暂时无法加载，请稍后重试'
     }
   } finally {

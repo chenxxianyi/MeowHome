@@ -108,6 +108,18 @@
       }
     },
     {
+      "path": "pages/purchase/index",
+      "style": {
+        "navigationBarTitleText": "识别订单截图"
+      }
+    },
+    {
+      "path": "pages/purchase-review/index",
+      "style": {
+        "navigationBarTitleText": "核对采购"
+      }
+    },
+    {
       "path": "pages/expenses/index",
       "style": {
         "navigationBarTitleText": "账目"

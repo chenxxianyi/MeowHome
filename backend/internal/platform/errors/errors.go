@@ -36,6 +36,7 @@ const (
 
 	CodeAIUnavailable      = "AI_UNAVAILABLE"
 	CodeOCRUnavailable     = "OCR_UNAVAILABLE"
+	CodeOCRFailed          = "OCR_FAILED"
 	CodeStorageUnavailable = "STORAGE_UNAVAILABLE"
 
 	CodeAIInvalidOutput    = "AI_INVALID_OUTPUT"

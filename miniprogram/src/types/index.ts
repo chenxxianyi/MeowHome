@@ -221,12 +221,108 @@ export interface CareTask {
 export interface InventoryItem {
   id: ID
   name: string
+  brand?: string
+  specification?: string
   category: string
   quantity: number
   unit: string
   estimatedDays?: number
   status: 'low' | 'ok' | 'expired'
   expiry?: string | null
+}
+
+export type ShoppingStatus = 'todo' | 'purchased' | 'dismissed'
+export type ShoppingPriority = 'low' | 'normal' | 'high'
+
+/** 待购买项：计划采购的物品，独立于库存。 */
+export interface ShoppingItem {
+  id: ID
+  name: string
+  brand?: string
+  specification?: string
+  category?: string
+  quantity: number
+  unit?: string
+  note?: string
+  priority: ShoppingPriority
+  status: ShoppingStatus
+  matchedInventoryItemId?: string
+  completedAt?: string
+  createdBy?: string
+  createdAt?: string
+}
+
+/** 库存流水（不可变增减记录）。 */
+export interface InventoryTransaction {
+  id: ID
+  itemId: ID
+  change: number
+  reason: string
+  sourceType?: string
+  sourceId?: string
+  createdAt?: string
+}
+
+export type PurchaseImportStatus =
+  | 'uploaded'
+  | 'processing'
+  | 'parsed'
+  | 'partial'
+  | 'failed'
+  | 'confirmed'
+  | 'cancelled'
+
+export type RecordConfidence = 'high' | 'medium' | 'low' | 'none'
+
+/** 采购导入商品行（可编辑草稿）。 */
+export interface PurchaseLine {
+  id: ID
+  rawTitle?: string
+  name: string
+  specification?: string
+  quantity: number
+  unit?: string
+  lineAmount?: number | null
+  confidence: RecordConfidence
+  evidence?: string
+  includeInStock: boolean
+  matchedInventoryItemId?: string
+  matchedShoppingItemId?: string
+}
+
+/** 采购导入：一次订单截图识别及其确认状态。 */
+export interface PurchaseImport {
+  id: ID
+  status: PurchaseImportStatus
+  platform?: string
+  orderDate?: string
+  orderNo?: string
+  totalAmount: number
+  currency: string
+  mediaKeys: string[]
+  recognitionVersion: number
+  errorSummary?: string
+  confirmedAt?: string
+  expenseId?: string
+  lines: PurchaseLine[]
+  createdAt?: string
+}
+
+/** 识别结果：失败时 success=false，导入记录保留为 failed。 */
+export interface PurchaseRecognizeResult {
+  import: PurchaseImport
+  success: boolean
+  issues?: string[]
+}
+
+/** 确认采购落账摘要。 */
+export interface PurchaseConfirmSummary {
+  import: PurchaseImport
+  created: boolean
+  expenseId?: string
+  expenseAmount?: number
+  transactions?: InventoryTransaction[]
+  shoppingCompleted?: string[]
 }
 
 export interface Expense {

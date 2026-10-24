@@ -139,6 +139,27 @@ func registerV1(r *gin.Engine, h *handler.Handler, jwtSecret string, patrolLimit
 	// 库存
 	familyG.GET("/:familyId/inventory", h.ListInventory)
 	familyG.POST("/:familyId/inventory", h.CreateInventoryItem)
+	// 手动库存调整（数量与流水同事务）与流水查询
+	familyG.POST("/:familyId/inventory/:itemId/adjustments", h.AdjustInventoryItem)
+	familyG.GET("/:familyId/inventory/transactions", h.ListInventoryTransactions)
+
+	// 待购买清单
+	familyG.GET("/:familyId/shopping-list", h.ListShopping)
+	familyG.POST("/:familyId/shopping-list", h.CreateShoppingItem)
+	familyG.PATCH("/:familyId/shopping-list/:itemId", h.UpdateShoppingItem)
+	familyG.DELETE("/:familyId/shopping-list/:itemId", h.DeleteShoppingItem)
+
+	// 采购截图导入与确认落账
+	familyG.POST("/:familyId/purchase-media", h.UploadPurchaseMedia)
+	familyG.POST("/:familyId/purchase-imports", h.CreatePurchaseImport)
+	familyG.GET("/:familyId/purchase-imports", h.ListPurchaseImports)
+	familyG.GET("/:familyId/purchase-imports/:importId", h.GetPurchaseImport)
+	familyG.POST("/:familyId/purchase-imports/:importId/recognize", h.RecognizePurchaseImport)
+	familyG.PATCH("/:familyId/purchase-imports/:importId", h.UpdatePurchaseDraft)
+	familyG.POST("/:familyId/purchase-imports/:importId/confirm", h.ConfirmPurchaseImport)
+	familyG.POST("/:familyId/purchase-imports/:importId/cancel", h.CancelPurchaseImport)
+	familyG.GET("/:familyId/purchase-imports/:importId/media/:index", h.PurchaseImportMedia)
+	familyG.DELETE("/:familyId/purchase-imports/:importId/media/:index", h.DeletePurchaseMedia)
 
 	// 账目
 	familyG.GET("/:familyId/expenses", h.ListExpenses)

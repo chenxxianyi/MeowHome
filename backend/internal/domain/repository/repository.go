@@ -236,6 +236,59 @@ type InventoryRepo interface {
 	ListByFamily(ctx context.Context, familyID string) ([]*model.InventoryItem, error)
 	Update(ctx context.Context, i *model.InventoryItem) error
 	Delete(ctx context.Context, id string) error
+	// Adjust 在同一事务内锁定库存项、更新数量并写入流水。
+	// delta 可为负（消耗/纠错）；结果数量不得小于 0。
+	Adjust(ctx context.Context, familyID, itemID string, delta int, tx *model.InventoryTransaction) (*model.InventoryItem, error)
+}
+
+// InventoryTransactionRepo 库存流水仓储。
+type InventoryTransactionRepo interface {
+	Create(ctx context.Context, tx *model.InventoryTransaction) error
+	// ListByFamily 按家庭列出流水；itemID 为空表示全部，结果按创建时间倒序。
+	ListByFamily(ctx context.Context, familyID, itemID string, limit int) ([]*model.InventoryTransaction, error)
+}
+
+// ShoppingListRepo 待购买项仓储。
+type ShoppingListRepo interface {
+	Create(ctx context.Context, item *model.ShoppingListItem) error
+	FindByID(ctx context.Context, familyID, id string) (*model.ShoppingListItem, error)
+	// ListByFamily 按家庭列出待购项；status 为空表示全部。
+	ListByFamily(ctx context.Context, familyID, status string) ([]*model.ShoppingListItem, error)
+	Update(ctx context.Context, item *model.ShoppingListItem) error
+	Delete(ctx context.Context, familyID, id string) error
+}
+
+// PurchaseConfirmPlan 采购确认的落账计划，由服务层组装、仓储层在一个事务内执行。
+type PurchaseConfirmPlan struct {
+	// Expense 订单支出；nil 表示用户关闭“记入支出”。
+	Expense *model.Expense
+	// StockLines 逐商品行的入库：Tx 指向目标库存项（NewItem 非空时由仓储先建项）。
+	StockLines []PurchaseStockLine
+	// ShoppingCompletions 待购完成项（已带更新后的状态字段）。
+	ShoppingCompletions []*model.ShoppingListItem
+}
+
+// PurchaseStockLine 一条入库计划。
+type PurchaseStockLine struct {
+	// NewItem 非空表示按行数据新建库存项（此时 Tx.ItemID 在写入后回填）。
+	NewItem *model.InventoryItem
+	// Tx 入库流水；Change 为正的入库数量。
+	Tx *model.InventoryTransaction
+}
+
+// PurchaseImportRepo 采购导入仓储。
+type PurchaseImportRepo interface {
+	Create(ctx context.Context, imp *model.PurchaseImport) error
+	FindByID(ctx context.Context, familyID, id string) (*model.PurchaseImport, error)
+	ListByFamily(ctx context.Context, familyID string, limit int) ([]*model.PurchaseImport, error)
+	ListLines(ctx context.Context, familyID, importID string) ([]*model.PurchaseImportLine, error)
+	UpdateImport(ctx context.Context, imp *model.PurchaseImport) error
+	// ReplaceLines 在一个事务内替换导入的全部商品行（保存用户修订后的草稿）。
+	ReplaceLines(ctx context.Context, familyID, importID string, lines []*model.PurchaseImportLine) error
+	// Confirm 在单事务内完成落账：锁定导入行做幂等判断，创建支出、逐行入库
+	// 流水与数量、完成待购项，最后标记 confirmed。
+	// created=false 表示该导入已被确认过（返回当前状态，不重复写入）。
+	Confirm(ctx context.Context, familyID, userID, importID string, plan PurchaseConfirmPlan) (*model.PurchaseImport, bool, error)
 }
 
 // ExpenseRepo 支出仓储。

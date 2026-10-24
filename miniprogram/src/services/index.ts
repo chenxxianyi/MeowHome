@@ -12,18 +12,24 @@ import {
   familyApi,
   inventoryApi,
   momentApi,
+  purchaseApi,
   recordApi,
   reminderApi,
+  shoppingApi,
   toCat,
   toExpense,
   toFamily,
   toInventory,
+  toInventoryTransaction,
   toMember,
   toMoment,
   toParseSession,
+  toPurchaseImport,
   toReminder,
+  toShoppingItem,
   toSummary
 } from '../api/endpoints'
+import { fetchMediaDataUrl } from '../api/media'
 import type { RecordDTO, RecordInput, VaccineSuggestionDTO } from '../api/endpoints'
 import { recordTypes as recordTypeConfig } from '../data/recordTypes'
 import { useAuthStore } from '../stores/auth'
@@ -37,7 +43,12 @@ import type {
   Family,
   FocusItemData,
   InventoryItem,
+  InventoryTransaction,
+  PurchaseConfirmSummary,
+  PurchaseImport,
+  PurchaseRecognizeResult,
   Reminder,
+  ShoppingItem,
   TimelineEvent,
   TodayStatusData,
   TrendDataPoint
@@ -271,6 +282,150 @@ export const services = {
       const list = await inventoryApi.list(familyId())
       return list.map(toInventory)
     })
+  },
+
+  /** 创建库存项；校验错误需要展示给用户，因此抛出异常。 */
+  async createInventoryItem(input: {
+    name: string
+    brand?: string
+    specification?: string
+    category?: string
+    quantity?: number
+    unit?: string
+    low_stock_threshold?: number
+    expiry?: string
+  }): Promise<InventoryItem> {
+    return toInventory(await inventoryApi.create(familyId(), input))
+  },
+
+  // ---- 待购买清单 ----
+
+  async getShoppingList(status?: string): Promise<APIResponse<ShoppingItem[]>> {
+    return api<ShoppingItem[]>([], async () => {
+      const list = await shoppingApi.list(familyId(), status)
+      return list.map(toShoppingItem)
+    })
+  },
+
+  /** 创建待购项；校验错误需要展示给用户，因此抛出异常。 */
+  async createShoppingItem(input: {
+    name: string
+    brand?: string
+    specification?: string
+    category?: string
+    quantity?: number
+    unit?: string
+    note?: string
+    priority?: string
+  }): Promise<ShoppingItem> {
+    return toShoppingItem(await shoppingApi.create(familyId(), input))
+  },
+
+  /** 修改待购项（含完成/驳回）；抛出异常由视图处理。 */
+  async updateShoppingItem(itemId: string, patch: Record<string, unknown>): Promise<ShoppingItem> {
+    return toShoppingItem(await shoppingApi.update(familyId(), itemId, patch))
+  },
+
+  async completeShoppingItem(itemId: string): Promise<ShoppingItem> {
+    return toShoppingItem(await shoppingApi.update(familyId(), itemId, { status: 'purchased' }))
+  },
+
+  async dismissShoppingItem(itemId: string): Promise<ShoppingItem> {
+    return toShoppingItem(await shoppingApi.update(familyId(), itemId, { status: 'dismissed' }))
+  },
+
+  async deleteShoppingItem(itemId: string): Promise<void> {
+    await shoppingApi.remove(familyId(), itemId)
+  },
+
+  // ---- 库存调整与流水 ----
+
+  /** 手动调整库存数量；返回更新后的库存项与流水。 */
+  async adjustInventory(
+    itemId: string,
+    delta: number,
+    reason?: string
+  ): Promise<{ item: InventoryItem; transaction: InventoryTransaction }> {
+    const result = await inventoryApi.adjust(familyId(), itemId, { delta, reason })
+    return { item: toInventory(result.item), transaction: toInventoryTransaction(result.transaction) }
+  },
+
+  async getInventoryTransactions(params: { item_id?: string; limit?: number } = {}): Promise<
+    APIResponse<InventoryTransaction[]>
+  > {
+    return api<InventoryTransaction[]>([], async () => {
+      const list = await inventoryApi.transactions(familyId(), params)
+      return list.map(toInventoryTransaction)
+    })
+  },
+
+  // ---- 采购截图导入 ----
+
+  /** 上传单张订单截图，返回私有媒体键。 */
+  async uploadPurchaseMedia(filePath: string): Promise<string> {
+    const result = await purchaseApi.uploadMedia(familyId(), filePath)
+    return result.media_key
+  },
+
+  async createPurchaseImport(mediaKeys: string[]): Promise<PurchaseImport> {
+    return toPurchaseImport(await purchaseApi.create(familyId(), mediaKeys))
+  },
+
+  async getPurchaseImport(importId: string): Promise<PurchaseImport> {
+    return toPurchaseImport(await purchaseApi.get(familyId(), importId))
+  },
+
+  async listPurchaseImports(): Promise<APIResponse<PurchaseImport[]>> {
+    return api<PurchaseImport[]>([], async () => {
+      const list = await purchaseApi.list(familyId())
+      return list.map(toPurchaseImport)
+    })
+  },
+
+  async recognizePurchaseImport(importId: string): Promise<PurchaseRecognizeResult> {
+    const result = await purchaseApi.recognize(familyId(), importId)
+    return {
+      import: toPurchaseImport(result.import),
+      success: result.success,
+      issues: result.issues
+    }
+  },
+
+  async savePurchaseDraft(
+    importId: string,
+    draft: Parameters<typeof purchaseApi.saveDraft>[2]
+  ): Promise<PurchaseImport> {
+    return toPurchaseImport(await purchaseApi.saveDraft(familyId(), importId, draft))
+  },
+
+  async confirmPurchaseImport(
+    importId: string,
+    data: { expected_version?: number; include_expense?: boolean }
+  ): Promise<PurchaseConfirmSummary> {
+    const result = await purchaseApi.confirm(familyId(), importId, data)
+    return {
+      import: toPurchaseImport(result.import),
+      created: result.created,
+      expenseId: result.expense_id,
+      expenseAmount: result.expense_amount,
+      transactions: (result.transactions ?? []).map(toInventoryTransaction),
+      shoppingCompleted: result.shopping_completed ?? []
+    }
+  },
+
+  /** 读取导入截图并转为 data URL（<image> 无法附加鉴权头，因此走带鉴权的字节请求）。 */
+  async getPurchaseMediaDataUrl(importId: string, index: number): Promise<string> {
+    return fetchMediaDataUrl(`/families/${familyId()}/purchase-imports/${importId}/media/${index}`)
+  },
+
+  /** 删除一张原始截图（隐私：允许用户立即删除原图）。 */
+  async deletePurchaseMedia(importId: string, index: number): Promise<PurchaseImport> {
+    return toPurchaseImport(await purchaseApi.removeMedia(familyId(), importId, index))
+  },
+
+  /** 取消未确认的草稿；已确认的采购不可取消。 */
+  async cancelPurchaseImport(importId: string): Promise<PurchaseImport> {
+    return toPurchaseImport(await purchaseApi.cancel(familyId(), importId))
   },
 
   async getExpenses(): Promise<APIResponse<Expense[]>> {

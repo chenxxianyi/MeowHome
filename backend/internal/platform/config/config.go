@@ -99,6 +99,7 @@ type OCR struct {
 	Enabled bool          `mapstructure:"enabled"`
 	BaseURL string        `mapstructure:"base_url"`
 	APIKey  string        `mapstructure:"api_key"`
+	Model   string        `mapstructure:"model"`
 	Timeout time.Duration `mapstructure:"timeout"`
 }
 
@@ -220,6 +221,7 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("ocr.enabled", false)
 	v.SetDefault("ocr.timeout", "30s")
+	v.SetDefault("ocr.model", "gpt-4o-mini")
 
 	v.SetDefault("redis.db", 0)
 

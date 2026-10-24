@@ -23,6 +23,9 @@ export function toMiniProgramUrl(path: string): string {
   if (path === '/family') return '/pages/family/index'
   if (path === '/family/inventory') return '/pages/inventory/index'
   if (path === '/family/expenses') return '/pages/expenses/index'
+  if (path === '/inventory/purchase') return '/pages/purchase/index'
+  const purchaseReview = path.match(/^\/inventory\/purchase\/review\/([^/?#]+)$/)
+  if (purchaseReview) return `/pages/purchase-review/index?id=${encodeURIComponent(purchaseReview[1])}`
   if (path === '/medical/upload') return '/pages/medical-upload/index'
   if (path === '/reminders') return '/pages/reminders/index'
   const agent = path.match(/^\/agent(?:\?(.*))?$/)

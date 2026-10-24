@@ -62,6 +62,8 @@ type InventoryItem struct {
 	Base
 	FamilyID          string `gorm:"index;type:varchar(26);not null"`
 	Name              string `gorm:"type:varchar(255);not null"`
+	Brand             string `gorm:"type:varchar(120)"`
+	Specification     string `gorm:"type:varchar(120)"`
 	Category          string `gorm:"type:varchar(64)"`
 	Unit              string `gorm:"type:varchar(32)"`
 	Quantity          int    `gorm:"default:0"`
@@ -71,16 +73,28 @@ type InventoryItem struct {
 
 func (InventoryItem) TableName() string { return "inventory_items" }
 
-// InventoryTransaction 库存流水。
+// InventoryTransaction 库存流水。不可变增减记录；数量变更必须与流水同事务。
 type InventoryTransaction struct {
 	Base
-	FamilyID string `gorm:"index;type:varchar(26);not null"`
-	ItemID   string `gorm:"index;type:varchar(26);not null"`
-	Change   int    `gorm:"not null"` // 正入负出
-	Reason   string `gorm:"type:varchar(120)"`
+	FamilyID   string `gorm:"index;type:varchar(26);not null"`
+	ItemID     string `gorm:"index;type:varchar(26);not null"`
+	Change     int    `gorm:"not null"` // 正入负出
+	Reason     string `gorm:"type:varchar(120)"`
+	SourceType string `gorm:"type:varchar(32)"` // opening_balance / manual_adjustment / purchase_import
+	SourceID   string `gorm:"type:varchar(26)"` // 采购导入商品行 ID 或库存项 ID
 }
 
 func (InventoryTransaction) TableName() string { return "inventory_transactions" }
+
+// 库存流水来源与原因规范值。
+const (
+	// TxReasonOpeningBalance 期初结存（迁移时为已有库存补录）。
+	TxReasonOpeningBalance = "opening_balance"
+	// TxReasonManualAdjustment 手动调整。
+	TxReasonManualAdjustment = "manual_adjustment"
+	// TxReasonPurchaseImport 采购导入入库。
+	TxReasonPurchaseImport = "purchase_import"
+)
 
 // Expense 支出。
 type Expense struct {
@@ -91,9 +105,103 @@ type Expense struct {
 	Category   string   `gorm:"type:varchar(64)"`
 	Label      string   `gorm:"type:varchar(255)"`
 	CatIDs     []string `gorm:"serializer:json;type:text"`
+	SourceType string   `gorm:"type:varchar(32)"` // purchase_import
+	SourceID   string   `gorm:"type:varchar(26)"` // 采购导入 ID
 }
 
 func (Expense) TableName() string { return "expenses" }
+
+// 待购买项状态。
+const (
+	ShoppingStatusTodo      = "todo"
+	ShoppingStatusPurchased = "purchased"
+	ShoppingStatusDismissed = "dismissed"
+)
+
+// 待购买项优先级。
+const (
+	ShoppingPriorityLow    = "low"
+	ShoppingPriorityNormal = "normal"
+	ShoppingPriorityHigh   = "high"
+)
+
+// ShoppingListItem 待购买项。独立实体，不以 inventory_items.quantity = 0 表示。
+type ShoppingListItem struct {
+	Base
+	FamilyID               string     `gorm:"index;type:varchar(26);not null"`
+	Name                   string     `gorm:"type:varchar(255);not null"`
+	Brand                  string     `gorm:"type:varchar(120)"`
+	Specification          string     `gorm:"type:varchar(120)"`
+	Category               string     `gorm:"type:varchar(64)"`
+	Quantity               int        `gorm:"not null;default:1"`
+	Unit                   string     `gorm:"type:varchar(32)"`
+	Note                   string     `gorm:"type:text"`
+	Priority               string     `gorm:"type:varchar(20);not null;default:normal"`
+	Status                 string     `gorm:"type:varchar(20);not null;default:todo"`
+	MatchedInventoryItemID *string    `gorm:"type:varchar(26)"`
+	CompletedAt            *time.Time `gorm:"type:datetime(3)"`
+}
+
+func (ShoppingListItem) TableName() string { return "shopping_list_items" }
+
+// 采购导入状态。uploaded → processing → parsed/partial/failed；confirmed/cancelled 为终态。
+const (
+	PurchaseStatusUploaded   = "uploaded"
+	PurchaseStatusProcessing = "processing"
+	PurchaseStatusParsed     = "parsed"
+	PurchaseStatusPartial    = "partial"
+	PurchaseStatusFailed     = "failed"
+	PurchaseStatusConfirmed  = "confirmed"
+	PurchaseStatusCancelled  = "cancelled"
+)
+
+// 识别置信度。
+const (
+	ConfidenceHigh   = "high"
+	ConfidenceMedium = "medium"
+	ConfidenceLow    = "low"
+	ConfidenceNone   = "none"
+)
+
+// PurchaseImport 采购导入：一次订单截图识别及其确认状态。
+type PurchaseImport struct {
+	Base
+	FamilyID           string     `gorm:"index;type:varchar(26);not null"`
+	Platform           string     `gorm:"type:varchar(32)"`
+	OrderDate          string     `gorm:"type:varchar(10)"`
+	OrderNo            string     `gorm:"type:varchar(64)"`
+	TotalAmount        int64      `gorm:"not null;default:0"` // 实付总额（分）
+	Currency           string     `gorm:"type:varchar(8);not null;default:CNY"`
+	Status             string     `gorm:"type:varchar(20);not null;default:uploaded"`
+	MediaKeys          []string   `gorm:"serializer:json;type:text"`
+	RecognitionVersion int        `gorm:"not null;default:0"`
+	ErrorSummary       string     `gorm:"type:varchar(512)"`
+	ConfirmedAt        *time.Time `gorm:"type:datetime(3)"`
+	ExpenseID          string     `gorm:"type:varchar(26)"`
+}
+
+func (PurchaseImport) TableName() string { return "purchase_imports" }
+
+// PurchaseImportLine 采购导入商品行：可编辑草稿，确认后作为库存流水与支出明细来源。
+type PurchaseImportLine struct {
+	Base
+	FamilyID               string  `gorm:"index;type:varchar(26);not null"`
+	ImportID               string  `gorm:"index;type:varchar(26);not null"`
+	LineNo                 int     `gorm:"not null;default:0"`
+	RawTitle               string  `gorm:"type:varchar(512)"`
+	Name                   string  `gorm:"type:varchar(255);not null"`
+	Specification          string  `gorm:"type:varchar(120)"`
+	Quantity               int     `gorm:"not null;default:1"`
+	Unit                   string  `gorm:"type:varchar(32)"`
+	LineAmount             *int64  `gorm:"type:bigint"`
+	Confidence             string  `gorm:"type:varchar(10);not null;default:none"`
+	Evidence               string  `gorm:"type:varchar(512)"`
+	MatchedInventoryItemID *string `gorm:"type:varchar(26)"`
+	MatchedShoppingItemID  *string `gorm:"type:varchar(26)"`
+	IncludeInStock         bool    `gorm:"not null;default:false"`
+}
+
+func (PurchaseImportLine) TableName() string { return "purchase_import_lines" }
 
 // Media 媒体资产。
 type Media struct {

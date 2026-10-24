@@ -34,6 +34,8 @@ type Handler struct {
 	ai             *app.AIService
 	agent          *app.AgentService
 	vaccine        *app.VaccineService
+	shopping       *app.ShoppingService
+	purchase       *app.PurchaseService
 	storageDir     string
 	maxUploadBytes int64
 }
@@ -41,6 +43,17 @@ type Handler struct {
 // SetVaccineService installs the vaccine recommendation and reminder workflow.
 func (h *Handler) SetVaccineService(service *app.VaccineService) {
 	h.vaccine = service
+}
+
+// SetShoppingService installs the shopping list, inventory adjustment,
+// and inventory transaction workflows.
+func (h *Handler) SetShoppingService(service *app.ShoppingService) {
+	h.shopping = service
+}
+
+// SetPurchaseService installs the purchase import recognition workflow.
+func (h *Handler) SetPurchaseService(service *app.PurchaseService) {
+	h.purchase = service
 }
 
 // New 创建 handler 集合。

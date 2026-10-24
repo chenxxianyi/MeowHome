@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -17,6 +19,7 @@ import (
 
 	"github.com/meowhome/backend/internal/app"
 	"github.com/meowhome/backend/internal/infrastructure/ai"
+	"github.com/meowhome/backend/internal/infrastructure/ocr"
 	"github.com/meowhome/backend/internal/infrastructure/persistence/mysql"
 	"github.com/meowhome/backend/internal/infrastructure/scheduler"
 	"github.com/meowhome/backend/internal/platform/config"
@@ -64,6 +67,9 @@ func main() {
 	timelineRepo := mysql.NewTimelineRepo(db)
 	aiRepo := mysql.NewAIRepo(db)
 	reportRepo := mysql.NewAnalysisReportRepo(db)
+	shoppingRepo := mysql.NewShoppingListRepo(db)
+	inventoryTxRepo := mysql.NewInventoryTransactionRepo(db)
+	purchaseRepo := mysql.NewPurchaseImportRepo(db)
 	_ = mediaRepo
 
 	// 组装应用层
@@ -77,6 +83,11 @@ func main() {
 	reminderSvc.SetRecordRepo(recordRepo)
 	vaccineSvc := app.NewVaccineService(recordRepo, catRepo, memberRepo, familyRepo, reminderSvc)
 	assetSvc := app.NewAssetService(timelineRepo, inventoryRepo, expenseRepo, memberRepo)
+	shoppingSvc := app.NewShoppingService(shoppingRepo, inventoryRepo, inventoryTxRepo, memberRepo)
+	purchaseSvc := app.NewPurchaseService(purchaseRepo, inventoryRepo, shoppingRepo, memberRepo)
+	purchaseSvc.SetOCRProvider(ocr.NewChatCompletionsProvider(cfg.OCR))
+	purchaseSvc.SetMediaReader(newLocalMediaReader(cfg.Storage, logger))
+	purchaseSvc.SetMediaRemover(newLocalMediaRemover(cfg.Storage, logger))
 	aiSvc := app.NewAIService(recordRepo, reportRepo, aiRepo, catRepo, memberRepo)
 	agentRepo := mysql.NewAgentRepo(db)
 	agentSvc := app.NewAgentService(agentRepo, recordRepo, reminderRepo, catRepo, familyRepo, memberRepo, cfg.Agent.Enabled)
@@ -99,6 +110,8 @@ func main() {
 	// 组装 HTTP 层
 	hdl := handler.New(authSvc, familySvc, catSvc, memberSvc, recordSvc, careSvc, reminderSvc, assetSvc, aiSvc, agentSvc)
 	hdl.SetVaccineService(vaccineSvc)
+	hdl.SetShoppingService(shoppingSvc)
+	hdl.SetPurchaseService(purchaseSvc)
 	if cfg.Storage.Driver == "local" {
 		hdl.SetLocalStorage(cfg.Storage.LocalDir, cfg.Server.MaxUploadSizeMB*(1<<20))
 	}
@@ -161,6 +174,54 @@ func newLogger() *zap.Logger {
 		zapcore.Lock(os.Stdout),
 		zapcore.InfoLevel,
 	))
+}
+
+// newLocalMediaReader 读取本地私有媒体（对象键 → 字节）；非本地存储驱动时返回 nil。
+// 对象键由服务端生成（purchase-imports/...），这里仍做路径穿越防护。
+func newLocalMediaReader(storage config.Storage, logger *zap.Logger) app.MediaReader {
+	if storage.Driver != "local" || storage.LocalDir == "" {
+		return nil
+	}
+	root := filepath.Clean(storage.LocalDir)
+	return func(_ context.Context, key string) ([]byte, error) {
+		clean := path.Clean(strings.ReplaceAll(key, "\\", "/"))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || path.IsAbs(clean) {
+			return nil, fmt.Errorf("invalid media key")
+		}
+		full := filepath.Join(root, filepath.FromSlash(clean))
+		if !strings.HasPrefix(full, root+string(os.PathSeparator)) {
+			return nil, fmt.Errorf("invalid media key")
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			logger.Warn("media read failed", zap.String("key", key), zap.Error(err))
+			return nil, err
+		}
+		return data, nil
+	}
+}
+
+// newLocalMediaRemover 删除本地私有媒体；非本地存储驱动时返回 nil。
+func newLocalMediaRemover(storage config.Storage, logger *zap.Logger) app.MediaRemover {
+	if storage.Driver != "local" || storage.LocalDir == "" {
+		return nil
+	}
+	root := filepath.Clean(storage.LocalDir)
+	return func(_ context.Context, key string) error {
+		clean := path.Clean(strings.ReplaceAll(key, "\\", "/"))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || path.IsAbs(clean) {
+			return fmt.Errorf("invalid media key")
+		}
+		full := filepath.Join(root, filepath.FromSlash(clean))
+		if !strings.HasPrefix(full, root+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid media key")
+		}
+		if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+			logger.Warn("media remove failed", zap.String("key", key), zap.Error(err))
+			return err
+		}
+		return nil
+	}
 }
 
 // appHealth 结合 DB 的实际健康检查。
